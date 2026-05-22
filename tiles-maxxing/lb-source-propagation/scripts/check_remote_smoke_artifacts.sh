@@ -5,6 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   check_remote_smoke_artifacts.sh OUT_DIR [--expect-head HEAD] [--expect-branch BRANCH]
+                                  [--expect-k-sq N]
 
 Validate pulled LB source-propagation remote smoke artifacts. This checks the
 sidecar and independent verifier CTest logs, the non-claim K26 preflight,
@@ -22,6 +23,7 @@ out_dir="$1"
 shift
 expect_head=""
 expect_branch=""
+expect_k_sq=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -31,6 +33,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --expect-branch)
       expect_branch="$2"
+      shift 2
+      ;;
+    --expect-k-sq)
+      expect_k_sq="$2"
       shift 2
       ;;
     -h|--help)
@@ -212,6 +218,10 @@ fi
 if [[ -n "$expect_branch" ]]; then
   require_grep "^deployed_local_branch=${expect_branch}$" \
     "$out_dir/deployed_source.txt" "deployed source branch"
+fi
+if [[ -n "$expect_k_sq" ]]; then
+  require_grep "^k_sq=${expect_k_sq}$" "$out_dir/environment.txt" \
+    "remote smoke K_SQ"
 fi
 
 echo "REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS dir=$out_dir"

@@ -5,6 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   vast_sidecar_smoke_guard.sh [--execute] [--max-dph PRICE] [--max-budget USD]
+                              [--k-sq N]
                               [--offer-id ID] [--remote DIR] [--pull-dir DIR]
 
 Dry-run by default. Searches for a single RTX 4090 offer, enforces the price
@@ -15,6 +16,7 @@ because SSH readiness and cleanup need human-visible instance metadata.
 Hard defaults from the LB source-propagation goal:
   --max-dph     0.37
   --max-budget  1.50
+  --k-sq        26
 
 This script never destroys an instance. Cleanup remains an explicit operator
 decision after artifacts are pulled.
@@ -25,6 +27,7 @@ execute=0
 max_dph="0.37"
 max_budget="1.50"
 offer_id=""
+k_sq="26"
 remote_dir="/workspace/gaussian-moat-cuda"
 pull_dir="tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull"
 
@@ -44,6 +47,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --offer-id)
       offer_id="$2"
+      shift 2
+      ;;
+    --k-sq)
+      k_sq="$2"
       shift 2
       ;;
     --remote)
@@ -124,7 +131,7 @@ PY
 )"
 
 echo "QUALIFYING_OFFER id=${offer_id} dph=${offer_dph} budget_hours=${soft_hours}"
-echo "LOCAL_SOURCE branch=${local_branch} head=${local_head}"
+echo "LOCAL_SOURCE branch=${local_branch} head=${local_head} k_sq=${k_sq}"
 
 create_cmd=(vastai create instance "$offer_id"
   --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel
@@ -148,14 +155,14 @@ DEPLOY:
   printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" "\$LOCAL_HEAD" "\$LOCAL_BRANCH" | \$SSH_CMD "mkdir -p /workspace/lb-source-remote-smoke && cat > /workspace/lb-source-remote-smoke/deployed_source.txt"
 
 REMOTE_SMOKE:
-  \$SSH_CMD "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh --repo ${remote_dir} --out-dir /workspace/lb-source-remote-smoke"
+  \$SSH_CMD "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh --repo ${remote_dir} --k-sq ${k_sq} --out-dir /workspace/lb-source-remote-smoke"
 
 PULL:
   mkdir -p ${pull_dir}
   rsync -avz -e "ssh -o StrictHostKeyChecking=accept-new -p \$PORT" root@\$HOST:/workspace/lb-source-remote-smoke/ ${pull_dir}/
 
 ACCEPTANCE_CHECK:
-  tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh ${pull_dir} --expect-head ${local_head} --expect-branch ${local_branch}
+  tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh ${pull_dir} --expect-head ${local_head} --expect-branch ${local_branch} --expect-k-sq ${k_sq}
 EOF
 
 if [[ "$execute" -eq 0 ]]; then

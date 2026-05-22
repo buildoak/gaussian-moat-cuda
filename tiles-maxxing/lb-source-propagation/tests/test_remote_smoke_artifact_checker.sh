@@ -93,6 +93,7 @@ deployed_local_head=abc1234
 deployed_local_branch=ttc/lb-source-propagation
 SRC
 "$checker" "$tmp" --expect-head abc1234 --expect-branch ttc/lb-source-propagation \
+  --expect-k-sq 36 \
   > "$tmp/provenance-pass.log"
 grep -q "REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS" "$tmp/provenance-pass.log"
 
@@ -104,6 +105,11 @@ cat > "$bad/k26_execution_plan.json" <<'JSON'
 JSON
 if "$checker" "$bad" > "$tmp/bad.log" 2>&1; then
   echo "checker accepted a corrupted executable K26 plan" >&2
+  exit 1
+fi
+
+if "$checker" "$tmp" --expect-k-sq 26 > "$tmp/bad-ksq.log" 2>&1; then
+  echo "checker accepted a mismatched remote K_SQ" >&2
   exit 1
 fi
 

@@ -161,6 +161,7 @@ After a qualifying Vast 4090 is rented and the repo is copied to the host, run:
 cd /workspace/gaussian-moat-cuda
 tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh \
   --repo /workspace/gaussian-moat-cuda \
+  --k-sq 26 \
   --build-dir /tmp/gm-lbsp-remote-smoke \
   --out-dir /workspace/lb-source-remote-smoke
 ```
@@ -177,7 +178,7 @@ The remote smoke finishes by running:
 
 ```bash
 tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh \
-  /workspace/lb-source-remote-smoke
+  /workspace/lb-source-remote-smoke --expect-k-sq 26
 ```
 
 The checker has its own CTest self-test so stale test counts, executable K26
