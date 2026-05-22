@@ -206,7 +206,10 @@ It prints the origin-prefix command and the repaired
 output is a run contract only; it uses the canonical-octant representative
 `376039 + 943460i` for Tsuchimura's endpoint `943460 + 376039i`, does not
 execute the full sqrt(26) comparison, and must not be treated as a
-`SOURCE_DEAD_CERT`.
+`SOURCE_DEAD_CERT`. The emitted continuation command includes
+`--require-full-bridge`; if any source coordinate carry atom lacks a first-band
+TileOp-port bridge, the run must stop instead of falling back to diagnostic
+unbridged bridge semantics.
 
 `k26_source_run_contract` emits the execution contract for the Tsuchimura
 comparison target. It is intentionally a non-claim artifact:

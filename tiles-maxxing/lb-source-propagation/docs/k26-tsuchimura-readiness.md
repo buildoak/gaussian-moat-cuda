@@ -122,11 +122,13 @@ k26_source_run_commands
 It emits the row-0 coordinate prefix command and the repaired TileOp-port
 continuation schedule. The row-0 prefix command targets the canonical-octant
 representative `376039 + 943460i`; the comparison back to Tsuchimura's
-`943460 + 376039i` is by Gaussian-unit and conjugation symmetry. This command
-is not part of the local smoke gate. A Mac Mini probe of the row-0 prefix was
-still CPU-bound after eight minutes with no completed artifact, so row-0 prefix
-execution should be treated as paid-run work under the Vast budget cap unless a
-smaller diagnostic radius is being tested.
+`943460 + 376039i` is by Gaussian-unit and conjugation symmetry. The
+continuation command includes `--require-full-bridge`, so unbridged source
+coordinate carry atoms are a hard stop rather than diagnostic evidence. This
+command is not part of the local smoke gate. A Mac Mini probe of the row-0
+prefix was still CPU-bound after eight minutes with no completed artifact, so
+row-0 prefix execution should be treated as paid-run work under the Vast budget
+cap unless a smaller diagnostic radius is being tested.
 
 ## Stop Conditions
 

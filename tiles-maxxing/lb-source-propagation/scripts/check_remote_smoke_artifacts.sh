@@ -63,7 +63,7 @@ require_grep() {
   local pattern="$1"
   local path="$2"
   local label="$3"
-  if ! grep -Eq "$pattern" "$path"; then
+  if ! grep -Eq -- "$pattern" "$path"; then
     echo "artifact check failed: $label ($path)" >&2
     exit 1
   fi
@@ -258,12 +258,22 @@ require_grep '"claim_label":"SOURCE_ORIGIN_K26"' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands claim label"
 require_grep '"executable_now":false' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands non-executable"
+require_grep '"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1"' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands BZ digest algorithm"
+require_grep '"seam_bridge_policy":"require_full_bridge"' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands strict seam bridge"
+require_grep '"blocked_if_unbridged_coordinate_carry_atoms":true' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands unbridged block"
+require_grep '--require-full-bridge' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands strict bridge flag"
 
 bz_digest="$(require_json_string_value "$out_dir/k26_bz_schedule_check.json" schedule_digest_hex)"
 plan_digest="$(require_json_string_value "$out_dir/k26_execution_plan.json" schedule_digest_hex)"
 profile_digest="$(require_json_string_value "$out_dir/k26_source_run_profile.json" schedule_digest_hex)"
+commands_digest="$(require_json_string_value "$out_dir/k26_source_run_commands.json" schedule_digest_hex)"
 require_equal "$bz_digest" "$plan_digest" "K26 BZ digest plan binding"
 require_equal "$bz_digest" "$profile_digest" "K26 BZ digest profile binding"
+require_equal "$bz_digest" "$commands_digest" "K26 BZ digest command binding"
 require_grep '"required_k_sq":26' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands required build"
 require_grep '"tsuchimura_endpoint":.*"a":943460.*"b":376039' \

@@ -188,7 +188,7 @@ add_test(NAME k26_source_run_commands
   COMMAND k26_source_run_commands)
 set_tests_properties(k26_source_run_commands PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_run_commands_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"required_k_sq\":26.*endpoint-a 376039 --endpoint-b 943460.*\"schedule_boundary_count\":124.*\"schedule_segment_count\":123"
+    "\"schema\":\"lb_source_k26_run_commands_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"required_k_sq\":26.*endpoint-a 376039 --endpoint-b 943460.*\"schedule_boundary_count\":124.*\"schedule_segment_count\":123.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"seam_bridge_policy\":\"require_full_bridge\".*--require-full-bridge"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME remote_smoke_artifact_checker

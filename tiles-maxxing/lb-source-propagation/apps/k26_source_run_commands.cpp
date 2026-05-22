@@ -1,4 +1,5 @@
 #include "lb_source/source_propagation.h"
+#include "lb_source/k26_bz_schedule.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -39,14 +40,7 @@ std::uint64_t endpoint_norm() {
 }
 
 std::uint64_t repaired_boundary(std::uint64_t nominal) {
-  switch (nominal) {
-    case 122880:
-    case 475136:
-    case 622592:
-      return nominal - 1;
-    default:
-      return nominal;
-  }
+  return lb_source::k26_bz::repaired_boundary(nominal);
 }
 
 std::vector<std::uint64_t> continuation_schedule_radii() {
@@ -143,6 +137,12 @@ int main() {
     std::cerr << "unexpected K26 continuation schedule width range\n";
     return EXIT_FAILURE;
   }
+  const std::vector<std::uint64_t> nominal =
+      lb_source::k26_bz::nominal_boundaries();
+  const std::vector<std::uint64_t> repaired =
+      lb_source::k26_bz::canonical_repaired_boundaries();
+  const std::string bz_schedule_digest =
+      lb_source::k26_bz::repaired_schedule_digest_hex(nominal, repaired);
 
   const std::string schedule_csv = csv(radii);
   const std::string prefix_command =
@@ -154,7 +154,8 @@ int main() {
       "source_tileop_port_runner --r-start 8192 --r-final 1015645 "
       "--band-width 8192 --schedule-radii " +
       schedule_csv +
-      " --max-atoms 50000000 --manifest-in k26-prefix-manifest.txt "
+      " --max-atoms 50000000 --require-full-bridge "
+      "--manifest-in k26-prefix-manifest.txt "
       "--prefix-witness-in k26-prefix-witness.txt";
 
   std::cout << "{"
@@ -184,6 +185,11 @@ int main() {
             << ",\"schedule_segment_count\":" << (radii.size() - 1)
             << ",\"schedule_min_width\":" << stats.min_width
             << ",\"schedule_max_width\":" << stats.max_width
+            << ",\"schedule_digest_algorithm\":\""
+            << lb_source::k26_bz::schedule_digest_algorithm
+            << "\",\"schedule_digest_hex\":\"" << bz_schedule_digest << "\""
+            << ",\"seam_bridge_policy\":\"require_full_bridge\""
+            << ",\"blocked_if_unbridged_coordinate_carry_atoms\":true"
             << ",\"schedule_radii_csv\":";
   emit_json_string(schedule_csv);
   std::cout << ",\"manifest_in\":\"k26-prefix-manifest.txt\","
