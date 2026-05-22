@@ -89,6 +89,13 @@ JSON
 
 good="$tmp/good"
 write_bundle "$good"
+if "$checker" "$good" --source-dead-checker "$fake_source_dead_checker" \
+    > "$tmp/missing-gap-checker.log" 2>&1; then
+  echo "checker accepted bundle without source-dead gap checker" >&2
+  exit 1
+fi
+grep -q 'missing required --source-dead-gap-checker' \
+  "$tmp/missing-gap-checker.log"
 "$checker" "$good" \
   --source-dead-checker "$fake_source_dead_checker" \
   --source-dead-gap-checker "$fake_source_dead_gap_checker" \

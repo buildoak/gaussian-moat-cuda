@@ -144,6 +144,20 @@ fi
 SH
 chmod +x "$fake_source_dead_checker"
 
+missing_gap_checker_out="$tmp/missing-gap-checker"
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$missing_gap_checker_out" \
+    --cert-in "$cert" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    >/tmp/k26-harness-missing-gap-checker.out \
+    2>/tmp/k26-harness-missing-gap-checker.err; then
+  echo "harness accepted a cert-supplied run without source-dead gap checker" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_GAP_CHECKER_MISSING' \
+  "$missing_gap_checker_out/status.txt"
+
 checked_out="$tmp/checked"
 "$harness" \
   --build-dir "$build_dir" \

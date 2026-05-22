@@ -311,11 +311,17 @@ if [[ -z "$source_dead_checker" ]]; then
   echo "k26-source-dead-cert.json exists, but --source-dead-checker was not supplied" >&2
   exit 2
 fi
-
-bundle_checker_args=("$out_dir" --source-dead-checker "$source_dead_checker")
-if [[ -n "$source_dead_gap_checker" ]]; then
-  bundle_checker_args+=(--source-dead-gap-checker "$source_dead_gap_checker")
+if [[ -z "$source_dead_gap_checker" ]]; then
+  write_status "K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_GAP_CHECKER_MISSING"
+  echo "k26-source-dead-cert.json exists, but --source-dead-gap-checker was not supplied" >&2
+  exit 2
 fi
+
+bundle_checker_args=(
+  "$out_dir"
+  --source-dead-checker "$source_dead_checker"
+  --source-dead-gap-checker "$source_dead_gap_checker"
+)
 "$bundle_checker" "${bundle_checker_args[@]}" \
   | tee "$out_dir/k26-full-run-bundle-check.log"
 write_status "K26_FULL_RUN_BUNDLE_CHECKED"

@@ -5,7 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   check_k26_full_run_bundle.sh OUT_DIR --source-dead-checker PATH
-                                 [--source-dead-gap-checker PATH]
+                                 --source-dead-gap-checker PATH
 
 Validate a completed K26 source/origin bundle. This is stricter than the remote
 smoke artifact checker: it expects the paid/full-run prefix result, strict
@@ -62,11 +62,15 @@ if [[ -z "$source_dead_checker" ]]; then
   echo "missing required --source-dead-checker" >&2
   exit 2
 fi
+if [[ -z "$source_dead_gap_checker" ]]; then
+  echo "missing required --source-dead-gap-checker" >&2
+  exit 2
+fi
 if [[ ! -x "$source_dead_checker" ]]; then
   echo "source-dead checker is not executable: $source_dead_checker" >&2
   exit 2
 fi
-if [[ -n "$source_dead_gap_checker" && ! -x "$source_dead_gap_checker" ]]; then
+if [[ ! -x "$source_dead_gap_checker" ]]; then
   echo "source-dead gap checker is not executable: $source_dead_gap_checker" >&2
   exit 2
 fi
@@ -361,14 +365,12 @@ require_equal "$continuation_max_norm" "$gap_max_norm" \
 require_equal "$continuation_max_ties" "$gap_max_ties" \
   "K26 gap max-norm tie binding"
 
-if [[ -n "$source_dead_gap_checker" ]]; then
-  gap_checker_output="$("$source_dead_gap_checker" "$gap")"
-  if ! grep -q '"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS"' \
-      <<<"$gap_checker_output"; then
-    echo "K26_FULL_RUN_BUNDLE_REJECT: source-dead gap checker did not accept gap artifact" >&2
-    echo "$gap_checker_output" >&2
-    exit 1
-  fi
+gap_checker_output="$("$source_dead_gap_checker" "$gap")"
+if ! grep -q '"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS"' \
+    <<<"$gap_checker_output"; then
+  echo "K26_FULL_RUN_BUNDLE_REJECT: source-dead gap checker did not accept gap artifact" >&2
+  echo "$gap_checker_output" >&2
+  exit 1
 fi
 
 require_grep '"schema":"lb_source_dead_cert_draft_v1"' "$cert" \
