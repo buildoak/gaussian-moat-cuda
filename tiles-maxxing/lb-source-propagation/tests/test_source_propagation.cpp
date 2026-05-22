@@ -360,6 +360,208 @@ void test_associativity_across_band_grouping() {
   expect_same_separator(grouped_right, one_big);
 }
 
+void test_source_seed_provider_marks_certified_atoms() {
+  BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{1, 25, false}, {2, 100, false}, {3, 400, false}},
+      .edges = {{1, 2}, {2, 3}},
+  };
+
+  const lb_source::SourceSeedApplyResult applied =
+      lb_source::apply_source_seeds(
+          band, {{"ORIGIN_SOURCE", "omega-axis-prime", 1}});
+  CHECK_TRUE(applied.accepted());
+  CHECK_EQ(applied.applied, static_cast<std::size_t>(1));
+  CHECK_TRUE(band.atoms[0].certified_source);
+
+  const ProcessResult result = lb_source::process_band(band, std::nullopt);
+  CHECK_TRUE(result.accepted());
+  CHECK_TRUE(component_has_source_bit(result.outgoing, {3}, true));
+}
+
+void test_source_seed_provider_rejects_uncertified_modes() {
+  BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{1, 25, false}},
+      .edges = {},
+  };
+
+  const lb_source::SourceSeedApplyResult bad_mode =
+      lb_source::apply_source_seeds(band, {{"GEO_I", "not-a-source", 1}});
+  CHECK_TRUE(!bad_mode.accepted());
+  CHECK_EQ(bad_mode.diagnostic,
+           std::string("invalid source seed mode: GEO_I"));
+
+  const lb_source::SourceSeedApplyResult missing =
+      lb_source::apply_source_seeds(
+          band, {{"CERTIFIED_SEED", "prior-cert", 99}});
+  CHECK_TRUE(!missing.accepted());
+  CHECK_EQ(missing.diagnostic,
+           std::string("source seed references missing atom"));
+}
+
+void test_carry_manifest_round_trip_is_canonical() {
+  lb_source::CarryManifest manifest;
+  manifest.k_sq = 36;
+  manifest.outer_radius = 20;
+  manifest.carry_width = 6;
+  manifest.separator.carry_atoms = {{4, 400}, {2, 100}, {3, 169}};
+  manifest.separator.component_partition = {{3, 2}, {4}};
+  manifest.separator.source_bit_per_component = {true, false};
+  manifest.separator.component_inventory = {{3, 1, 2}, {9, 4}};
+
+  const std::string encoded = lb_source::carry_manifest_to_string(manifest);
+  CHECK_EQ(encoded,
+           std::string(
+               "LB_SOURCE_CARRY_MANIFEST_V1\n"
+               "k_sq 36\n"
+               "outer_radius 20\n"
+               "carry_width 6\n"
+               "carry_atoms 3\n"
+               "carry_atom 2 100\n"
+               "carry_atom 3 169\n"
+               "carry_atom 4 400\n"
+               "components 2\n"
+               "component 1 2 2 3 3 1 2 3\n"
+               "component 0 1 4 2 4 9\n"
+               "END\n"));
+
+  const lb_source::CarryManifestReadResult decoded =
+      lb_source::carry_manifest_from_string(encoded);
+  CHECK_TRUE(decoded.accepted());
+
+  lb_source::CarryManifest expected = manifest;
+  expected.separator = lb_source::canonicalize_separator(expected.separator);
+  CHECK_EQ(decoded.manifest, expected);
+  CHECK_EQ(lb_source::carry_manifest_to_string(decoded.manifest), encoded);
+}
+
+void test_carry_manifest_rejects_malformed_partition() {
+  const std::string encoded =
+      "LB_SOURCE_CARRY_MANIFEST_V1\n"
+      "k_sq 36\n"
+      "outer_radius 20\n"
+      "carry_width 6\n"
+      "carry_atoms 1\n"
+      "carry_atom 1 25\n"
+      "components 1\n"
+      "component 1 1 2 1 2\n"
+      "END\n";
+
+  const lb_source::CarryManifestReadResult decoded =
+      lb_source::carry_manifest_from_string(encoded);
+  CHECK_TRUE(!decoded.accepted());
+  CHECK_EQ(decoded.diagnostic,
+           std::string("component references non-carry atom"));
+}
+
+void test_make_carry_manifest_from_process_result() {
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{1, 25, true}, {2, 100, false}, {3, 169, false}},
+      .edges = {{1, 2}, {2, 3}},
+  };
+
+  const ProcessResult result = lb_source::process_band(band, std::nullopt);
+  CHECK_TRUE(result.accepted());
+  const lb_source::CarryManifest manifest =
+      lb_source::make_carry_manifest(band.k_sq, band.outer_radius, result);
+  CHECK_EQ(manifest.k_sq, static_cast<std::uint64_t>(36));
+  CHECK_EQ(manifest.outer_radius, static_cast<std::uint64_t>(20));
+  CHECK_EQ(manifest.carry_width, static_cast<std::uint64_t>(6));
+  CHECK_EQ(manifest.separator, result.outgoing);
+}
+
+void test_draft_profile_and_certificate_json_output() {
+  lb_source::CarryManifest manifest;
+  manifest.k_sq = 36;
+  manifest.outer_radius = 20;
+  manifest.carry_width = 6;
+  manifest.separator.carry_atoms = {{2, 100}};
+  manifest.separator.component_partition = {{2}};
+  manifest.separator.source_bit_per_component = {true};
+  manifest.separator.component_inventory = {{1, 2}};
+
+  const lb_source::SourceDraftMetadata metadata{
+      .source_mode = "ORIGIN_SOURCE",
+      .source_id = "omega\"seed",
+      .geometry_id = "full-octant",
+      .commit_id = "abc123",
+      .build_id = "debug",
+      .bz_status = "BZ_CLEAN",
+      .artifact_hash = "sha256:test",
+  };
+  const lb_source::SourceProfileDraft profile{
+      .profile_id = "profile-1",
+      .metadata = metadata,
+      .carry_manifest = manifest,
+      .reject = RejectReason::kNone,
+      .diagnostic = "",
+      .terminal_source_dead = true,
+      .terminal_source_inventory = {1, 2},
+  };
+  const std::string profile_json =
+      lb_source::source_profile_draft_json(profile);
+  CHECK_EQ(profile_json,
+           std::string(
+               "{\"schema\":\"lb_source_profile_draft_v1\","
+               "\"profile_id\":\"profile-1\","
+               "\"metadata\":{\"source_mode\":\"ORIGIN_SOURCE\","
+               "\"source_id\":\"omega\\\"seed\","
+               "\"geometry_id\":\"full-octant\","
+               "\"commit_id\":\"abc123\","
+               "\"build_id\":\"debug\","
+               "\"bz_status\":\"BZ_CLEAN\","
+               "\"artifact_hash\":\"sha256:test\"},"
+               "\"k_sq\":36,"
+               "\"outer_radius\":20,"
+               "\"carry_width\":6,"
+               "\"reject\":\"none\","
+               "\"diagnostic\":\"\","
+               "\"terminal_source_dead\":true,"
+               "\"terminal_source_inventory\":[1,2],"
+               "\"carry_manifest\":{\"schema\":\"lb_source_carry_manifest_v1\","
+               "\"k_sq\":36,"
+               "\"outer_radius\":20,"
+               "\"carry_width\":6,"
+               "\"separator\":{\"carry_atoms\":[{\"id\":2,"
+               "\"norm_sq\":100}],"
+               "\"components\":[{\"source\":true,"
+               "\"carry_atoms\":[2],"
+               "\"inventory\":[1,2]}]}}}"));
+
+  const lb_source::SourceCertificateDraft certificate{
+      .certificate_id = "cert-1",
+      .profile_id = "profile-1",
+      .metadata = metadata,
+      .k_sq = 36,
+      .terminal_radius = 20,
+      .negative_guard_pass = true,
+      .terminal_source_inventory = {1, 2},
+  };
+  const std::string cert_json =
+      lb_source::source_certificate_draft_json(certificate);
+  CHECK_EQ(cert_json,
+           std::string(
+               "{\"schema\":\"lb_source_dead_cert_draft_v1\","
+               "\"certificate_id\":\"cert-1\","
+               "\"profile_id\":\"profile-1\","
+               "\"metadata\":{\"source_mode\":\"ORIGIN_SOURCE\","
+               "\"source_id\":\"omega\\\"seed\","
+               "\"geometry_id\":\"full-octant\","
+               "\"commit_id\":\"abc123\","
+               "\"build_id\":\"debug\","
+               "\"bz_status\":\"BZ_CLEAN\","
+               "\"artifact_hash\":\"sha256:test\"},"
+               "\"k_sq\":36,"
+               "\"terminal_radius\":20,"
+               "\"negative_guard_pass\":true,"
+               "\"terminal_source_inventory\":[1,2]}"));
+}
+
 void run(const std::string& name, void (*test)()) {
   const int before = g_failures;
   test();
@@ -392,6 +594,18 @@ int main() {
       test_k32_ceil_sqrt_carry_width_is_six);
   run("associativity_across_band_grouping",
       test_associativity_across_band_grouping);
+  run("source_seed_provider_marks_certified_atoms",
+      test_source_seed_provider_marks_certified_atoms);
+  run("source_seed_provider_rejects_uncertified_modes",
+      test_source_seed_provider_rejects_uncertified_modes);
+  run("carry_manifest_round_trip_is_canonical",
+      test_carry_manifest_round_trip_is_canonical);
+  run("carry_manifest_rejects_malformed_partition",
+      test_carry_manifest_rejects_malformed_partition);
+  run("make_carry_manifest_from_process_result",
+      test_make_carry_manifest_from_process_result);
+  run("draft_profile_and_certificate_json_output",
+      test_draft_profile_and_certificate_json_output);
 
   if (g_failures != 0) {
     std::cerr << g_failures << " test failure(s)\n";

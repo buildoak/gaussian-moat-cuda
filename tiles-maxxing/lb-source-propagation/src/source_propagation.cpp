@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <cassert>
+#include <charconv>
+#include <iomanip>
+#include <istream>
 #include <limits>
 #include <map>
+#include <ostream>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -83,6 +87,199 @@ bool square_ge(std::uint64_t x, std::uint64_t n) {
   const std::uint64_t q = n / x;
   const std::uint64_t r = n % x;
   return x > q || (x == q && r == 0);
+}
+
+bool valid_source_mode(std::string_view mode) {
+  return mode == "ORIGIN_SOURCE" || mode == "WIRED_SOURCE" ||
+         mode == "CERTIFIED_SEED";
+}
+
+bool parse_uint64_token(const std::string& token, std::uint64_t& value) {
+  if (token.empty() || token[0] == '-') {
+    return false;
+  }
+  const char* begin = token.data();
+  const char* end = token.data() + token.size();
+  const auto [ptr, ec] = std::from_chars(begin, end, value);
+  return ec == std::errc() && ptr == end;
+}
+
+bool parse_int64_token(const std::string& token, std::int64_t& value) {
+  if (token.empty()) {
+    return false;
+  }
+  const char* begin = token.data();
+  const char* end = token.data() + token.size();
+  const auto [ptr, ec] = std::from_chars(begin, end, value);
+  return ec == std::errc() && ptr == end;
+}
+
+bool parse_size_token(const std::string& token, std::size_t& value) {
+  std::uint64_t parsed = 0;
+  if (!parse_uint64_token(token, parsed) ||
+      parsed > std::numeric_limits<std::size_t>::max()) {
+    return false;
+  }
+  value = static_cast<std::size_t>(parsed);
+  return true;
+}
+
+std::string validate_separator_manifest(const SeparatorState& state) {
+  if (state.component_partition.size() !=
+      state.source_bit_per_component.size()) {
+    return "source-bit count does not match component count";
+  }
+  if (state.component_inventory.size() != state.component_partition.size()) {
+    return "inventory count does not match component count";
+  }
+
+  std::set<AtomId> carry_atoms;
+  for (const CarryAtom& atom : state.carry_atoms) {
+    if (!carry_atoms.insert(atom.id).second) {
+      return "duplicate carry atom";
+    }
+  }
+
+  std::set<AtomId> partition_atoms;
+  std::set<AtomId> inventory_atoms;
+  for (std::size_t c = 0; c < state.component_partition.size(); ++c) {
+    const auto& component = state.component_partition[c];
+    const auto& inventory = state.component_inventory[c];
+    if (component.empty()) {
+      return "empty component";
+    }
+    if (inventory.empty()) {
+      return "empty inventory";
+    }
+    std::set<AtomId> local_inventory;
+    for (const AtomId id : component) {
+      if (carry_atoms.find(id) == carry_atoms.end()) {
+        return "component references non-carry atom";
+      }
+      if (!partition_atoms.insert(id).second) {
+        return "carry atom appears in multiple components";
+      }
+      if (std::find(inventory.begin(), inventory.end(), id) ==
+          inventory.end()) {
+        return "inventory omits carry atom";
+      }
+    }
+    for (const AtomId id : inventory) {
+      if (!local_inventory.insert(id).second) {
+        return "duplicate inventory atom";
+      }
+      if (!inventory_atoms.insert(id).second) {
+        return "inventory atom appears in multiple components";
+      }
+    }
+  }
+  if (partition_atoms != carry_atoms) {
+    return "component partition does not cover all carry atoms";
+  }
+  return "";
+}
+
+void append_json_string(std::ostringstream& out, std::string_view value) {
+  out << '"';
+  for (const unsigned char ch : value) {
+    switch (ch) {
+      case '"':
+        out << "\\\"";
+        break;
+      case '\\':
+        out << "\\\\";
+        break;
+      case '\b':
+        out << "\\b";
+        break;
+      case '\f':
+        out << "\\f";
+        break;
+      case '\n':
+        out << "\\n";
+        break;
+      case '\r':
+        out << "\\r";
+        break;
+      case '\t':
+        out << "\\t";
+        break;
+      default:
+        if (ch < 0x20) {
+          out << "\\u" << std::hex << std::setw(4) << std::setfill('0')
+              << static_cast<int>(ch) << std::dec << std::setfill(' ');
+        } else {
+          out << static_cast<char>(ch);
+        }
+        break;
+    }
+  }
+  out << '"';
+}
+
+void append_atom_id_array(std::ostringstream& out,
+                          const std::vector<AtomId>& ids) {
+  out << '[';
+  for (std::size_t i = 0; i < ids.size(); ++i) {
+    if (i != 0) {
+      out << ',';
+    }
+    out << ids[i];
+  }
+  out << ']';
+}
+
+void append_metadata_json(std::ostringstream& out,
+                          const SourceDraftMetadata& metadata) {
+  out << "{\"source_mode\":";
+  append_json_string(out, metadata.source_mode);
+  out << ",\"source_id\":";
+  append_json_string(out, metadata.source_id);
+  out << ",\"geometry_id\":";
+  append_json_string(out, metadata.geometry_id);
+  out << ",\"commit_id\":";
+  append_json_string(out, metadata.commit_id);
+  out << ",\"build_id\":";
+  append_json_string(out, metadata.build_id);
+  out << ",\"bz_status\":";
+  append_json_string(out, metadata.bz_status);
+  out << ",\"artifact_hash\":";
+  append_json_string(out, metadata.artifact_hash);
+  out << '}';
+}
+
+void append_manifest_json(std::ostringstream& out,
+                          const CarryManifest& manifest) {
+  CarryManifest canonical = manifest;
+  canonical.separator = canonicalize_separator(canonical.separator);
+
+  out << "{\"schema\":\"lb_source_carry_manifest_v1\",\"k_sq\":"
+      << canonical.k_sq << ",\"outer_radius\":" << canonical.outer_radius
+      << ",\"carry_width\":" << canonical.carry_width
+      << ",\"separator\":{\"carry_atoms\":[";
+  for (std::size_t i = 0; i < canonical.separator.carry_atoms.size(); ++i) {
+    if (i != 0) {
+      out << ',';
+    }
+    const CarryAtom& atom = canonical.separator.carry_atoms[i];
+    out << "{\"id\":" << atom.id << ",\"norm_sq\":" << atom.norm_sq << '}';
+  }
+  out << "],\"components\":[";
+  for (std::size_t c = 0; c < canonical.separator.component_partition.size();
+       ++c) {
+    if (c != 0) {
+      out << ',';
+    }
+    out << "{\"source\":"
+        << (canonical.separator.source_bit_per_component[c] ? "true"
+                                                            : "false")
+        << ",\"carry_atoms\":";
+    append_atom_id_array(out, canonical.separator.component_partition[c]);
+    out << ",\"inventory\":";
+    append_atom_id_array(out, canonical.separator.component_inventory[c]);
+    out << '}';
+  }
+  out << "]}}";
 }
 
 }  // namespace
@@ -167,6 +364,270 @@ SeparatorState canonicalize_separator(const SeparatorState& state) {
     out.component_inventory.push_back(std::move(inventories[index]));
   }
   return out;
+}
+
+SourceSeedApplyResult apply_source_seeds(BandInput& band,
+                                         const std::vector<SourceSeed>& seeds) {
+  SourceSeedApplyResult result;
+  if (seeds.empty()) {
+    result.diagnostic = "source seed set must not be empty";
+    return result;
+  }
+
+  std::unordered_map<AtomId, std::size_t> atom_index;
+  atom_index.reserve(band.atoms.size());
+  for (std::size_t i = 0; i < band.atoms.size(); ++i) {
+    if (!atom_index.emplace(band.atoms[i].id, i).second) {
+      result.diagnostic = "duplicate band atom id";
+      return result;
+    }
+  }
+
+  std::set<AtomId> applied_atoms;
+  for (const SourceSeed& seed : seeds) {
+    if (!valid_source_mode(seed.source_mode)) {
+      result.diagnostic = "invalid source seed mode: " + seed.source_mode;
+      return result;
+    }
+    if (seed.source_id.empty()) {
+      result.diagnostic = "source seed id must not be empty";
+      return result;
+    }
+    const auto it = atom_index.find(seed.atom_id);
+    if (it == atom_index.end()) {
+      result.diagnostic = "source seed references missing atom";
+      return result;
+    }
+    band.atoms[it->second].certified_source = true;
+    applied_atoms.insert(seed.atom_id);
+  }
+  result.applied = applied_atoms.size();
+  return result;
+}
+
+CarryManifest make_carry_manifest(std::uint64_t k_sq,
+                                  std::uint64_t outer_radius,
+                                  const ProcessResult& result) {
+  CarryManifest manifest;
+  manifest.k_sq = k_sq;
+  manifest.outer_radius = outer_radius;
+  manifest.carry_width = result.carry_width;
+  manifest.separator = canonicalize_separator(result.outgoing);
+  return manifest;
+}
+
+std::ostream& write_carry_manifest(std::ostream& out,
+                                   const CarryManifest& manifest) {
+  CarryManifest canonical = manifest;
+  canonical.separator = canonicalize_separator(canonical.separator);
+
+  out << "LB_SOURCE_CARRY_MANIFEST_V1\n";
+  out << "k_sq " << canonical.k_sq << "\n";
+  out << "outer_radius " << canonical.outer_radius << "\n";
+  out << "carry_width " << canonical.carry_width << "\n";
+  out << "carry_atoms " << canonical.separator.carry_atoms.size() << "\n";
+  for (const CarryAtom& atom : canonical.separator.carry_atoms) {
+    out << "carry_atom " << atom.id << ' ' << atom.norm_sq << "\n";
+  }
+  out << "components " << canonical.separator.component_partition.size()
+      << "\n";
+  for (std::size_t c = 0; c < canonical.separator.component_partition.size();
+       ++c) {
+    out << "component "
+        << (canonical.separator.source_bit_per_component[c] ? 1 : 0) << ' '
+        << canonical.separator.component_partition[c].size();
+    for (const AtomId id : canonical.separator.component_partition[c]) {
+      out << ' ' << id;
+    }
+    out << ' ' << canonical.separator.component_inventory[c].size();
+    for (const AtomId id : canonical.separator.component_inventory[c]) {
+      out << ' ' << id;
+    }
+    out << "\n";
+  }
+  out << "END\n";
+  return out;
+}
+
+CarryManifestReadResult read_carry_manifest(std::istream& in) {
+  CarryManifestReadResult result;
+  std::vector<std::string> tokens;
+  std::string token;
+  while (in >> token) {
+    tokens.push_back(token);
+  }
+
+  std::size_t cursor = 0;
+  const auto fail = [&](std::string diagnostic) {
+    result = {};
+    result.diagnostic = std::move(diagnostic);
+    return result;
+  };
+  const auto next = [&]() -> const std::string* {
+    if (cursor >= tokens.size()) {
+      return nullptr;
+    }
+    return &tokens[cursor++];
+  };
+  const auto expect = [&](std::string_view expected) -> bool {
+    const std::string* actual = next();
+    return actual != nullptr && *actual == expected;
+  };
+  const auto read_uint64 = [&](std::uint64_t& value) -> bool {
+    const std::string* actual = next();
+    return actual != nullptr && parse_uint64_token(*actual, value);
+  };
+  const auto read_int64 = [&](std::int64_t& value) -> bool {
+    const std::string* actual = next();
+    return actual != nullptr && parse_int64_token(*actual, value);
+  };
+  const auto read_size = [&](std::size_t& value) -> bool {
+    const std::string* actual = next();
+    return actual != nullptr && parse_size_token(*actual, value);
+  };
+
+  if (!expect("LB_SOURCE_CARRY_MANIFEST_V1")) {
+    return fail("missing carry manifest header");
+  }
+  if (!expect("k_sq") || !read_uint64(result.manifest.k_sq)) {
+    return fail("missing or invalid k_sq");
+  }
+  if (!expect("outer_radius") ||
+      !read_uint64(result.manifest.outer_radius)) {
+    return fail("missing or invalid outer_radius");
+  }
+  if (!expect("carry_width") || !read_uint64(result.manifest.carry_width)) {
+    return fail("missing or invalid carry_width");
+  }
+
+  std::size_t carry_count = 0;
+  if (!expect("carry_atoms") || !read_size(carry_count)) {
+    return fail("missing or invalid carry atom count");
+  }
+  result.manifest.separator.carry_atoms.reserve(carry_count);
+  for (std::size_t i = 0; i < carry_count; ++i) {
+    CarryAtom atom;
+    if (!expect("carry_atom") || !read_int64(atom.id) ||
+        !read_uint64(atom.norm_sq)) {
+      return fail("missing or invalid carry atom");
+    }
+    result.manifest.separator.carry_atoms.push_back(atom);
+  }
+
+  std::size_t component_count = 0;
+  if (!expect("components") || !read_size(component_count)) {
+    return fail("missing or invalid component count");
+  }
+  result.manifest.separator.component_partition.reserve(component_count);
+  result.manifest.separator.source_bit_per_component.reserve(component_count);
+  result.manifest.separator.component_inventory.reserve(component_count);
+  for (std::size_t c = 0; c < component_count; ++c) {
+    std::uint64_t source_bit = 0;
+    std::size_t partition_count = 0;
+    if (!expect("component") || !read_uint64(source_bit) ||
+        source_bit > 1 || !read_size(partition_count)) {
+      return fail("missing or invalid component header");
+    }
+    std::vector<AtomId> partition;
+    partition.reserve(partition_count);
+    for (std::size_t i = 0; i < partition_count; ++i) {
+      AtomId id = 0;
+      if (!read_int64(id)) {
+        return fail("missing or invalid component atom");
+      }
+      partition.push_back(id);
+    }
+
+    std::size_t inventory_count = 0;
+    if (!read_size(inventory_count)) {
+      return fail("missing or invalid inventory count");
+    }
+    std::vector<AtomId> inventory;
+    inventory.reserve(inventory_count);
+    for (std::size_t i = 0; i < inventory_count; ++i) {
+      AtomId id = 0;
+      if (!read_int64(id)) {
+        return fail("missing or invalid inventory atom");
+      }
+      inventory.push_back(id);
+    }
+
+    result.manifest.separator.source_bit_per_component.push_back(source_bit !=
+                                                                 0);
+    result.manifest.separator.component_partition.push_back(
+        std::move(partition));
+    result.manifest.separator.component_inventory.push_back(
+        std::move(inventory));
+  }
+
+  if (!expect("END")) {
+    return fail("missing manifest END marker");
+  }
+  if (cursor != tokens.size()) {
+    return fail("unexpected trailing manifest tokens");
+  }
+
+  const std::string validation =
+      validate_separator_manifest(result.manifest.separator);
+  if (!validation.empty()) {
+    return fail(validation);
+  }
+  result.manifest.separator =
+      canonicalize_separator(result.manifest.separator);
+  return result;
+}
+
+std::string carry_manifest_to_string(const CarryManifest& manifest) {
+  std::ostringstream out;
+  write_carry_manifest(out, manifest);
+  return out.str();
+}
+
+CarryManifestReadResult carry_manifest_from_string(std::string_view text) {
+  std::istringstream in{std::string(text)};
+  return read_carry_manifest(in);
+}
+
+std::string source_profile_draft_json(const SourceProfileDraft& profile) {
+  std::ostringstream out;
+  out << "{\"schema\":\"lb_source_profile_draft_v1\",\"profile_id\":";
+  append_json_string(out, profile.profile_id);
+  out << ",\"metadata\":";
+  append_metadata_json(out, profile.metadata);
+  out << ",\"k_sq\":" << profile.carry_manifest.k_sq
+      << ",\"outer_radius\":" << profile.carry_manifest.outer_radius
+      << ",\"carry_width\":" << profile.carry_manifest.carry_width
+      << ",\"reject\":";
+  append_json_string(out, reject_reason_name(profile.reject));
+  out << ",\"diagnostic\":";
+  append_json_string(out, profile.diagnostic);
+  out << ",\"terminal_source_dead\":"
+      << (profile.terminal_source_dead ? "true" : "false")
+      << ",\"terminal_source_inventory\":";
+  append_atom_id_array(out, profile.terminal_source_inventory);
+  out << ",\"carry_manifest\":";
+  append_manifest_json(out, profile.carry_manifest);
+  out << '}';
+  return out.str();
+}
+
+std::string source_certificate_draft_json(
+    const SourceCertificateDraft& certificate) {
+  std::ostringstream out;
+  out << "{\"schema\":\"lb_source_dead_cert_draft_v1\",\"certificate_id\":";
+  append_json_string(out, certificate.certificate_id);
+  out << ",\"profile_id\":";
+  append_json_string(out, certificate.profile_id);
+  out << ",\"metadata\":";
+  append_metadata_json(out, certificate.metadata);
+  out << ",\"k_sq\":" << certificate.k_sq
+      << ",\"terminal_radius\":" << certificate.terminal_radius
+      << ",\"negative_guard_pass\":"
+      << (certificate.negative_guard_pass ? "true" : "false")
+      << ",\"terminal_source_inventory\":";
+  append_atom_id_array(out, certificate.terminal_source_inventory);
+  out << '}';
+  return out.str();
 }
 
 ProcessResult process_band(const BandInput& band,
