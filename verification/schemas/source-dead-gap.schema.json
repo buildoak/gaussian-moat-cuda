@@ -68,8 +68,7 @@
           "const": "sha256:lb_source_k26_repaired_bz_schedule_v1"
         },
         "schedule_digest_hex": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "const": "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"
         }
       }
     },

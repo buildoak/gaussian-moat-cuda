@@ -23,6 +23,8 @@ constexpr std::int64_t kEndpointAtomId = 1615075207964004LL;
 constexpr std::int32_t kEndpointTileI = 1468;
 constexpr std::int32_t kEndpointTileJ = 3685;
 constexpr std::uint64_t kExpectedComponentSize = 14542615005ULL;
+constexpr std::string_view kK26RepairedBzScheduleDigest =
+    "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95";
 
 std::string type_name(const nlohmann::json& value) {
   return std::string(value.type_name());
@@ -229,8 +231,13 @@ void verify_gap(const nlohmann::json& gap) {
       "sha256:lb_source_k26_repaired_bz_schedule_v1") {
     throw std::runtime_error("unexpected BZ schedule digest algorithm");
   }
-  if (!sha256_hex(require_string(bz_evidence, "schedule_digest_hex"))) {
+  const std::string bz_digest_hex =
+      require_string(bz_evidence, "schedule_digest_hex");
+  if (!sha256_hex(bz_digest_hex)) {
     throw std::runtime_error("BZ schedule digest is not sha256 hex");
+  }
+  if (bz_digest_hex != kK26RepairedBzScheduleDigest) {
+    throw std::runtime_error("BZ schedule digest does not match K26 repaired schedule");
   }
 
   const nlohmann::json& bridge_safety =
