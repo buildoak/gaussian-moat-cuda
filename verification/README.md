@@ -56,7 +56,7 @@ Post-flight statuses are separate:
 - `TILE_SAMPLE_AUDIT_PASS`
 - `SPAN_PROOF_PASS`
 - `CLAIM_PROOF_MISSING`
-- `SOURCE_DEAD_CERT_DRAFT_PASS` is emitted only by the source-dead draft checker; it validates a positive Gaussian-prime source path to the endpoint, negative guard, non-placeholder metadata, and terminal inventory count/digest consistency. It does not yet prove a full Tsuchimura-scale run or K26 BZ acceptance.
+- `SOURCE_DEAD_CERT_DRAFT_PASS` is emitted only by the source-dead draft checker; it validates a positive Gaussian-prime source path to the endpoint, negative guard, non-placeholder metadata, and terminal inventory count/digest/max-norm/tie-set consistency. It does not yet prove a full Tsuchimura-scale run or K26 BZ acceptance.
 
 `MOAT_PROOF_PASS` is reserved for future work. Current negative `MOAT` rows can
 pass profile coherence and sample audit, but remain detector/audit evidence

@@ -21,7 +21,9 @@
   "terminal_source_inventory_summary": {
     "count": 2,
     "digest_algorithm": "sha256:lb_source_inventory_v1",
-    "digest_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+    "digest_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+    "max_norm_sq": 4,
+    "max_norm_atom_ids": [2]
   },
   "terminal_source_inventory": [1, 2]
 }

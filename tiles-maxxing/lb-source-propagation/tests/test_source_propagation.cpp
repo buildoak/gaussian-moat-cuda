@@ -507,6 +507,8 @@ void test_inventory_summary_is_canonical() {
   CHECK_EQ(canonical.digest_algorithm,
            std::string("sha256:lb_source_inventory_v1"));
   CHECK_EQ(canonical.digest_hex.size(), static_cast<std::size_t>(64));
+  CHECK_EQ(canonical.max_norm_sq, static_cast<std::uint64_t>(9));
+  CHECK_EQ(canonical.max_norm_atom_ids, (std::vector<AtomId>{3}));
   CHECK_TRUE(canonical.digest_hex != different.digest_hex);
 }
 
@@ -547,6 +549,9 @@ void test_draft_profile_and_certificate_json_output() {
                  "\"terminal_source_inventory_summary\":{\"count\":2,"
                  "\"digest_algorithm\":\"sha256:lb_source_inventory_v1\","
                  "\"digest_hex\":\"") != std::string::npos);
+  CHECK_TRUE(profile_json.find("\"max_norm_sq\":4,"
+                               "\"max_norm_atom_ids\":[2]") !=
+             std::string::npos);
   CHECK_TRUE(profile_json.find("\"terminal_source_inventory\":[1,2]") !=
              std::string::npos);
   CHECK_TRUE(profile_json.find(
@@ -573,6 +578,9 @@ void test_draft_profile_and_certificate_json_output() {
                  "\"terminal_source_inventory_summary\":{\"count\":2,"
                  "\"digest_algorithm\":\"sha256:lb_source_inventory_v1\","
                  "\"digest_hex\":\"") != std::string::npos);
+  CHECK_TRUE(cert_json.find("\"max_norm_sq\":4,"
+                            "\"max_norm_atom_ids\":[2]") !=
+             std::string::npos);
   CHECK_TRUE(cert_json.find("\"endpoint\":{\"a\":0,\"b\":3,"
                             "\"norm_sq\":9}") != std::string::npos);
   CHECK_TRUE(cert_json.find("\"source_path\":[{\"a\":0,\"b\":3,"

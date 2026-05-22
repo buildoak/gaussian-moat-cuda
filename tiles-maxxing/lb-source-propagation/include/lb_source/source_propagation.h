@@ -112,6 +112,8 @@ struct InventorySummary {
   std::uint64_t count = 0;
   std::string digest_algorithm;
   std::string digest_hex;
+  std::uint64_t max_norm_sq = 0;
+  std::vector<AtomId> max_norm_atom_ids;
 
   friend bool operator==(const InventorySummary&,
                          const InventorySummary&) = default;

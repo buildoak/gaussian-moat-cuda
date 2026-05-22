@@ -431,6 +431,39 @@ std::string inventory_digest(const std::vector<std::int64_t>& ids) {
   return sha256_hex(payload.str());
 }
 
+std::uint64_t coordinate_atom_norm_sq(std::int64_t id) {
+  if (id < 0) {
+    throw std::runtime_error("terminal_source_inventory contains negative atom id");
+  }
+  const std::uint64_t raw = static_cast<std::uint64_t>(id);
+  const std::uint64_t a = raw >> 32;
+  const std::uint64_t b = raw & 0xffffffffULL;
+  const unsigned __int128 norm =
+      static_cast<unsigned __int128>(a) * a +
+      static_cast<unsigned __int128>(b) * b;
+  if (norm > std::numeric_limits<std::uint64_t>::max()) {
+    throw std::runtime_error("terminal_source_inventory atom norm overflows u64");
+  }
+  return static_cast<std::uint64_t>(norm);
+}
+
+std::vector<std::int64_t> max_norm_atom_ids(
+    const std::vector<std::int64_t>& ids,
+    std::uint64_t& max_norm_sq) {
+  std::vector<std::int64_t> ties;
+  max_norm_sq = 0;
+  for (const std::int64_t id : ids) {
+    const std::uint64_t norm_sq = coordinate_atom_norm_sq(id);
+    if (ties.empty() || norm_sq > max_norm_sq) {
+      max_norm_sq = norm_sq;
+      ties = {id};
+    } else if (norm_sq == max_norm_sq) {
+      ties.push_back(id);
+    }
+  }
+  return ties;
+}
+
 void verify_source_dead_cert(const nlohmann::json& cert) {
   if (!cert.is_object()) {
     throw std::runtime_error("certificate must be object");
@@ -500,6 +533,27 @@ void verify_source_dead_cert(const nlohmann::json& cert) {
   }
   if (digest_hex != inventory_digest(inventory)) {
     throw std::runtime_error("inventory digest mismatch");
+  }
+
+  std::uint64_t actual_max_norm_sq = 0;
+  const std::vector<std::int64_t> actual_ties =
+      max_norm_atom_ids(inventory, actual_max_norm_sq);
+  if (require_u64(summary, "max_norm_sq") != actual_max_norm_sq) {
+    throw std::runtime_error("inventory max_norm_sq mismatch");
+  }
+  const nlohmann::json& raw_ties =
+      require_array(summary, "max_norm_atom_ids");
+  std::vector<std::int64_t> expected_ties;
+  expected_ties.reserve(raw_ties.size());
+  for (const nlohmann::json& item : raw_ties) {
+    if (!item.is_number_integer()) {
+      throw std::runtime_error("max_norm_atom_ids item is not integer");
+    }
+    expected_ties.push_back(item.get<std::int64_t>());
+  }
+  std::sort(expected_ties.begin(), expected_ties.end());
+  if (expected_ties != actual_ties) {
+    throw std::runtime_error("inventory max_norm_atom_ids mismatch");
   }
 }
 

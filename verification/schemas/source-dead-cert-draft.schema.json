@@ -57,7 +57,13 @@
     "terminal_source_inventory_summary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["count", "digest_algorithm", "digest_hex"],
+      "required": [
+        "count",
+        "digest_algorithm",
+        "digest_hex",
+        "max_norm_sq",
+        "max_norm_atom_ids"
+      ],
       "properties": {
         "count": { "type": "integer", "minimum": 0 },
         "digest_algorithm": {
@@ -66,6 +72,11 @@
         "digest_hex": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "max_norm_sq": { "type": "integer", "minimum": 0 },
+        "max_norm_atom_ids": {
+          "type": "array",
+          "items": { "type": "integer" }
         }
       }
     },

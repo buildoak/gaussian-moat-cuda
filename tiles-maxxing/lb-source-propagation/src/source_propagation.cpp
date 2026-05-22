@@ -237,6 +237,9 @@ void append_inventory_summary_json(std::ostringstream& out,
   append_json_string(out, summary.digest_algorithm);
   out << ",\"digest_hex\":";
   append_json_string(out, summary.digest_hex);
+  out << ",\"max_norm_sq\":" << summary.max_norm_sq
+      << ",\"max_norm_atom_ids\":";
+  append_atom_id_array(out, summary.max_norm_atom_ids);
   out << '}';
 }
 
@@ -665,6 +668,19 @@ InventorySummary summarize_inventory(const std::vector<AtomId>& atom_ids) {
   summary.count = static_cast<std::uint64_t>(canonical.size());
   summary.digest_algorithm = "sha256:lb_source_inventory_v1";
   summary.digest_hex = campaign::detail::sha256_hex(payload.str());
+  for (const AtomId id : canonical) {
+    const std::optional<CoordinateAtom> atom = decode_coordinate_atom_id(id);
+    if (!atom.has_value()) {
+      continue;
+    }
+    if (summary.max_norm_atom_ids.empty() ||
+        atom->norm_sq > summary.max_norm_sq) {
+      summary.max_norm_sq = atom->norm_sq;
+      summary.max_norm_atom_ids = {id};
+    } else if (atom->norm_sq == summary.max_norm_sq) {
+      summary.max_norm_atom_ids.push_back(id);
+    }
+  }
   return summary;
 }
 

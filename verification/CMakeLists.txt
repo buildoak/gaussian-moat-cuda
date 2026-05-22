@@ -71,6 +71,7 @@ add_test(NAME source_dead_cert_fixture_first_quadrant_valid
     ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-cert-first-quadrant-valid.json)
 foreach(bad_source_dead_cert
     dead-cert-bad-digest
+    dead-cert-bad-inventory-extrema
     dead-cert-bad-negative-guard
     dead-cert-bad-pending-metadata
     dead-cert-bad-source-path)
