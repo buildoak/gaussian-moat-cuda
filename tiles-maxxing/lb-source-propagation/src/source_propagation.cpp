@@ -338,6 +338,38 @@ std::uint64_t ceil_sqrt(std::uint64_t n) {
   return hi;
 }
 
+std::optional<AtomId> coordinate_atom_id(std::int64_t a, std::int64_t b) {
+  if (a < 0 || b < 0 ||
+      a > std::numeric_limits<std::int32_t>::max() ||
+      b > std::numeric_limits<std::uint32_t>::max()) {
+    return std::nullopt;
+  }
+  const std::uint64_t raw =
+      (static_cast<std::uint64_t>(a) << 32) | static_cast<std::uint64_t>(b);
+  if (raw > static_cast<std::uint64_t>(
+                std::numeric_limits<AtomId>::max())) {
+    return std::nullopt;
+  }
+  return static_cast<AtomId>(raw);
+}
+
+std::optional<CoordinateAtom> decode_coordinate_atom_id(AtomId id) {
+  if (id < 0) {
+    return std::nullopt;
+  }
+  const std::uint64_t raw = static_cast<std::uint64_t>(id);
+  const std::int64_t a = static_cast<std::int64_t>(raw >> 32);
+  const std::int64_t b =
+      static_cast<std::int64_t>(raw & 0xffffffffULL);
+  const unsigned __int128 norm =
+      static_cast<unsigned __int128>(a) * static_cast<unsigned __int128>(a) +
+      static_cast<unsigned __int128>(b) * static_cast<unsigned __int128>(b);
+  if (norm > std::numeric_limits<std::uint64_t>::max()) {
+    return std::nullopt;
+  }
+  return CoordinateAtom{a, b, static_cast<std::uint64_t>(norm)};
+}
+
 SeparatorState canonicalize_separator(const SeparatorState& state) {
   SeparatorState out;
   out.carry_atoms = state.carry_atoms;

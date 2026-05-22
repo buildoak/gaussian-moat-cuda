@@ -307,6 +307,25 @@ void test_k32_ceil_sqrt_carry_width_is_six() {
   CHECK_TRUE(component_has_source_bit(result.outgoing, {2, 3}, true));
 }
 
+void test_coordinate_atom_ids_are_stable_and_canonical() {
+  const std::optional<AtomId> endpoint =
+      lb_source::coordinate_atom_id(943460, 376039);
+  CHECK_TRUE(endpoint.has_value());
+
+  const std::optional<lb_source::CoordinateAtom> decoded =
+      lb_source::decode_coordinate_atom_id(*endpoint);
+  CHECK_TRUE(decoded.has_value());
+  CHECK_EQ(decoded->a, static_cast<std::int64_t>(943460));
+  CHECK_EQ(decoded->b, static_cast<std::int64_t>(376039));
+  CHECK_EQ(decoded->norm_sq, static_cast<std::uint64_t>(1031522101121ULL));
+  CHECK_EQ(lb_source::coordinate_atom_id(decoded->a, decoded->b), endpoint);
+
+  CHECK_TRUE(!lb_source::coordinate_atom_id(-1, 3).has_value());
+  CHECK_TRUE(lb_source::coordinate_atom_id(5, 3).has_value());
+  CHECK_TRUE(!lb_source::coordinate_atom_id(0, -1).has_value());
+  CHECK_TRUE(!lb_source::decode_coordinate_atom_id(-1).has_value());
+}
+
 void test_associativity_across_band_grouping() {
   const std::vector<BandInput> atomized = {
       {.k_sq = 36,
@@ -592,6 +611,8 @@ int main() {
   run("overflow_reject_is_hard", test_overflow_reject_is_hard);
   run("k32_ceil_sqrt_carry_width_is_six",
       test_k32_ceil_sqrt_carry_width_is_six);
+  run("coordinate_atom_ids_are_stable_and_canonical",
+      test_coordinate_atom_ids_are_stable_and_canonical);
   run("associativity_across_band_grouping",
       test_associativity_across_band_grouping);
   run("source_seed_provider_marks_certified_atoms",

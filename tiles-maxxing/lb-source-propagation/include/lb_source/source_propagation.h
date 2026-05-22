@@ -126,6 +126,15 @@ struct SourcePathPoint {
                          const SourcePathPoint&) = default;
 };
 
+struct CoordinateAtom {
+  std::int64_t a = 0;
+  std::int64_t b = 0;
+  std::uint64_t norm_sq = 0;
+
+  friend bool operator==(const CoordinateAtom&,
+                         const CoordinateAtom&) = default;
+};
+
 struct SourceProfileDraft {
   std::string profile_id;
   SourceDraftMetadata metadata;
@@ -149,6 +158,10 @@ struct SourceCertificateDraft {
 };
 
 std::uint64_t ceil_sqrt(std::uint64_t n);
+
+std::optional<AtomId> coordinate_atom_id(std::int64_t a, std::int64_t b);
+
+std::optional<CoordinateAtom> decode_coordinate_atom_id(AtomId id);
 
 SeparatorState canonicalize_separator(const SeparatorState& state);
 

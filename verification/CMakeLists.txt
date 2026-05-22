@@ -66,6 +66,9 @@ endforeach()
 add_test(NAME source_dead_cert_fixture_valid
   COMMAND source_dead_cert_check
     ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-cert-valid.json)
+add_test(NAME source_dead_cert_fixture_first_quadrant_valid
+  COMMAND source_dead_cert_check
+    ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-cert-first-quadrant-valid.json)
 foreach(bad_source_dead_cert
     dead-cert-bad-digest
     dead-cert-bad-negative-guard

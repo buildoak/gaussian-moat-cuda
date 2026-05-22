@@ -149,9 +149,9 @@ Point require_point(const nlohmann::json& object, const char* field) {
   point.a = require_i64(raw, "a");
   point.b = require_i64(raw, "b");
   point.norm_sq = require_u64(raw, "norm_sq");
-  if (point.a < 0 || point.b < point.a) {
+  if (point.a < 0 || point.b < 0) {
     throw std::runtime_error(std::string(field) +
-                             " must be in canonical octant 0 <= a <= b");
+                             " must be in first quadrant");
   }
   if (norm_sq_checked(point.a, point.b) != point.norm_sq) {
     throw std::runtime_error(std::string(field) + " norm_sq mismatch");
@@ -258,8 +258,8 @@ std::vector<Point> require_source_path(const nlohmann::json& cert) {
     point.a = require_i64(item, "a");
     point.b = require_i64(item, "b");
     point.norm_sq = require_u64(item, "norm_sq");
-    if (point.a < 0 || point.b < point.a) {
-      throw std::runtime_error("source_path point outside canonical octant");
+    if (point.a < 0 || point.b < 0) {
+      throw std::runtime_error("source_path point outside first quadrant");
     }
     if (norm_sq_checked(point.a, point.b) != point.norm_sq) {
       throw std::runtime_error("source_path norm_sq mismatch");

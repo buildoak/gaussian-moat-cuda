@@ -37,8 +37,14 @@ std::optional<campaign::TileCoord> find_axis_owner(
   return std::nullopt;
 }
 
-lb_source::AtomId atom_id(std::int64_t a, std::int64_t b) {
-  return (a << 32) ^ b;
+lb_source::AtomId checked_atom_id(std::int64_t a, std::int64_t b) {
+  const std::optional<lb_source::AtomId> id =
+      lb_source::coordinate_atom_id(a, b);
+  if (!id.has_value()) {
+    std::cerr << "coordinate atom id overflow or non-canonical coordinate\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return *id;
 }
 
 std::uint64_t dist_sq(const campaign::Prime& lhs,
@@ -106,14 +112,14 @@ int main() {
   band.atoms.reserve(primes.size());
   for (const campaign::Prime& prime : primes) {
     band.atoms.push_back(lb_source::BandAtom{
-        atom_id(prime.a, prime.b), prime.norm_sq, false});
+        checked_atom_id(prime.a, prime.b), prime.norm_sq, false});
   }
   for (std::size_t i = 0; i < primes.size(); ++i) {
     for (std::size_t j = i + 1; j < primes.size(); ++j) {
       if (dist_sq(primes[i], primes[j]) <= campaign::k_sq_value) {
         band.edges.push_back(
-            {atom_id(primes[i].a, primes[i].b),
-             atom_id(primes[j].a, primes[j].b)});
+            {checked_atom_id(primes[i].a, primes[i].b),
+             checked_atom_id(primes[j].a, primes[j].b)});
       }
     }
   }
@@ -121,7 +127,7 @@ int main() {
   const lb_source::SourceSeedApplyResult seed =
       lb_source::apply_source_seeds(
           band, {{"ORIGIN_SOURCE", "omega-axis-prime-251",
-                  atom_id(axis_it->a, axis_it->b)}});
+                  checked_atom_id(axis_it->a, axis_it->b)}});
   if (!seed.accepted() || seed.applied != 1) {
     std::cerr << "source seed provider failed: " << seed.diagnostic << "\n";
     return EXIT_FAILURE;

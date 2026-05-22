@@ -16,6 +16,12 @@ death can report where the source component ended.
 
 ## Carry Manifest And Draft Output
 
+The sidecar exposes `coordinate_atom_id(a, b)` /
+`decode_coordinate_atom_id(id)` for first-quadrant source runs. This keeps
+small runners, TileOp producer smokes, carry manifests, and future certificate
+chains on one stable coordinate identity instead of app-local encodings or
+transient union-find roots.
+
 The library exposes deterministic carry-manifest helpers:
 
 - `make_carry_manifest(k_sq, outer_radius, result)`

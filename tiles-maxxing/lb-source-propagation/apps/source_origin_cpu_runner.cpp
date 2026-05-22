@@ -188,15 +188,14 @@ std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b) {
   return static_cast<std::uint64_t>(norm);
 }
 
-lb_source::AtomId atom_id(std::int64_t a, std::int64_t b) {
-  return static_cast<lb_source::AtomId>((static_cast<std::uint64_t>(a) << 32) |
-                                       static_cast<std::uint64_t>(b));
-}
-
-std::pair<std::int64_t, std::int64_t> decode_atom_id(lb_source::AtomId id) {
-  const auto raw = static_cast<std::uint64_t>(id);
-  return {static_cast<std::int64_t>(raw >> 32),
-          static_cast<std::int64_t>(raw & 0xffffffffULL)};
+lb_source::AtomId checked_atom_id(std::int64_t a, std::int64_t b) {
+  const std::optional<lb_source::AtomId> id =
+      lb_source::coordinate_atom_id(a, b);
+  if (!id.has_value()) {
+    std::cerr << "coordinate atom id overflow or non-canonical coordinate\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return *id;
 }
 
 std::uint64_t dist_sq(const Point& lhs, const Point& rhs) {
@@ -374,7 +373,7 @@ int main(int argc, char** argv) {
   }
 
   const lb_source::AtomId endpoint_id =
-      atom_id(config.endpoint_a, config.endpoint_b);
+      checked_atom_id(config.endpoint_a, config.endpoint_b);
   const std::uint64_t endpoint_norm =
       norm_sq_i64(config.endpoint_a, config.endpoint_b);
 
@@ -406,13 +405,18 @@ int main(int argc, char** argv) {
 
     if (incoming) {
       for (const lb_source::CarryAtom& atom : incoming->carry_atoms) {
-        const auto [a, b] = decode_atom_id(atom.id);
-        edge_points.push_back({a, b, atom.norm_sq});
+        const std::optional<lb_source::CoordinateAtom> decoded =
+            lb_source::decode_coordinate_atom_id(atom.id);
+        if (!decoded.has_value() || decoded->norm_sq != atom.norm_sq) {
+          std::cerr << "incoming carry atom is not a stable coordinate atom\n";
+          return EXIT_FAILURE;
+        }
+        edge_points.push_back({decoded->a, decoded->b, atom.norm_sq});
       }
     }
 
     for (const Point& point : new_points) {
-      const lb_source::AtomId id = atom_id(point.a, point.b);
+      const lb_source::AtomId id = checked_atom_id(point.a, point.b);
       const bool is_origin_seed = point.norm_sq <= config.k_sq;
       band.atoms.push_back({id, point.norm_sq, is_origin_seed});
       norm_by_id.emplace(id, point.norm_sq);
@@ -431,8 +435,10 @@ int main(int argc, char** argv) {
         if (dist_sq(edge_points[i], edge_points[j]) > config.k_sq) {
           continue;
         }
-        lb_source::AtomId lhs = atom_id(edge_points[i].a, edge_points[i].b);
-        lb_source::AtomId rhs = atom_id(edge_points[j].a, edge_points[j].b);
+        lb_source::AtomId lhs =
+            checked_atom_id(edge_points[i].a, edge_points[i].b);
+        lb_source::AtomId rhs =
+            checked_atom_id(edge_points[j].a, edge_points[j].b);
         if (lhs > rhs) {
           std::swap(lhs, rhs);
         }
