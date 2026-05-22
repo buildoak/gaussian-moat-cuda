@@ -316,6 +316,51 @@ require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_cla
 require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
   "K26 source-dead gap missing coordinate source path"
 
+actual_continuation_digest="$(
+  shasum -a 256 "$continuation" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
+)"
+gap_continuation_digest="$(require_json_string_value "$gap" sha256)"
+require_equal "$actual_continuation_digest" "$gap_continuation_digest" \
+  "K26 gap continuation hash binding"
+continuation_path_provenance="$(
+  require_json_string_value "$continuation" path_provenance
+)"
+gap_path_provenance="$(require_json_string_value "$gap" target_path_provenance)"
+continuation_atom_path_length="$(
+  require_json_number_value "$continuation" atom_path_length
+)"
+gap_atom_path_length="$(require_json_number_value "$gap" target_atom_path_length)"
+continuation_atom_path="$(require_json_array_value "$continuation" atom_path)"
+gap_atom_path="$(require_json_array_value "$gap" target_atom_path)"
+require_equal "$continuation_path_provenance" "$gap_path_provenance" \
+  "K26 gap path provenance binding"
+require_equal "$continuation_atom_path_length" "$gap_atom_path_length" \
+  "K26 gap atom path length binding"
+require_equal "$continuation_atom_path" "$gap_atom_path" \
+  "K26 gap atom path binding"
+continuation_inventory_count="$(
+  require_json_number_value "$continuation" source_inventory_count
+)"
+continuation_inventory_digest="$(
+  require_json_string_value "$continuation" source_inventory_digest_hex
+)"
+continuation_max_norm="$(require_json_number_value "$continuation" max_source_norm_sq)"
+continuation_max_ties="$(
+  require_json_array_value "$continuation" max_source_norm_atom_ids
+)"
+gap_inventory_count="$(require_json_number_value "$gap" count)"
+gap_inventory_digest="$(require_json_string_value "$gap" digest_hex)"
+gap_max_norm="$(require_json_number_value "$gap" max_norm_sq)"
+gap_max_ties="$(require_json_array_value "$gap" max_norm_atom_ids)"
+require_equal "$continuation_inventory_count" "$gap_inventory_count" \
+  "K26 gap inventory count binding"
+require_equal "$continuation_inventory_digest" "$gap_inventory_digest" \
+  "K26 gap inventory digest binding"
+require_equal "$continuation_max_norm" "$gap_max_norm" \
+  "K26 gap max source norm binding"
+require_equal "$continuation_max_ties" "$gap_max_ties" \
+  "K26 gap max-norm tie binding"
+
 if [[ -n "$source_dead_gap_checker" ]]; then
   gap_checker_output="$("$source_dead_gap_checker" "$gap")"
   if ! grep -q '"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS"' \

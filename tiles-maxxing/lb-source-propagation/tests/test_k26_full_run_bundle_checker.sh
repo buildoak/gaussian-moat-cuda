@@ -77,8 +77,10 @@ JSON
   cat > "$dir/k26-source-dead-cert.json" <<'JSON'
 {"schema":"lb_source_dead_cert_draft_v1","k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]}}
 JSON
-  cat > "$dir/k26-source-dead-gap.json" <<'JSON'
-{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim","target_atom_path_length":3,"target_atom_path":[1615075207963900,-25220051735553,1615075207964004],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]},"missing_for_source_dead_cert":["coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","claim-grade verifier binding the coordinate path to terminal inventory"]}
+  local continuation_digest
+  continuation_digest="$(shasum -a 256 "$dir/k26-continuation-result.json" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+  cat > "$dir/k26-source-dead-gap.json" <<JSON
+{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"},"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim","target_atom_path_length":3,"target_atom_path":[1615075207963900,-25220051735553,1615075207964004],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]},"missing_for_source_dead_cert":["coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","claim-grade verifier binding the coordinate path to terminal inventory"]}
 JSON
   echo 'manifest' > "$dir/k26-prefix-manifest.txt"
   echo 'witness' > "$dir/k26-prefix-witness.txt"
@@ -115,6 +117,20 @@ if "$checker" "$bad_gap" \
   exit 1
 fi
 grep -q 'K26 source-dead gap blocker' "$tmp/bad-gap-rehashed.log"
+
+bad_gap_binding="$tmp/bad-gap-binding"
+write_bundle "$bad_gap_binding"
+perl -0pi -e 's/"target_atom_path_length":3/"target_atom_path_length":4/' \
+  "$bad_gap_binding/k26-source-dead-gap.json"
+write_manifest "$bad_gap_binding"
+if "$checker" "$bad_gap_binding" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-gap-binding.log" 2>&1; then
+  echo "checker accepted gap atom path length that disagrees with continuation" >&2
+  exit 1
+fi
+grep -q 'K26 gap atom path length binding' "$tmp/bad-gap-binding.log"
 
 bad_digest="$tmp/bad-digest"
 write_bundle "$bad_digest"
