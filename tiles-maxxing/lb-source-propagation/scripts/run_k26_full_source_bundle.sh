@@ -20,6 +20,7 @@ Artifacts written under OUT_DIR:
   k26_bz_schedule_check.json
   k26_source_run_profile.json
   k26-prefix-result.json
+  k26-prefix-progress.jsonl
   k26-continuation-result.json
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
@@ -158,6 +159,7 @@ write_artifact_manifest() {
     k26_bz_schedule_check.json
     k26_source_run_profile.json
     k26-prefix-result.json
+    k26-prefix-progress.jsonl
     k26-continuation-result.json
     k26-prefix-manifest.txt
     k26-prefix-witness.txt
@@ -321,7 +323,8 @@ run_json K26_PREFIX "$out_dir/k26-prefix-result.json" \
     --endpoint-b 943460 \
     --max-atoms "$max_atoms" \
     --manifest-out "$out_dir/k26-prefix-manifest.txt" \
-    --prefix-witness-out "$out_dir/k26-prefix-witness.txt"
+    --prefix-witness-out "$out_dir/k26-prefix-witness.txt" \
+    --progress-out "$out_dir/k26-prefix-progress.jsonl"
 
 run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
   "$build_dir/source_tileop_port_runner" \

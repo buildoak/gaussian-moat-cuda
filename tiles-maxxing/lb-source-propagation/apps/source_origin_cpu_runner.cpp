@@ -1,6 +1,7 @@
 #include "lb_source/source_propagation.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -13,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -30,6 +32,7 @@ struct Config {
   std::optional<std::string> cert_out;
   std::optional<std::string> manifest_out;
   std::optional<std::string> prefix_witness_out;
+  std::optional<std::string> progress_out;
 };
 
 struct Point {
@@ -89,7 +92,8 @@ void usage(const char* prog) {
       << "                        the final carry window\n"
       << "  --prefix-witness-out PATH\n"
       << "                        write diagnostic origin-prefix paths to live\n"
-      << "                        source carry atoms\n";
+      << "                        source carry atoms\n"
+      << "  --progress-out PATH   write one JSONL progress row per processed band\n";
 }
 
 bool parse_args(int argc, char** argv, Config& config) {
@@ -169,6 +173,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.prefix_witness_out = value;
+    } else if (take_value("--progress-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--progress-out must not be empty\n";
+        return false;
+      }
+      config.progress_out = value;
     } else {
       std::cerr << "unknown argument: " << arg << "\n";
       return false;
@@ -231,6 +241,55 @@ std::uint64_t dist_sq(const Point& lhs, const Point& rhs) {
   const __int128 da = static_cast<__int128>(lhs.a) - rhs.a;
   const __int128 db = static_cast<__int128>(lhs.b) - rhs.b;
   return static_cast<std::uint64_t>(da * da + db * db);
+}
+
+std::vector<std::pair<lb_source::AtomId, lb_source::AtomId>>
+build_local_edges(const std::vector<Point>& edge_points,
+                  std::uint64_t k_sq) {
+  std::unordered_set<lb_source::AtomId> atoms;
+  atoms.reserve(edge_points.size() * 2);
+  for (const Point& point : edge_points) {
+    atoms.insert(checked_atom_id(point.a, point.b));
+  }
+
+  const std::int64_t radius =
+      static_cast<std::int64_t>(lb_source::ceil_sqrt(k_sq));
+  std::vector<std::pair<lb_source::AtomId, lb_source::AtomId>> edges;
+  for (const Point& point : edge_points) {
+    const lb_source::AtomId lhs = checked_atom_id(point.a, point.b);
+    for (std::int64_t da = -radius; da <= radius; ++da) {
+      const std::int64_t candidate_a = point.a + da;
+      if (candidate_a < 0) {
+        continue;
+      }
+      for (std::int64_t db = -radius; db <= radius; ++db) {
+        const std::int64_t candidate_b = point.b + db;
+        if (candidate_b < candidate_a) {
+          continue;
+        }
+        const std::uint64_t distance_sq =
+            static_cast<std::uint64_t>(da * da + db * db);
+        if (distance_sq == 0 || distance_sq > k_sq) {
+          continue;
+        }
+        const lb_source::AtomId rhs =
+            checked_atom_id(candidate_a, candidate_b);
+        if (lhs >= rhs || atoms.find(rhs) == atoms.end()) {
+          continue;
+        }
+        edges.push_back({lhs, rhs});
+      }
+    }
+  }
+  std::sort(edges.begin(), edges.end());
+  return edges;
+}
+
+std::uint64_t elapsed_ms(std::chrono::steady_clock::time_point begin,
+                         std::chrono::steady_clock::time_point end) {
+  return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
+          .count());
 }
 
 bool is_gaussian_prime_point(std::int64_t a, std::int64_t b,
@@ -499,14 +558,25 @@ int main(int argc, char** argv) {
   std::uint64_t generated_atoms = 0;
   bool endpoint_seen = false;
   bool endpoint_source_reached = false;
+  std::ofstream progress;
+  if (config.progress_out.has_value()) {
+    progress.open(*config.progress_out);
+    if (!progress) {
+      std::cerr << "cannot open --progress-out path: " << *config.progress_out
+                << "\n";
+      return EXIT_FAILURE;
+    }
+  }
 
   while (previous_outer < config.r_final) {
+    const auto band_begin = std::chrono::steady_clock::now();
     const std::uint64_t outer =
         std::min(config.r_final, previous_outer + config.band_width);
     const std::uint64_t low_norm = square_u64(previous_outer);
     const std::uint64_t high_norm = square_u64(outer);
     const std::vector<Point> new_points =
         enumerate_band_points(low_norm, high_norm, outer);
+    const auto enumerate_done = std::chrono::steady_clock::now();
 
     lb_source::BandInput band;
     band.k_sq = config.k_sq;
@@ -540,33 +610,45 @@ int main(int argc, char** argv) {
       }
     }
 
-    std::set<std::pair<lb_source::AtomId, lb_source::AtomId>> edges;
-    for (std::size_t i = 0; i < edge_points.size(); ++i) {
-      for (std::size_t j = i + 1; j < edge_points.size(); ++j) {
-        if (dist_sq(edge_points[i], edge_points[j]) > config.k_sq) {
-          continue;
-        }
-        lb_source::AtomId lhs =
-            checked_atom_id(edge_points[i].a, edge_points[i].b);
-        lb_source::AtomId rhs =
-            checked_atom_id(edge_points[j].a, edge_points[j].b);
-        if (lhs > rhs) {
-          std::swap(lhs, rhs);
-        }
-        edges.insert({lhs, rhs});
-        insert_adjacency_edge(adjacency, lhs, rhs);
-      }
+    band.edges = build_local_edges(edge_points, config.k_sq);
+    for (const auto& [lhs, rhs] : band.edges) {
+      insert_adjacency_edge(adjacency, lhs, rhs);
     }
-    band.edges.assign(edges.begin(), edges.end());
+    const auto edges_done = std::chrono::steady_clock::now();
 
     last = lb_source::process_band(
         band, incoming,
         {.max_atoms = config.max_atoms,
          .max_carry_atoms = config.max_atoms,
          .max_components = config.max_atoms});
+    const auto process_done = std::chrono::steady_clock::now();
     ++bands_processed;
     generated_atoms += new_points.size();
     if (!last.accepted()) {
+      if (progress) {
+        progress << "{\"schema\":\"lb_source_origin_progress_v1\""
+                 << ",\"band_index\":" << (bands_processed - 1)
+                 << ",\"r_start\":" << previous_outer
+                 << ",\"r_outer\":" << outer
+                 << ",\"new_atoms\":" << new_points.size()
+                 << ",\"edge_points\":" << edge_points.size()
+                 << ",\"edges\":" << band.edges.size()
+                 << ",\"accepted\":false"
+                 << ",\"reject\":\""
+                 << lb_source::reject_reason_name(last.reject) << "\""
+                 << ",\"terminal_source_dead\":false"
+                 << ",\"has_source_carry\":false"
+                 << ",\"source_inventory_count\":0"
+                 << ",\"enumerate_ms\":"
+                 << elapsed_ms(band_begin, enumerate_done)
+                 << ",\"edges_ms\":"
+                 << elapsed_ms(enumerate_done, edges_done)
+                 << ",\"process_ms\":"
+                 << elapsed_ms(edges_done, process_done)
+                 << ",\"total_ms\":"
+                 << elapsed_ms(band_begin, process_done) << "}\n";
+        progress.flush();
+      }
       break;
     }
 
@@ -575,6 +657,35 @@ int main(int argc, char** argv) {
         endpoint_source_reached ||
         std::find(inventory.begin(), inventory.end(), endpoint_id) !=
             inventory.end();
+    const bool live_source_carry = has_source_carry(last.outgoing);
+    const auto inventory_done = std::chrono::steady_clock::now();
+    if (progress) {
+      progress << "{\"schema\":\"lb_source_origin_progress_v1\""
+               << ",\"band_index\":" << (bands_processed - 1)
+               << ",\"r_start\":" << previous_outer
+               << ",\"r_outer\":" << outer
+               << ",\"new_atoms\":" << new_points.size()
+               << ",\"edge_points\":" << edge_points.size()
+               << ",\"edges\":" << band.edges.size()
+               << ",\"accepted\":true"
+               << ",\"reject\":\"none\""
+               << ",\"terminal_source_dead\":"
+               << (last.terminal_source_dead ? "true" : "false")
+               << ",\"has_source_carry\":"
+               << (live_source_carry ? "true" : "false")
+               << ",\"source_inventory_count\":" << inventory.size()
+               << ",\"enumerate_ms\":"
+               << elapsed_ms(band_begin, enumerate_done)
+               << ",\"edges_ms\":"
+               << elapsed_ms(enumerate_done, edges_done)
+               << ",\"process_ms\":"
+               << elapsed_ms(edges_done, process_done)
+               << ",\"inventory_ms\":"
+               << elapsed_ms(process_done, inventory_done)
+               << ",\"total_ms\":"
+               << elapsed_ms(band_begin, inventory_done) << "}\n";
+      progress.flush();
+    }
     if (last.terminal_source_dead) {
       break;
     }

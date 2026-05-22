@@ -38,18 +38,22 @@ cat > "$build_dir/source_origin_cpu_runner" <<'SH'
 #!/usr/bin/env bash
 manifest=""
 witness=""
+progress=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --manifest-out)
       manifest="$2"; shift 2 ;;
     --prefix-witness-out)
       witness="$2"; shift 2 ;;
+    --progress-out)
+      progress="$2"; shift 2 ;;
     *)
       shift ;;
   esac
 done
 [[ -n "$manifest" ]] && echo "manifest" > "$manifest"
 [[ -n "$witness" ]] && echo "witness" > "$witness"
+[[ -n "$progress" ]] && echo '{"schema":"lb_source_origin_progress_v1","accepted":true}' > "$progress"
 cat <<'JSON'
 {"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"manifest_written":true,"prefix_witness_written":true}
 JSON
@@ -140,10 +144,13 @@ fi
 grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING' \
   "$blocked_out/status.txt"
 test -f "$blocked_out/k26-prefix-result.json"
+test -f "$blocked_out/k26-prefix-progress.jsonl"
 test -f "$blocked_out/k26-continuation-result.json"
 test -f "$blocked_out/k26-source-dead-gap.json"
 test -f "$blocked_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-continuation-result.json' \
+  "$blocked_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-prefix-progress.jsonl' \
   "$blocked_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-source-dead-gap.json' \
   "$blocked_out/k26-full-run-artifacts.sha256"
