@@ -91,6 +91,9 @@ ctest --test-dir "$build_dir" --output-on-failure \
 "$build_dir/source_prop_cpu_tileop_smoke" \
   | tee "$out_dir/source_prop_cpu_tileop_smoke.log"
 
+"$build_dir/k26_tsuchimura_preflight" \
+  | tee "$out_dir/k26_tsuchimura_preflight.json"
+
 cat > "$out_dir/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
 Scope: sidecar build/test plus CPU TileOp producer smoke only.

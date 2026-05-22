@@ -62,7 +62,8 @@ The tests cover composed bands versus one big band, false welding,
 source-only-carry loss, neutral partition merges, terminal inventory, hard
 overflow rejection, `K=32` carry width, associativity across band groupings,
 certified source seed application/rejection, carry-manifest round-trip/rejection,
-exact draft JSON output, and CPU TileOp producer smoke.
+exact draft JSON output, CPU TileOp producer smoke, and sqrt(26) Tsuchimura
+preflight constants.
 
 ## Remote Smoke
 

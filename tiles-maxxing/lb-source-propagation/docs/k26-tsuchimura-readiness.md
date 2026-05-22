@@ -12,21 +12,27 @@ It is not a result claim.
 - Radius: about `1015638.765`.
 - Expected component size: `14,542,615,005`.
 
-For a terminal guard, use `R_final >= 1015644`; tighter values such as
-`1015639` leave the expected endpoint inside the final guard and cannot support
-a death certificate.
+For the exact mathematical guard, `R_final >= 1015644` puts the expected
+endpoint below `R_final - sqrt(26)`.
+
+For the current conservative integer carry shell
+`R_final - ceil_sqrt(26) <= |p| <= R_final`, use `R_final >= 1015645`.
+At `R_final = 1015644`, the endpoint is still inside the conservative carry
+shell. Until a tighter exact non-square guard predicate is promoted into the
+verifier, the campaign should use the conservative value.
 
 ## Required Evidence Before Run
 
 1. Local sidecar CMake/CTest passes from a fresh build directory.
 2. Full independent `verification/` CTest passes from a fresh build directory.
-3. A remote 4090 sidecar smoke passes under the budget cap:
+3. `k26_tsuchimura_preflight` passes locally and on remote smoke.
+4. A remote 4090 sidecar smoke passes under the budget cap:
    - price `< 0.37 USD/hour`;
    - total budget `<= 1.50 USD`;
    - no long K32 launch.
-4. The run is wired to source/origin seed logic, not `geo_I` flags.
-5. Every source/origin proof row rejects overflow.
-6. Non-square `K=26` has external per-row BZ evidence, or the row is labeled
+5. The run is wired to source/origin seed logic, not `geo_I` flags.
+6. Every source/origin proof row rejects overflow.
+7. Non-square `K=26` has external per-row BZ evidence, or the row is labeled
    diagnostic rather than accepted.
 
 ## Certificate Gap To Close
@@ -34,7 +40,8 @@ a death certificate.
 `SOURCE_TERMINAL` is not enough. A `SOURCE_DEAD_CERT` needs:
 
 - positive source path or certificate chain to `943460 + 376039i`;
-- negative final guard proof at `R_final >= 1015644`;
+- negative final guard proof at `R_final >= 1015645` under the current
+  conservative integer carry shell;
 - terminal inventory with count/digest/max norm/tie set;
 - stable artifact hashes for carry manifests and source profile drafts;
 - commit/build identity and BZ evidence in the profile metadata.

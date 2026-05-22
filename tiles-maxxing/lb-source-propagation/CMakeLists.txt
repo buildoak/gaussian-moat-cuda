@@ -42,6 +42,11 @@ target_include_directories(lb_source_campaign_tileop
 add_executable(source_prop_smoke apps/source_prop_smoke.cpp)
 target_link_libraries(source_prop_smoke PRIVATE lb_source_propagation)
 
+add_executable(k26_tsuchimura_preflight
+  apps/k26_tsuchimura_preflight.cpp
+)
+target_link_libraries(k26_tsuchimura_preflight PRIVATE lb_source_propagation)
+
 enable_testing()
 
 add_executable(source_prop_tests tests/test_source_propagation.cpp)
@@ -60,3 +65,5 @@ add_test(NAME source_prop_tests COMMAND source_prop_tests)
 add_test(NAME source_prop_smoke COMMAND source_prop_smoke)
 add_test(NAME source_prop_cpu_tileop_smoke
   COMMAND source_prop_cpu_tileop_smoke)
+add_test(NAME k26_tsuchimura_preflight
+  COMMAND k26_tsuchimura_preflight)
