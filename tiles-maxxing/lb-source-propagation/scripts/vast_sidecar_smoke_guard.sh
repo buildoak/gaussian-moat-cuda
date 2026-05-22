@@ -11,6 +11,7 @@ Usage:
                               [--exclude-host-id ID]
                               [--offer-wait-seconds N]
                               [--offer-poll-seconds N]
+                              [--max-create-attempts N]
                               [--wait-ssh-seconds N] [--ssh-poll-seconds N]
                               [--stop-on-ssh-timeout]
                               [--run-remote-smoke] [--destroy-on-exit]
@@ -26,6 +27,9 @@ Optional offer polling handles transient market races, and optional SSH
 readiness polling can stop or destroy a newly-created instance when SSH never
 opens. Exclusion flags are for avoiding hosts/offers that have already failed
 SSH readiness during the current campaign.
+When --execute and --max-create-attempts is greater than one, SSH timeouts
+destroy the timed-out instance when --destroy-on-exit is supplied, exclude that
+offer id, and try the next capped offer.
 
 Hard defaults from the LB source-propagation goal:
   --max-dph     0.37
@@ -45,6 +49,7 @@ remote_dir="/workspace/gaussian-moat-cuda"
 pull_dir="tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull"
 offer_wait_seconds="0"
 offer_poll_seconds="30"
+max_create_attempts="1"
 wait_ssh_seconds="0"
 ssh_poll_seconds="10"
 stop_on_ssh_timeout=0
@@ -98,6 +103,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --offer-poll-seconds)
       offer_poll_seconds="$2"
+      shift 2
+      ;;
+    --max-create-attempts)
+      max_create_attempts="$2"
       shift 2
       ;;
     --wait-ssh-seconds)
@@ -165,6 +174,7 @@ require_nonnegative_integer "$wait_ssh_seconds" "--wait-ssh-seconds"
 require_nonnegative_integer "$ssh_poll_seconds" "--ssh-poll-seconds"
 require_nonnegative_integer "$offer_wait_seconds" "--offer-wait-seconds"
 require_nonnegative_integer "$offer_poll_seconds" "--offer-poll-seconds"
+require_nonnegative_integer "$max_create_attempts" "--max-create-attempts"
 for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
   require_nonnegative_integer "$id" "--exclude-offer-id"
 done
@@ -177,6 +187,18 @@ if [[ "$wait_ssh_seconds" != "0" && "$ssh_poll_seconds" == "0" ]]; then
 fi
 if [[ "$offer_wait_seconds" != "0" && "$offer_poll_seconds" == "0" ]]; then
   echo "--offer-poll-seconds must be positive when offer polling is enabled" >&2
+  exit 2
+fi
+if [[ "$max_create_attempts" == "0" ]]; then
+  echo "--max-create-attempts must be positive" >&2
+  exit 2
+fi
+if [[ "$max_create_attempts" != "1" && -n "$offer_id" ]]; then
+  echo "--max-create-attempts greater than 1 cannot be combined with --offer-id" >&2
+  exit 2
+fi
+if [[ "$execute" -eq 1 && "$max_create_attempts" != "1" && "$destroy_on_exit" -ne 1 ]]; then
+  echo "--max-create-attempts greater than 1 requires --destroy-on-exit when executing" >&2
   exit 2
 fi
 if [[ "$run_remote_smoke" -eq 1 && "$wait_ssh_seconds" == "0" ]]; then
@@ -200,6 +222,11 @@ join_words() {
 
 exclude_offer_ids_joined="$(join_words "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}")"
 exclude_host_ids_joined="$(join_words "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}")"
+
+refresh_exclude_joins() {
+  exclude_offer_ids_joined="$(join_words "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}")"
+  exclude_host_ids_joined="$(join_words "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}")"
+}
 
 parse_created_instance_id() {
   CREATE_OUTPUT="$1" python3 <<'PY'
@@ -344,16 +371,21 @@ run_remote_smoke_gate() {
 }
 
 filter="gpu_name=RTX_4090 cuda_vers>=12.0 disk_space>=40 num_gpus=1 dph<=${max_dph} reliability>=0.95"
+selected_offer_id=""
+selected_offer_json=""
+selected_offer_dph=""
+selected_soft_hours=""
 
-echo "search_filter=$filter"
-offers=""
-offer_deadline="$((SECONDS + offer_wait_seconds))"
-while :; do
-  offers="$(vastai search offers "$filter" -o 'dph' --raw)"
-  offers="$(
-    EXCLUDE_OFFER_IDS="$exclude_offer_ids_joined" \
-    EXCLUDE_HOST_IDS="$exclude_host_ids_joined" \
-    python3 -c '
+select_capped_offer() {
+  refresh_exclude_joins
+  offers=""
+  offer_deadline="$((SECONDS + offer_wait_seconds))"
+  while :; do
+    offers="$(vastai search offers "$filter" -o 'dph' --raw)"
+    offers="$(
+      EXCLUDE_OFFER_IDS="$exclude_offer_ids_joined" \
+      EXCLUDE_HOST_IDS="$exclude_host_ids_joined" \
+      python3 -c '
 import json
 import os
 import sys
@@ -368,34 +400,35 @@ filtered = [
 ]
 print(json.dumps(filtered))
 ' <<<"$offers"
-  )"
-  if [[ -n "$offers" && "$offers" != "[]" ]]; then
-    break
+    )"
+    if [[ -n "$offers" && "$offers" != "[]" ]]; then
+      break
+    fi
+    if [[ "$offer_wait_seconds" == "0" || "$SECONDS" -ge "$offer_deadline" ]]; then
+      break
+    fi
+    echo "NO_QUALIFYING_OFFER_YET waited_seconds=$((offer_wait_seconds - (offer_deadline - SECONDS)))"
+    sleep "$offer_poll_seconds"
+  done
+  if [[ -z "$offers" || "$offers" == "[]" ]]; then
+    echo "NO_QUALIFYING_OFFER"
+    echo "No RTX 4090 offer satisfied max_dph=${max_dph}; no rental attempted."
+    return 3
   fi
-  if [[ "$offer_wait_seconds" == "0" || "$SECONDS" -ge "$offer_deadline" ]]; then
-    break
+
+  selected_offer_id="$offer_id"
+  if [[ -z "$selected_offer_id" ]]; then
+    selected_offer_id="$(python3 -c 'import json,sys; data=json.load(sys.stdin); print(data[0]["id"])' <<<"$offers")"
   fi
-  echo "NO_QUALIFYING_OFFER_YET waited_seconds=$((offer_wait_seconds - (offer_deadline - SECONDS)))"
-  sleep "$offer_poll_seconds"
-done
-if [[ -z "$offers" || "$offers" == "[]" ]]; then
-  echo "NO_QUALIFYING_OFFER"
-  echo "No RTX 4090 offer satisfied max_dph=${max_dph}; no rental attempted."
-  exit 3
-fi
 
-if [[ -z "$offer_id" ]]; then
-  offer_id="$(python3 -c 'import json,sys; data=json.load(sys.stdin); print(data[0]["id"])' <<<"$offers")"
-fi
+  selected_offer_json="$(python3 -c 'import json,sys; oid=int(sys.argv[1]); data=json.load(sys.stdin); matches=[x for x in data if int(x["id"])==oid]; print(json.dumps(matches[0] if matches else {}))' "$selected_offer_id" <<<"$offers")"
+  if [[ "$selected_offer_json" == "{}" ]]; then
+    echo "offer_id ${selected_offer_id} is not present in the capped search results" >&2
+    return 4
+  fi
 
-offer_json="$(python3 -c 'import json,sys; oid=int(sys.argv[1]); data=json.load(sys.stdin); matches=[x for x in data if int(x["id"])==oid]; print(json.dumps(matches[0] if matches else {}))' "$offer_id" <<<"$offers")"
-if [[ "$offer_json" == "{}" ]]; then
-  echo "offer_id ${offer_id} is not present in the capped search results" >&2
-  exit 4
-fi
-
-offer_dph="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["dph_total"])' <<<"$offer_json")"
-python3 - "$offer_dph" "$max_dph" <<'PY'
+  selected_offer_dph="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["dph_total"])' <<<"$selected_offer_json")"
+  python3 - "$selected_offer_dph" "$max_dph" <<'PY'
 import sys
 dph=float(sys.argv[1])
 cap=float(sys.argv[2])
@@ -403,45 +436,49 @@ if not dph <= cap:
     raise SystemExit(f"offer price {dph} exceeds cap {cap}")
 PY
 
-soft_hours="$(python3 - "$max_budget" "$offer_dph" <<'PY'
+  selected_soft_hours="$(python3 - "$max_budget" "$selected_offer_dph" <<'PY'
 import sys
 budget=float(sys.argv[1])
 dph=float(sys.argv[2])
 print(f"{budget / dph:.2f}")
 PY
-)"
+  )"
+}
 
-echo "QUALIFYING_OFFER id=${offer_id} dph=${offer_dph} budget_hours=${soft_hours}"
-echo "LOCAL_SOURCE branch=${local_branch} head=${local_head} k_sq=${k_sq}"
-if [[ -n "$exclude_offer_ids_joined" ]]; then
-  echo "EXCLUDED_OFFER_IDS ${exclude_offer_ids_joined}"
-fi
-if [[ -n "$exclude_host_ids_joined" ]]; then
-  echo "EXCLUDED_HOST_IDS ${exclude_host_ids_joined}"
-fi
+print_offer_plan() {
+  refresh_exclude_joins
+  echo "QUALIFYING_OFFER id=${selected_offer_id} dph=${selected_offer_dph} budget_hours=${selected_soft_hours}"
+  echo "LOCAL_SOURCE branch=${local_branch} head=${local_head} k_sq=${k_sq}"
+  if [[ -n "$exclude_offer_ids_joined" ]]; then
+    echo "EXCLUDED_OFFER_IDS ${exclude_offer_ids_joined}"
+  fi
+  if [[ -n "$exclude_host_ids_joined" ]]; then
+    echo "EXCLUDED_HOST_IDS ${exclude_host_ids_joined}"
+  fi
 
-one_shot_wait_ssh_seconds="$wait_ssh_seconds"
-if [[ "$one_shot_wait_ssh_seconds" == "0" ]]; then
-  one_shot_wait_ssh_seconds="600"
-fi
-one_shot_cmd=("$0" --execute --run-remote-smoke --destroy-on-exit
-  --max-dph "$max_dph" --max-budget "$max_budget" --k-sq "$k_sq"
-  --offer-wait-seconds "$offer_wait_seconds"
-  --offer-poll-seconds "$offer_poll_seconds"
-  --wait-ssh-seconds "$one_shot_wait_ssh_seconds"
-  --ssh-poll-seconds "$ssh_poll_seconds")
-for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
-  one_shot_cmd+=(--exclude-offer-id "$id")
-done
-for id in "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}"; do
-  one_shot_cmd+=(--exclude-host-id "$id")
-done
+  one_shot_wait_ssh_seconds="$wait_ssh_seconds"
+  if [[ "$one_shot_wait_ssh_seconds" == "0" ]]; then
+    one_shot_wait_ssh_seconds="600"
+  fi
+  one_shot_cmd=("$0" --execute --run-remote-smoke --destroy-on-exit
+    --max-dph "$max_dph" --max-budget "$max_budget" --k-sq "$k_sq"
+    --offer-wait-seconds "$offer_wait_seconds"
+    --offer-poll-seconds "$offer_poll_seconds"
+    --max-create-attempts "$max_create_attempts"
+    --wait-ssh-seconds "$one_shot_wait_ssh_seconds"
+    --ssh-poll-seconds "$ssh_poll_seconds")
+  for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
+    one_shot_cmd+=(--exclude-offer-id "$id")
+  done
+  for id in "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}"; do
+    one_shot_cmd+=(--exclude-host-id "$id")
+  done
 
-create_cmd=(vastai create instance "$offer_id"
-  --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel
-  --disk 40 --ssh)
+  create_cmd=(vastai create instance "$selected_offer_id"
+    --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel
+    --disk 40 --ssh)
 
-cat <<EOF
+  cat <<EOF
 CREATE:
   $(shell_join "${create_cmd[@]}")
 
@@ -471,39 +508,73 @@ ACCEPTANCE_CHECK:
 ONE_SHOT_REMOTE_SMOKE:
   $(shell_join "${one_shot_cmd[@]}")
 EOF
+}
 
-if [[ "$execute" -eq 0 ]]; then
-  echo "DRY_RUN_ONLY"
-  exit 0
-fi
+create_cmd=()
 
-set +e
-create_output="$("${create_cmd[@]}" 2>&1)"
-create_status="$?"
-set -e
-redact_create_output "$create_output"
-if [[ "$create_status" -ne 0 ]]; then
-  exit "$create_status"
-fi
+echo "search_filter=$filter"
+attempt=1
+while (( attempt <= max_create_attempts )); do
+  set +e
+  select_capped_offer
+  select_status="$?"
+  set -e
+  if [[ "$select_status" -ne 0 ]]; then
+    exit "$select_status"
+  fi
+  print_offer_plan
 
-created_instance_id="$(parse_created_instance_id "$create_output")"
-if [[ -z "$created_instance_id" ]]; then
-  echo "Could not parse created instance id from Vast output" >&2
-  exit 5
-fi
-echo "CREATED_INSTANCE id=${created_instance_id}"
+  if [[ "$execute" -eq 0 ]]; then
+    echo "DRY_RUN_ONLY"
+    exit 0
+  fi
 
-if [[ "$wait_ssh_seconds" != "0" ]]; then
-  wait_for_ssh_ready "$created_instance_id"
-fi
+  set +e
+  create_output="$("${create_cmd[@]}" 2>&1)"
+  create_status="$?"
+  set -e
+  redact_create_output "$create_output"
+  if [[ "$create_status" -ne 0 ]]; then
+    exit "$create_status"
+  fi
 
-if [[ "$run_remote_smoke" -eq 1 ]]; then
-  run_remote_smoke_gate "$created_instance_id"
-  exit 0
-fi
+  created_instance_id="$(parse_created_instance_id "$create_output")"
+  if [[ -z "$created_instance_id" ]]; then
+    echo "Could not parse created instance id from Vast output" >&2
+    exit 5
+  fi
+  echo "CREATED_INSTANCE id=${created_instance_id}"
 
-cat <<'EOF'
+  if [[ "$wait_ssh_seconds" != "0" ]]; then
+    set +e
+    wait_for_ssh_ready "$created_instance_id"
+    ssh_ready_status="$?"
+    set -e
+    if [[ "$ssh_ready_status" -ne 0 ]]; then
+      if [[ "$destroy_on_exit" -eq 1 && -n "$created_instance_id" ]]; then
+        echo "DESTROYING_UNREADY_INSTANCE id=${created_instance_id}" >&2
+        vastai destroy instance "$created_instance_id" -y >&2 || true
+        created_instance_id=""
+      fi
+      if (( attempt < max_create_attempts )); then
+        echo "RETRYING_AFTER_SSH_TIMEOUT offer_id=${selected_offer_id} next_attempt=$((attempt + 1))"
+        exclude_offer_ids+=("$selected_offer_id")
+        attempt=$((attempt + 1))
+        continue
+      fi
+      exit "$ssh_ready_status"
+    fi
+  fi
+
+  if [[ "$run_remote_smoke" -eq 1 ]]; then
+    run_remote_smoke_gate "$created_instance_id"
+    exit 0
+  fi
+
+  cat <<'EOF'
 Instance creation requested. Wait for SSH readiness, then run the DEPLOY,
 REMOTE_SMOKE, PULL, and ACCEPTANCE_CHECK commands printed above. This script
 destroys instances only when --destroy-on-exit is supplied.
 EOF
+  exit 0
+done
