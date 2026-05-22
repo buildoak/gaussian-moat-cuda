@@ -165,6 +165,13 @@ cmake --build /tmp/gm-lbsp -j
 ctest --test-dir /tmp/gm-lbsp --output-on-failure
 ```
 
+The branch-scope gate is checked separately because remote smoke deployments
+may not include `.git` metadata:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/check_phase1_diff_scope.sh
+```
+
 The tests cover composed bands versus one big band, false welding,
 source-only-carry loss, neutral partition merges, terminal inventory, hard
 overflow rejection, `K=32` carry width, associativity across band groupings,
