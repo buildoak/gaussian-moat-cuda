@@ -156,14 +156,14 @@ add_test(NAME k26_execution_plan
   COMMAND k26_execution_plan)
 set_tests_properties(k26_execution_plan PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645"
+    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_bz_schedule_check
   COMMAND k26_bz_schedule_check)
 set_tests_properties(k26_bz_schedule_check PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_bz_schedule_check_v1\".*\"proof_status\":\"BZ_SCHEDULE_REQUIRES_ROW_SHIFTS_DIAGNOSTIC\".*\"accepted_for_claim\":false.*\"band_count\":124.*\"rows_checked\":124.*\"rows_with_bad_norms\":3.*\"bad_norm_count\":3.*\"bz_clean\":false"
+    "\"schema\":\"lb_source_k26_bz_schedule_check_v1\".*\"proof_status\":\"BZ_REPAIRED_SCHEDULE_DIAGNOSTIC_NON_CLAIM\".*\"accepted_for_claim\":false.*\"band_count\":124.*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"nominal_summary\":.*\"rows_with_bad_norms\":3.*\"repaired_summary\":.*\"bad_norm_count\":0.*\"bz_clean\":true"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME remote_smoke_artifact_checker

@@ -33,9 +33,11 @@ verifier, the campaign should use the conservative value.
 5. The run is wired to source/origin seed logic, not `geo_I` flags.
 6. Every source/origin proof row rejects overflow.
 7. Non-square `K=26` has per-row BZ evidence, and every accepted row is
-   BZ-clean. The current exact schedule diagnostic shows the nominal 124-row
-   width-8192 schedule is not BZ-clean: rows `15`, `58`, and `75` need row
-   shifts or adaptive boundary repair before any claim run.
+   BZ-clean. The exact schedule diagnostic shows the nominal 124-row
+   width-8192 schedule is not BZ-clean at rows `15`, `58`, and `75`, then
+   repairs the internal boundaries `122880`, `475136`, and `622592` down by
+   `1`. The repaired schedule is BZ-clean but remains diagnostic until it is
+   bound into full-run metadata.
 8. Coordinate-to-port seam bridging is accepted or explicitly reported as
    diagnostic evidence. The current K36 smoke keeps `133` source coordinate
    carry atoms as the original incoming separator, inserts `374` bridge edges
@@ -86,7 +88,7 @@ required evidence, and current blocking gaps. It must keep
   accepted lemma and verifier gate.
 - accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
-- accepted K26 non-square BZ evidence after repairing nominal dirty rows;
+- accepted K26 non-square BZ evidence bound to the repaired schedule;
 - an accepted full-scale `SOURCE_DEAD_CERT` artifact. The current independent
   draft checker validates a listed positive source path, negative guard, and
   inventory count/digest consistency, but the real K26 chain and BZ acceptance

@@ -74,11 +74,11 @@ cat > "$tmp/k26_source_run_contract.json" <<'JSON'
 JSON
 
 cat > "$tmp/k26_execution_plan.json" <<'JSON'
-{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 16/16"],"non_claim":"execution plan only; no source/origin run executed"}
+{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 16/16"],"non_claim":"execution plan only; no source/origin run executed"}
 JSON
 
 cat > "$tmp/k26_bz_schedule_check.json" <<'JSON'
-{"schema":"lb_source_k26_bz_schedule_check_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"BZ_SCHEDULE_REQUIRES_ROW_SHIFTS_DIAGNOSTIC","accepted_for_claim":false,"band_count":124,"summary":{"rows_checked":124,"rows_with_bad_norms":3,"bad_norm_count":3,"bz_clean":false},"non_claim":"exact K26 bad-zone schedule diagnostic only; nominal rows require BZ repair before any source/origin run"}
+{"schema":"lb_source_k26_bz_schedule_check_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"BZ_REPAIRED_SCHEDULE_DIAGNOSTIC_NON_CLAIM","accepted_for_claim":false,"band_count":124,"repair":{"repaired_boundary_count":3,"max_abs_boundary_shift":1},"nominal_summary":{"rows_checked":124,"rows_with_bad_norms":3,"bad_norm_count":3,"bz_clean":false},"repaired_summary":{"rows_checked":124,"rows_with_bad_norms":0,"bad_norm_count":0,"bz_clean":true},"non_claim":"exact K26 bad-zone schedule diagnostic only; repaired rows are BZ-clean but no source/origin run was executed"}
 JSON
 
 "$checker" "$tmp" > "$tmp/pass.log"

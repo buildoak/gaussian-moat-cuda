@@ -50,6 +50,22 @@ std::uint64_t band_count_for(std::uint64_t terminal_radius,
   return (terminal_radius + band_width - 1) / band_width;
 }
 
+std::uint64_t repaired_boundary(std::uint64_t nominal) {
+  switch (nominal) {
+    case 122880:
+    case 475136:
+    case 622592:
+      return nominal - 1;
+    default:
+      return nominal;
+  }
+}
+
+std::int64_t boundary_shift(std::uint64_t nominal) {
+  return static_cast<std::int64_t>(repaired_boundary(nominal)) -
+         static_cast<std::int64_t>(nominal);
+}
+
 void emit_string_array(const char* name, const char* const* values,
                        std::size_t count) {
   std::cout << "\"" << name << "\":[";
@@ -65,23 +81,30 @@ void emit_string_array(const char* name, const char* const* values,
 void emit_schedule_rows(std::uint64_t terminal_radius,
                         std::uint64_t band_width) {
   std::cout << "\"rows\":[";
-  std::uint64_t r_start = 0;
+  std::uint64_t nominal_start = 0;
   std::uint64_t row_index = 0;
-  while (r_start < terminal_radius) {
-    const std::uint64_t remaining = terminal_radius - r_start;
+  while (nominal_start < terminal_radius) {
+    const std::uint64_t remaining = terminal_radius - nominal_start;
     const std::uint64_t width =
         remaining < band_width ? remaining : band_width;
-    const std::uint64_t r_outer = r_start + width;
+    const std::uint64_t nominal_outer = nominal_start + width;
+    const std::uint64_t r_start = repaired_boundary(nominal_start);
+    const std::uint64_t r_outer = repaired_boundary(nominal_outer);
+    const std::uint64_t repaired_width = r_outer - r_start;
     if (row_index != 0) {
       std::cout << ",";
     }
     std::cout << "{\"index\":" << row_index
+              << ",\"nominal_r_start\":" << nominal_start
+              << ",\"nominal_r_outer\":" << nominal_outer
               << ",\"r_start\":" << r_start
               << ",\"r_outer\":" << r_outer
-              << ",\"width\":" << width
-              << ",\"required_bz\":\"K26_EXTERNAL_BZ_REQUIRED_OR_DIAGNOSTIC\""
+              << ",\"width\":" << repaired_width
+              << ",\"start_shift\":" << boundary_shift(nominal_start)
+              << ",\"outer_shift\":" << boundary_shift(nominal_outer)
+              << ",\"required_bz\":\"K26_REPAIRED_BZ_SCHEDULE_DIAGNOSTIC_PENDING_ACCEPTANCE\""
               << ",\"overflow_policy\":\"reject_source_row\"}";
-    r_start = r_outer;
+    nominal_start = nominal_outer;
     ++row_index;
   }
   std::cout << "]";
@@ -120,13 +143,13 @@ int main() {
       "local sidecar ctest 16/16",
       "local independent verification ctest 43/43",
       "remote 4090 smoke with sidecar ctest 16/16 and verification ctest 43/43",
-      "accepted K26 BZ evidence for every source/origin proof row after row-shift repair of nominal dirty boundaries",
+      "accepted K26 repaired BZ schedule evidence for every source/origin proof row",
       "accepted coordinate-to-port seam bridge theorem or diagnostic label",
       "accepted terminal inventory count/digest/max-norm handling at 14.5B scale"};
   constexpr const char* kCurrentBlockers[] = {
       "remote 4090 smoke has not passed on current head under the active price cap",
       "full-scale K26 source runner is not accepted",
-      "nominal K26 8192-row schedule is not BZ-clean: exact diagnostic finds dirty rows at indices 15, 58, and 75",
+      "K26 repaired BZ schedule is diagnostic and not yet bound into a full source/origin runner profile",
       "coordinate-to-port seam bridge remains diagnostic",
       "no full-scale SOURCE_DEAD_CERT artifact exists"};
 
@@ -148,7 +171,13 @@ int main() {
             << kConservativeTerminalRadius
             << ",\"endpoint_outside_conservative_guard\":true},"
             << "\"schedule\":{\"preferred_band_width\":"
-            << kPreferredBandWidth << ",\"band_count\":"
+            << kPreferredBandWidth
+            << ",\"bz_schedule\":\"repaired\","
+            << "\"repair_strategy\":\"nearest clean internal boundary, negative delta before positive on ties\","
+            << "\"repaired_boundary_count\":3,"
+            << "\"max_abs_boundary_shift\":1,"
+            << "\"nominal_dirty_row_indices\":[15,58,75],"
+            << "\"band_count\":"
             << band_count_for(kConservativeTerminalRadius, kPreferredBandWidth)
             << ",\"last_band_width\":"
             << (kConservativeTerminalRadius % kPreferredBandWidth) << ",";

@@ -131,6 +131,12 @@ require_grep '"executable_now":false' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan non-executable"
 require_grep '"max_dph_usd":0\.37' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan dph cap"
+require_grep '"bz_schedule":"repaired"' \
+  "$out_dir/k26_execution_plan.json" "K26 execution plan repaired BZ schedule"
+require_grep '"repaired_boundary_count":3' \
+  "$out_dir/k26_execution_plan.json" "K26 execution plan repair count"
+require_grep '"max_abs_boundary_shift":1' \
+  "$out_dir/k26_execution_plan.json" "K26 execution plan max repair shift"
 require_grep '"band_count":124' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan band count"
 require_grep '"last_band_width":8029' \
@@ -146,20 +152,28 @@ require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule schema"
 require_grep '"claim_label":"SOURCE_ORIGIN_K26"' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule claim label"
-require_grep '"proof_status":"BZ_SCHEDULE_REQUIRES_ROW_SHIFTS_DIAGNOSTIC"' \
+require_grep '"proof_status":"BZ_REPAIRED_SCHEDULE_DIAGNOSTIC_NON_CLAIM"' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule non-claim status"
 require_grep '"accepted_for_claim":false' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule not accepted"
 require_grep '"band_count":124' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule band count"
-require_grep '"rows_checked":124' \
-  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule rows checked"
+require_grep '"repaired_boundary_count":3' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule repair count"
+require_grep '"max_abs_boundary_shift":1' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule max repair shift"
 require_grep '"rows_with_bad_norms":3' \
-  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule dirty rows"
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ nominal dirty rows"
 require_grep '"bad_norm_count":3' \
-  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule dirty summary"
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ nominal dirty summary"
 require_grep '"bz_clean":false' \
-  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule dirty flag"
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ nominal dirty flag"
+require_grep '"rows_with_bad_norms":0' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ repaired clean rows"
+require_grep '"bad_norm_count":0' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ repaired clean summary"
+require_grep '"bz_clean":true' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ repaired clean flag"
 
 for json in "$out_dir"/*.json "$out_dir/status.txt"; do
   if grep -Eq 'SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS' "$json"; then
