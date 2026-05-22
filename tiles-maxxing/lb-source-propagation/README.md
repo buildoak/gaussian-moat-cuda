@@ -243,13 +243,13 @@ tiles-maxxing/lb-source-propagation/scripts/check_k26_full_run_bundle.sh \
 ```
 
 It is intentionally stricter than the remote smoke checker. It expects the
-K26 prefix result, strict-bridge continuation result, BZ schedule evidence,
-run profile, run command contract, `k26-source-dead-gap.json`, and
-`k26-source-dead-cert.json`; it rejects digest mismatches, malformed gap
-artifacts, unbridged coordinate carry, overflow, wrong component size, missing
-source-dead draft, a source-dead draft whose terminal inventory summary does
-not match the executed continuation result, or a source-dead draft not accepted
-by the independent checker.
+K26 prefix result, diagnostic-bridge TileOp-port continuation result, BZ
+schedule evidence, run profile, run command contract,
+`k26-source-dead-gap.json`, and `k26-source-dead-cert.json`; it rejects digest
+mismatches, malformed gap artifacts, unsafe source-connected bridge gaps,
+overflow, wrong component size, missing source-dead draft, a source-dead draft
+whose terminal inventory summary does not match the executed continuation
+result, or a source-dead draft not accepted by the independent checker.
 
 The paid/full-run harness is:
 
@@ -262,7 +262,7 @@ tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
 ```
 
 It runs the exact K26 command/profile/BZ emitters, then executes the row-0
-coordinate prefix and strict-bridge TileOp-port continuation. It does not
+coordinate prefix and diagnostic-bridge TileOp-port continuation. It does not
 manufacture a source-dead certificate. If no `k26-source-dead-cert.json` is
 available, it writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt` after
@@ -275,7 +275,13 @@ with tile counts, port atom/edge counts, overflow totals, seam bridge counts,
 source carry/death state, and timing fields. This is also observability only.
 The harness also writes
 `k26-source-dead-gap.json`, binding the continuation artifact and naming the
-missing coordinate Gaussian-prime source-path layer. The gap artifact also
+remaining certificate obligations. `bridge_safety` records the
+`source_unbridged_unsafe_candidate_atoms == 0` bridge condition.
+`coordinate_path_obligation` records that the observed target path is still a
+mixed coordinate/TileOp-port atom chain and must be expanded to a coordinate
+Gaussian-prime source path. `terminal_inventory_obligation` records that the
+observed inventory is still summary-digest non-claim evidence and must be
+promoted to claim-grade terminal inventory provenance. The gap artifact also
 binds the repaired K26 BZ schedule digest as schedule-only, non-claim evidence.
 When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
@@ -316,7 +322,7 @@ not a coordinate Gaussian-prime source path suitable for a `SOURCE_DEAD_CERT`.
 comparison target. It is intentionally a non-claim artifact:
 `"executable_now": false` remains correct until a campaign-scale source runner,
 scalable terminal inventory digest, full-run K26 BZ digest binding, and
-`SOURCE_DEAD_CERT` verifier exist.
+accepted `SOURCE_DEAD_CERT` artifact exist.
 
 `k26_execution_plan` emits the machine-checkable execution plan for the same
 target. It expands the conservative `R_final=1015645` guard into 124 radial
