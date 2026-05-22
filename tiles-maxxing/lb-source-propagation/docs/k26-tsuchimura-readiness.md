@@ -200,9 +200,15 @@ artifact. The target field currently reports
 id chain when target reachability is proved. This is still not a coordinate
 Gaussian-prime source-path witness suitable for a `SOURCE_DEAD_CERT`. This
 command is not part of the local smoke gate. A Mac Mini probe of the row-0
-prefix was still CPU-bound after eight minutes with no completed artifact, so
-row-0 prefix execution should be treated as paid-run work under the Vast budget
-cap unless a smaller diagnostic radius is being tested.
+prefix now completes after the prefix-witness BFS-tree fix: on 2026-05-22,
+`source_origin_cpu_runner --k-sq 26 --r-final 8192 --band-width 8192
+--endpoint-a 376039 --endpoint-b 943460 --max-atoms 50000000
+--manifest-out ... --prefix-witness-out ... --progress-out ...` completed
+locally in about `40s`. It generated `1,979,012` atoms, `6,328,416` edges,
+`2,580` source carry witness targets, and wrote the prefix manifest plus
+witness. This is operational readiness evidence for row 0 only; it is still
+not a source/origin comparison, not terminal source death, and not a
+`SOURCE_DEAD_CERT`.
 
 ## Stop Conditions
 

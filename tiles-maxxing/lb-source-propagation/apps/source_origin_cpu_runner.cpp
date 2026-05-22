@@ -430,6 +430,68 @@ std::vector<lb_source::AtomId> source_path_to_endpoint(
   return {reversed_path.rbegin(), reversed_path.rend()};
 }
 
+std::map<lb_source::AtomId, lb_source::AtomId> source_parent_tree(
+    const std::vector<lb_source::AtomId>& source_seed_ids,
+    const std::map<lb_source::AtomId, Point>& point_by_id,
+    const std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>&
+        adjacency) {
+  std::vector<lb_source::AtomId> seeds = source_seed_ids;
+  std::sort(seeds.begin(), seeds.end());
+  seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
+
+  std::queue<lb_source::AtomId> pending;
+  std::map<lb_source::AtomId, lb_source::AtomId> parent_by_id;
+  for (const lb_source::AtomId seed_id : seeds) {
+    if (point_by_id.find(seed_id) == point_by_id.end()) {
+      continue;
+    }
+    if (!parent_by_id.emplace(seed_id, seed_id).second) {
+      continue;
+    }
+    pending.push(seed_id);
+  }
+
+  while (!pending.empty()) {
+    const lb_source::AtomId current = pending.front();
+    pending.pop();
+    const auto neighbors = adjacency.find(current);
+    if (neighbors == adjacency.end()) {
+      continue;
+    }
+    for (const lb_source::AtomId neighbor : neighbors->second) {
+      if (point_by_id.find(neighbor) == point_by_id.end()) {
+        continue;
+      }
+      if (!parent_by_id.emplace(neighbor, current).second) {
+        continue;
+      }
+      pending.push(neighbor);
+    }
+  }
+
+  return parent_by_id;
+}
+
+std::vector<lb_source::AtomId> source_path_from_parent_tree(
+    lb_source::AtomId target_id,
+    const std::map<lb_source::AtomId, lb_source::AtomId>& parent_by_id) {
+  if (parent_by_id.find(target_id) == parent_by_id.end()) {
+    return {};
+  }
+
+  std::vector<lb_source::AtomId> reversed_path;
+  lb_source::AtomId current = target_id;
+  while (true) {
+    reversed_path.push_back(current);
+    const lb_source::AtomId parent = parent_by_id.at(current);
+    if (parent == current) {
+      break;
+    }
+    current = parent;
+  }
+  return {reversed_path.rbegin(), reversed_path.rend()};
+}
+
 void append_source_path_json(
     std::ostream& out,
     const std::vector<lb_source::AtomId>& source_path,
@@ -505,6 +567,8 @@ std::size_t write_prefix_witness_or_die(
           << "outer_radius " << outer_radius << "\n"
           << "witness_count " << targets.size() << "\n";
 
+  const std::map<lb_source::AtomId, lb_source::AtomId> parent_by_id =
+      source_parent_tree(source_seed_ids, point_by_id, adjacency);
   for (const lb_source::AtomId target : targets) {
     const auto point_it = point_by_id.find(target);
     if (point_it == point_by_id.end()) {
@@ -512,8 +576,7 @@ std::size_t write_prefix_witness_or_die(
       std::exit(EXIT_FAILURE);
     }
     const std::vector<lb_source::AtomId> path_ids =
-        source_path_to_endpoint(source_seed_ids, target, point_by_id,
-                                adjacency);
+        source_path_from_parent_tree(target, parent_by_id);
     if (path_ids.empty()) {
       std::cerr << "source carry target lacks an origin-prefix witness path\n";
       std::exit(EXIT_FAILURE);
