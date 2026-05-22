@@ -94,9 +94,12 @@ ctest --test-dir "$build_dir" --output-on-failure \
 "$build_dir/k26_tsuchimura_preflight" \
   | tee "$out_dir/k26_tsuchimura_preflight.json"
 
+"$build_dir/k26_source_run_contract" \
+  | tee "$out_dir/k26_source_run_contract.json"
+
 cat > "$out_dir/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test plus CPU TileOp producer smoke only.
+Scope: sidecar build/test, CPU TileOp producer smoke, and K26 non-claim run contract only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 

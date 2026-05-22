@@ -63,7 +63,7 @@ source-only-carry loss, neutral partition merges, terminal inventory, hard
 overflow rejection, `K=32` carry width, associativity across band groupings,
 certified source seed application/rejection, carry-manifest round-trip/rejection,
 exact draft JSON output, CPU TileOp producer smoke, and sqrt(26) Tsuchimura
-preflight constants.
+preflight/run-contract constants.
 
 ## Remote Smoke
 
@@ -79,10 +79,17 @@ tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh \
 
 This only builds/tests the sidecar and runs the CPU TileOp source smoke. It
 does not start K32, does not run a long campaign, and does not claim a moat
-result.
+result. The smoke artifact set includes `k26_source_run_contract.json`, which
+must remain a non-claim contract until the blockers it lists are closed.
 
 The sqrt(26) readiness guard lives in
 `docs/k26-tsuchimura-readiness.md`.
+
+`k26_source_run_contract` emits the execution contract for the Tsuchimura
+comparison target. It is intentionally a non-claim artifact:
+`"executable_now": false` remains correct until a campaign-scale source runner,
+scalable terminal inventory digest, accepted K26 BZ evidence, and
+`SOURCE_DEAD_CERT` verifier exist.
 
 ## Integration Boundary
 

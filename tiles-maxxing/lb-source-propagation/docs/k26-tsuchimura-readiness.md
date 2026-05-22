@@ -46,6 +46,28 @@ verifier, the campaign should use the conservative value.
 - stable artifact hashes for carry manifests and source profile drafts;
 - commit/build identity and BZ evidence in the profile metadata.
 
+## Executable Contract
+
+The local executable contract is:
+
+```bash
+k26_source_run_contract
+```
+
+It emits `lb_source_k26_run_contract_v1`, including the target endpoint,
+`R_final >= 1015645` conservative guard, a suggested 8192-radius band schedule,
+required evidence, and current blocking gaps. It must keep
+`"executable_now": false` until these pieces exist:
+
+- a campaign-scale source runner that feeds the sidecar from CPU/CUDA TileOps;
+- stable coordinate or canonical-port carry atoms, not transient TileOp group
+  labels;
+- scalable terminal inventory with count/digest/max norm/tie set rather than an
+  explicit 14.5B-member atom-id vector;
+- accepted K26 non-square BZ evidence;
+- an independent `SOURCE_DEAD_CERT` schema/verifier for the positive source
+  chain and negative final guard proof.
+
 ## Stop Conditions
 
 Stop and report without claiming reproduction if:
