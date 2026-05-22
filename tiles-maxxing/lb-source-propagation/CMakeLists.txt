@@ -111,3 +111,16 @@ set_tests_properties(source_origin_cpu_runner_smoke PROPERTIES
     "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\".*\"source_reached\":true.*\"accepted\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\".*\"source_path_length\":1.*\"source_path\":\\[\\{\"a\":0,\"b\":3,\"norm_sq\":9\\}\\]"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME source_origin_cpu_runner_dead_cert_smoke
+  COMMAND source_origin_cpu_runner
+    --k-sq 2
+    --r-final 16
+    --band-width 2
+    --endpoint-a 0
+    --endpoint-b 3
+    --cert-out ${CMAKE_CURRENT_BINARY_DIR}/source_origin_dead_cert_smoke.json)
+set_tests_properties(source_origin_cpu_runner_dead_cert_smoke PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"terminal_source_dead\":true.*\"source_path_length\":3.*\"cert_written\":true"
+  FAIL_REGULAR_EXPRESSION
+    "MOAT_PROOF_PASS|SPAN_PROOF_PASS")

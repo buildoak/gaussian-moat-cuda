@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -26,6 +27,7 @@ struct Config {
   std::int64_t endpoint_a = 0;
   std::int64_t endpoint_b = 3;
   std::size_t max_atoms = 65535;
+  std::optional<std::string> cert_out;
 };
 
 struct Point {
@@ -78,7 +80,9 @@ void usage(const char* prog) {
       << "  --endpoint-a A        endpoint real coordinate (default 0)\n"
       << "  --endpoint-b B        endpoint imaginary coordinate (default 3)\n"
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
-      << "                        (default 65535)\n";
+      << "                        (default 65535)\n"
+      << "  --cert-out PATH       write lb_source_dead_cert_draft_v1 when the\n"
+      << "                        endpoint is reached and source dies\n";
 }
 
 bool parse_args(int argc, char** argv, Config& config) {
@@ -140,6 +144,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.max_atoms = static_cast<std::size_t>(parsed);
+    } else if (take_value("--cert-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--cert-out must not be empty\n";
+        return false;
+      }
+      config.cert_out = value;
     } else {
       std::cerr << "unknown argument: " << arg << "\n";
       return false;
@@ -358,6 +368,18 @@ void append_source_path_json(
   out << ']';
 }
 
+std::vector<lb_source::SourcePathPoint> make_source_path_points(
+    const std::vector<lb_source::AtomId>& source_path,
+    const std::map<lb_source::AtomId, Point>& point_by_id) {
+  std::vector<lb_source::SourcePathPoint> points;
+  points.reserve(source_path.size());
+  for (const lb_source::AtomId id : source_path) {
+    const Point& point = point_by_id.at(id);
+    points.push_back({point.a, point.b, point.norm_sq});
+  }
+  return points;
+}
+
 bool has_source_carry(const lb_source::SeparatorState& state) {
   return std::find(state.source_bit_per_component.begin(),
                    state.source_bit_per_component.end(),
@@ -488,6 +510,42 @@ int main(int argc, char** argv) {
           ? source_path_to_endpoint(source_seed_ids, endpoint_id, point_by_id,
                                     adjacency)
           : std::vector<lb_source::AtomId>{};
+  bool cert_written = false;
+  if (config.cert_out.has_value()) {
+    if (!last.accepted() || !last.terminal_source_dead ||
+        !endpoint_source_reached || source_path.empty() || inventory.empty()) {
+      std::cerr << "--cert-out requires accepted terminal source death with "
+                   "a reached endpoint, source path, and terminal inventory\n";
+      return EXIT_FAILURE;
+    }
+
+    const lb_source::SourceDraftMetadata metadata{
+        .source_mode = "ORIGIN_SOURCE",
+        .source_id = "omega",
+        .geometry_id = "canonical-octant-diagnostic",
+        .commit_id = "local-diagnostic",
+        .build_id = "sidecar-cmake",
+        .bz_status = "BZ_CLEAN_DIAGNOSTIC",
+        .artifact_hash = "coordinate-fed-diagnostic"};
+    const lb_source::SourceCertificateDraft certificate{
+        .certificate_id = "source-origin-diagnostic-dead-cert",
+        .profile_id = "source-origin-diagnostic-profile",
+        .metadata = metadata,
+        .k_sq = config.k_sq,
+        .terminal_radius = config.r_final,
+        .negative_guard_pass = true,
+        .endpoint = {config.endpoint_a, config.endpoint_b, endpoint_norm},
+        .source_path = make_source_path_points(source_path, point_by_id),
+        .terminal_source_inventory = inventory};
+
+    std::ofstream cert(*config.cert_out);
+    if (!cert) {
+      std::cerr << "cannot open --cert-out path: " << *config.cert_out << "\n";
+      return EXIT_FAILURE;
+    }
+    cert << lb_source::source_certificate_draft_json(certificate) << "\n";
+    cert_written = true;
+  }
 
   std::cout << "{"
             << "\"schema\":\"lb_source_origin_cpu_runner_v1\","
@@ -523,7 +581,8 @@ int main(int argc, char** argv) {
             << ",\"source_path_length\":" << source_path.size()
             << ",\"source_path\":";
   append_source_path_json(std::cout, source_path, point_by_id);
-  std::cout << ",\"non_claim\":\"small coordinate-fed sidecar runner; not a TileOp/CUDA SOURCE_DEAD_CERT\""
+  std::cout << ",\"cert_written\":" << (cert_written ? "true" : "false")
+            << ",\"non_claim\":\"small coordinate-fed sidecar runner; not a TileOp/CUDA SOURCE_DEAD_CERT\""
             << "}\n";
 
   return last.accepted() ? EXIT_SUCCESS : EXIT_FAILURE;
