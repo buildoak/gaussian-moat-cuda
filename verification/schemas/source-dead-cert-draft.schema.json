@@ -53,10 +53,28 @@
       },
       "then": {
         "properties": {
+          "k_sq": { "const": 26 },
+          "terminal_radius": { "const": 1015645 },
+          "endpoint": {
+            "properties": {
+              "a": { "const": 376039 },
+              "b": { "const": 943460 },
+              "norm_sq": { "const": 1031522101121 }
+            }
+          },
           "metadata": {
             "properties": {
               "bz_status": {
                 "const": "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE"
+              }
+            }
+          },
+          "terminal_source_inventory_summary": {
+            "properties": {
+              "count": { "const": 14542615005 },
+              "max_norm_sq": { "const": 1031522101121 },
+              "max_norm_atom_ids": {
+                "contains": { "const": 1615075207964004 }
               }
             }
           }

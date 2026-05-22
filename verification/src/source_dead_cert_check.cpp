@@ -17,6 +17,15 @@
 
 namespace {
 
+constexpr std::uint64_t kK26Sq = 26;
+constexpr std::uint64_t kK26TerminalRadius = 1015645;
+constexpr std::int64_t kK26EndpointA = 376039;
+constexpr std::int64_t kK26EndpointB = 943460;
+constexpr std::uint64_t kK26EndpointNormSq = 1031522101121ULL;
+constexpr std::uint64_t kK26ExpectedComponentSize = 14542615005ULL;
+constexpr std::string_view kK26BzStatus =
+    "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE";
+
 std::string type_name(const nlohmann::json& value) {
   return std::string(value.type_name());
 }
@@ -145,8 +154,7 @@ void require_nonpending_metadata(const nlohmann::json& metadata) {
     throw std::runtime_error(
         "metadata.artifact_hash must be sha256:<64 lowercase hex chars>");
   }
-  if (geometry_id == "SOURCE_ORIGIN_K26" &&
-      bz_status != "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE") {
+  if (geometry_id == "SOURCE_ORIGIN_K26" && bz_status != kK26BzStatus) {
     throw std::runtime_error(
         "SOURCE_ORIGIN_K26 cert requires repaired K26 BZ status");
   }
@@ -543,6 +551,10 @@ std::vector<std::int64_t> require_summary_ties(const nlohmann::json& summary) {
   return expected_ties;
 }
 
+bool has_i64(const std::vector<std::int64_t>& values, std::int64_t value) {
+  return std::find(values.begin(), values.end(), value) != values.end();
+}
+
 enum class CertStatus {
   kListedDraftPass,
   kSummaryOnlyNonClaimPass,
@@ -616,6 +628,21 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
       require_object(cert, "terminal_source_inventory_summary");
   require_inventory_digest_shape(summary);
 
+  const std::string geometry_id =
+      require_string(require_object(cert, "metadata"), "geometry_id");
+  const bool is_k26_cert = geometry_id == "SOURCE_ORIGIN_K26";
+  if (is_k26_cert) {
+    if (k_sq != kK26Sq || terminal_radius != kK26TerminalRadius) {
+      throw std::runtime_error(
+          "SOURCE_ORIGIN_K26 cert has wrong K26 constants");
+    }
+    if (endpoint.a != kK26EndpointA || endpoint.b != kK26EndpointB ||
+        endpoint.norm_sq != kK26EndpointNormSq) {
+      throw std::runtime_error(
+          "SOURCE_ORIGIN_K26 cert endpoint is not the canonical K26 target");
+    }
+  }
+
   if (inventory_mode == "summary_only_non_claim") {
     if (has_field(cert, "terminal_source_inventory")) {
       throw std::runtime_error(
@@ -652,6 +679,14 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
       if (coordinate_atom_norm_sq(id) != max_norm_sq) {
         throw std::runtime_error(
             "summary-only inventory max_norm_atom_ids norm mismatch");
+      }
+    }
+    if (is_k26_cert) {
+      if (count != kK26ExpectedComponentSize ||
+          max_norm_sq != kK26EndpointNormSq ||
+          !has_i64(ties, endpoint_atom_id)) {
+        throw std::runtime_error(
+            "SOURCE_ORIGIN_K26 summary does not match Tsuchimura component");
       }
     }
     return CertStatus::kSummaryOnlyNonClaimPass;
@@ -693,6 +728,14 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
       require_summary_ties(summary);
   if (expected_ties != actual_ties) {
     throw std::runtime_error("inventory max_norm_atom_ids mismatch");
+  }
+  if (is_k26_cert) {
+    if (inventory.size() != kK26ExpectedComponentSize ||
+        actual_max_norm_sq != kK26EndpointNormSq ||
+        !has_i64(actual_ties, endpoint_atom_id)) {
+      throw std::runtime_error(
+          "SOURCE_ORIGIN_K26 inventory does not match Tsuchimura component");
+    }
   }
   return CertStatus::kListedDraftPass;
 }
