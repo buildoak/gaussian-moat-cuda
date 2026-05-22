@@ -86,6 +86,7 @@ foreach(bad_source_dead_cert
     dead-cert-bad-inventory-extrema
     dead-cert-bad-negative-guard
     dead-cert-bad-path-inventory
+    dead-cert-bad-path-provenance
     dead-cert-bad-pending-metadata
     dead-cert-bad-summary-extrema
     dead-cert-bad-summary-mode-claim

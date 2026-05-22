@@ -404,6 +404,8 @@ require_grep '"endpoint":.*"a":376039.*"b":943460.*"norm_sq":1031522101121' "$ce
   "K26 source-dead cert canonical endpoint"
 require_grep '"endpoint_atom_id":1615075207964004' "$cert" \
   "K26 source-dead cert endpoint atom id"
+require_grep '"source_path_provenance":"coordinate_gaussian_prime_path"' "$cert" \
+  "K26 source-dead cert coordinate path provenance"
 require_grep '"source_path":\[' "$cert" \
   "K26 source-dead cert source path"
 require_grep '"terminal_source_inventory_summary":.*"count":14542615005' "$cert" \

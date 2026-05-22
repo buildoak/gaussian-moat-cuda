@@ -575,6 +575,11 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   if (require_i64(cert, "endpoint_atom_id") != endpoint_atom_id) {
     throw std::runtime_error("endpoint_atom_id does not match endpoint");
   }
+  if (require_string(cert, "source_path_provenance") !=
+      "coordinate_gaussian_prime_path") {
+    throw std::runtime_error(
+        "source_path_provenance is not coordinate_gaussian_prime_path");
+  }
 
   const std::vector<Point> source_path = require_source_path(cert);
   if (!(source_path.back() == endpoint)) {

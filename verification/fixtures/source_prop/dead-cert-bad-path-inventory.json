@@ -16,6 +16,7 @@
   "negative_guard_pass": true,
   "endpoint": { "a": 7, "b": 2, "norm_sq": 53 },
   "endpoint_atom_id": 30064771074,
+  "source_path_provenance": "coordinate_gaussian_prime_path",
   "source_path": [
     { "a": 5, "b": 2, "norm_sq": 29 },
     { "a": 7, "b": 2, "norm_sq": 53 }

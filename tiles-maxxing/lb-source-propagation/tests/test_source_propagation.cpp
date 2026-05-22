@@ -616,6 +616,9 @@ void test_draft_profile_and_certificate_json_output() {
                             "\"norm_sq\":9}") != std::string::npos);
   CHECK_TRUE(cert_json.find("\"endpoint_atom_id\":3") !=
              std::string::npos);
+  CHECK_TRUE(cert_json.find("\"source_path_provenance\":"
+                            "\"coordinate_gaussian_prime_path\"") !=
+             std::string::npos);
   CHECK_TRUE(cert_json.find("\"source_path\":[{\"a\":0,\"b\":3,"
                             "\"norm_sq\":9}]") != std::string::npos);
   CHECK_TRUE(cert_json.find("\"terminal_source_inventory\":[1,2]") !=
