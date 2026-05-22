@@ -100,10 +100,13 @@ writes `k26-source-dead-gap.json`, a partial
 the continuation artifact and records the exact missing layer: a coordinate
 Gaussian-prime source path from the origin prefix to the canonical endpoint,
 plus a verifier that expands the mixed coordinate/port atom chain into
-claim-grade coordinate provenance. With a supplied cert, the manifest binds the
-cert with the command/profile/BZ/prefix/continuation/gap artifacts before the
-checker runs. This keeps a paid sqrt(26) attempt reproducible without relaxing
-the `SOURCE_DEAD_CERT` logic.
+claim-grade coordinate provenance. When invoked with
+`--source-dead-gap-checker`, the harness verifies this gap artifact with the
+independent `source_dead_gap_check` before reporting the missing cert blocker.
+With a supplied cert, the manifest binds the cert with the
+command/profile/BZ/prefix/continuation/gap artifacts before the checker runs.
+This keeps a paid sqrt(26) attempt reproducible without relaxing the
+`SOURCE_DEAD_CERT` logic.
 
 ## Executable Contract
 

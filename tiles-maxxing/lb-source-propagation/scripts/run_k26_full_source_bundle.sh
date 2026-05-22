@@ -7,6 +7,7 @@ Usage:
   run_k26_full_source_bundle.sh --build-dir DIR --out-dir DIR
                                 [--max-atoms N]
                                 [--cert-in PATH]
+                                [--source-dead-gap-checker PATH]
                                 [--source-dead-checker PATH]
 
 Run the prepared sqrt(26) source/origin bundle contract using an existing
@@ -35,6 +36,7 @@ build_dir=""
 out_dir=""
 max_atoms="50000000"
 cert_in=""
+source_dead_gap_checker=""
 source_dead_checker=""
 
 while [[ $# -gt 0 ]]; do
@@ -53,6 +55,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --cert-in)
       cert_in="$2"
+      shift 2
+      ;;
+    --source-dead-gap-checker)
+      source_dead_gap_checker="$2"
       shift 2
       ;;
     --source-dead-checker)
@@ -115,6 +121,24 @@ write_status() {
     echo "max_atoms=$max_atoms"
     echo "non_claim=this is an executed bundle harness, not a source-dead acceptance"
   } > "$status_file"
+}
+
+check_source_dead_gap() {
+  if [[ -z "$source_dead_gap_checker" ]]; then
+    return
+  fi
+  if [[ ! -x "$source_dead_gap_checker" ]]; then
+    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_GAP_CHECKER_MISSING"
+    echo "source-dead gap checker is not executable: $source_dead_gap_checker" >&2
+    exit 2
+  fi
+  if ! "$source_dead_gap_checker" "$source_dead_gap" \
+      > "$out_dir/k26-source-dead-gap-check.log" \
+      2> "$out_dir/k26-source-dead-gap-check.err"; then
+    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_GAP_REJECTED"
+    cat "$out_dir/k26-source-dead-gap-check.err" >&2
+    exit 1
+  fi
 }
 
 write_artifact_manifest() {
@@ -262,6 +286,7 @@ run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
     --prefix-witness-in "$out_dir/k26-prefix-witness.txt"
 
 write_source_dead_gap
+check_source_dead_gap
 write_artifact_manifest
 
 if [[ -n "$cert_in" ]]; then

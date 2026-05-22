@@ -77,8 +77,26 @@ SH
 
 chmod +x "$build_dir"/*
 
+fake_source_dead_gap_checker="$tmp/fake-source-dead-gap-checker"
+cat > "$fake_source_dead_gap_checker" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+if grep -q '"schema":"lb_source_k26_source_dead_gap_v1"' "$1" &&
+    grep -q '"target_atom_path":\[1615075207963900,-25220051735553,1615075207964004\]' "$1"; then
+  echo '{"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS"}'
+else
+  echo 'SOURCE_DEAD_GAP_REJECT: bad fixture' >&2
+  exit 1
+fi
+SH
+chmod +x "$fake_source_dead_gap_checker"
+
 blocked_out="$tmp/blocked"
-if "$harness" --build-dir "$build_dir" --out-dir "$blocked_out" >/tmp/k26-harness-blocked.out 2>/tmp/k26-harness-blocked.err; then
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$blocked_out" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    >/tmp/k26-harness-blocked.out 2>/tmp/k26-harness-blocked.err; then
   echo "harness accepted a run without k26-source-dead-cert.json" >&2
   exit 1
 fi
@@ -102,6 +120,8 @@ grep -q '"target_atom_path":\[1615075207963900,-25220051735553,1615075207964004\
   "$blocked_out/k26-source-dead-gap.json"
 grep -q 'coordinate Gaussian-prime source_path' \
   "$blocked_out/k26-source-dead-gap.json"
+grep -q 'SOURCE_DEAD_GAP_NON_CLAIM_PASS' \
+  "$blocked_out/k26-source-dead-gap-check.log"
 if grep -q 'k26-source-dead-cert.json' \
     "$blocked_out/k26-full-run-artifacts.sha256"; then
   echo "blocked partial manifest unexpectedly included missing cert" >&2
@@ -129,6 +149,7 @@ checked_out="$tmp/checked"
   --build-dir "$build_dir" \
   --out-dir "$checked_out" \
   --cert-in "$cert" \
+  --source-dead-gap-checker "$fake_source_dead_gap_checker" \
   --source-dead-checker "$fake_source_dead_checker" \
   >/tmp/k26-harness-checked.out
 grep -q 'K26_FULL_RUN_BUNDLE_CHECKED' "$checked_out/status.txt"
@@ -138,5 +159,7 @@ grep -q 'k26-source-dead-cert.json' \
   "$checked_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-source-dead-gap.json' \
   "$checked_out/k26-full-run-artifacts.sha256"
+grep -q 'SOURCE_DEAD_GAP_NON_CLAIM_PASS' \
+  "$checked_out/k26-source-dead-gap-check.log"
 
 echo "k26 full-run harness self-test PASS"

@@ -221,7 +221,8 @@ The paid/full-run harness is:
 ```bash
 tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
   --build-dir /tmp/gm-lbsp-remote-smoke \
-  --out-dir /workspace/k26-full-source-bundle
+  --out-dir /workspace/k26-full-source-bundle \
+  --source-dead-gap-checker /path/to/source_dead_gap_check
 ```
 
 It runs the exact K26 command/profile/BZ emitters, then executes the row-0
@@ -231,7 +232,9 @@ available, it writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt` after
 the prefix and continuation artifacts are produced. It also writes
 `k26-source-dead-gap.json`, binding the continuation artifact and naming the
-missing coordinate Gaussian-prime source-path layer. It also writes
+missing coordinate Gaussian-prime source-path layer. When
+`--source-dead-gap-checker` is supplied, the harness runs the independent gap
+checker before stopping on the missing cert. It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
 continuation, manifest, witness, gap, and any supplied cert artifacts by
 SHA-256.
