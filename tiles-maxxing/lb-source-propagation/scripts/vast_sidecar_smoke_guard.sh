@@ -7,6 +7,8 @@ Usage:
   vast_sidecar_smoke_guard.sh [--execute] [--max-dph PRICE] [--max-budget USD]
                               [--k-sq N]
                               [--offer-id ID] [--remote DIR] [--pull-dir DIR]
+                              [--offer-wait-seconds N]
+                              [--offer-poll-seconds N]
                               [--wait-ssh-seconds N] [--ssh-poll-seconds N]
                               [--stop-on-ssh-timeout]
 
@@ -14,7 +16,8 @@ Dry-run by default. Searches for a single RTX 4090 offer, enforces the price
 cap, and prints the exact create/deploy/smoke/pull commands. With --execute it
 creates the instance only by default; deploy/smoke/pull remain explicit
 operator steps because cleanup needs human-visible instance metadata. Optional
-SSH readiness polling can stop a newly-created instance when SSH never opens.
+offer polling handles transient market races, and optional SSH readiness polling
+can stop a newly-created instance when SSH never opens.
 
 Hard defaults from the LB source-propagation goal:
   --max-dph     0.37
@@ -33,6 +36,8 @@ offer_id=""
 k_sq="26"
 remote_dir="/workspace/gaussian-moat-cuda"
 pull_dir="tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull"
+offer_wait_seconds="0"
+offer_poll_seconds="30"
 wait_ssh_seconds="0"
 ssh_poll_seconds="10"
 stop_on_ssh_timeout=0
@@ -65,6 +70,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pull-dir)
       pull_dir="$2"
+      shift 2
+      ;;
+    --offer-wait-seconds)
+      offer_wait_seconds="$2"
+      shift 2
+      ;;
+    --offer-poll-seconds)
+      offer_poll_seconds="$2"
       shift 2
       ;;
     --wait-ssh-seconds)
@@ -122,8 +135,14 @@ require_nonnegative_integer() {
 
 require_nonnegative_integer "$wait_ssh_seconds" "--wait-ssh-seconds"
 require_nonnegative_integer "$ssh_poll_seconds" "--ssh-poll-seconds"
+require_nonnegative_integer "$offer_wait_seconds" "--offer-wait-seconds"
+require_nonnegative_integer "$offer_poll_seconds" "--offer-poll-seconds"
 if [[ "$wait_ssh_seconds" != "0" && "$ssh_poll_seconds" == "0" ]]; then
   echo "--ssh-poll-seconds must be positive when SSH readiness polling is enabled" >&2
+  exit 2
+fi
+if [[ "$offer_wait_seconds" != "0" && "$offer_poll_seconds" == "0" ]]; then
+  echo "--offer-poll-seconds must be positive when offer polling is enabled" >&2
   exit 2
 fi
 
@@ -195,7 +214,19 @@ wait_for_ssh_ready() {
 filter="gpu_name=RTX_4090 cuda_vers>=12.0 disk_space>=40 num_gpus=1 dph<=${max_dph} reliability>=0.95"
 
 echo "search_filter=$filter"
-offers="$(vastai search offers "$filter" -o 'dph' --raw)"
+offers=""
+offer_deadline="$((SECONDS + offer_wait_seconds))"
+while :; do
+  offers="$(vastai search offers "$filter" -o 'dph' --raw)"
+  if [[ -n "$offers" && "$offers" != "[]" ]]; then
+    break
+  fi
+  if [[ "$offer_wait_seconds" == "0" || "$SECONDS" -ge "$offer_deadline" ]]; then
+    break
+  fi
+  echo "NO_QUALIFYING_OFFER_YET waited_seconds=$((offer_wait_seconds - (offer_deadline - SECONDS)))"
+  sleep "$offer_poll_seconds"
+done
 if [[ -z "$offers" || "$offers" == "[]" ]]; then
   echo "NO_QUALIFYING_OFFER"
   echo "No RTX 4090 offer satisfied max_dph=${max_dph}; no rental attempted."

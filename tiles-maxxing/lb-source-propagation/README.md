@@ -183,6 +183,8 @@ tiles-maxxing/lb-source-propagation/scripts/vast_sidecar_smoke_guard.sh \
   --max-dph 0.37 \
   --max-budget 1.50 \
   --k-sq 26 \
+  --offer-wait-seconds 900 \
+  --offer-poll-seconds 30 \
   --wait-ssh-seconds 300 \
   --stop-on-ssh-timeout
 ```
