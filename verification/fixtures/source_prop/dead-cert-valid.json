@@ -19,11 +19,11 @@
     { "a": 0, "b": 3, "norm_sq": 9 }
   ],
   "terminal_source_inventory_summary": {
-    "count": 2,
+    "count": 3,
     "digest_algorithm": "sha256:lb_source_inventory_v1",
-    "digest_hex": "71b8f5f4a856d853385dcf7757a4fa4a86247452e7c769722235cab7319de11a",
-    "max_norm_sq": 4,
-    "max_norm_atom_ids": [2]
+    "digest_hex": "5581d7afe8168334e0a52b984f406365c56b37935a22bca28d45d75060c07e46",
+    "max_norm_sq": 9,
+    "max_norm_atom_ids": [3]
   },
-  "terminal_source_inventory": [1, 2]
+  "terminal_source_inventory": [1, 2, 3]
 }

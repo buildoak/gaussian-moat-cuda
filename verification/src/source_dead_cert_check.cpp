@@ -484,6 +484,21 @@ std::uint64_t coordinate_atom_norm_sq(std::int64_t id) {
   return static_cast<std::uint64_t>(norm);
 }
 
+std::int64_t coordinate_atom_id_for_point(const Point& point) {
+  if (point.a > std::numeric_limits<std::int32_t>::max() ||
+      point.b > std::numeric_limits<std::uint32_t>::max()) {
+    throw std::runtime_error("endpoint coordinate atom id overflows");
+  }
+  const std::uint64_t raw =
+      (static_cast<std::uint64_t>(point.a) << 32) |
+      static_cast<std::uint64_t>(point.b);
+  if (raw > static_cast<std::uint64_t>(
+                std::numeric_limits<std::int64_t>::max())) {
+    throw std::runtime_error("endpoint coordinate atom id overflows");
+  }
+  return static_cast<std::int64_t>(raw);
+}
+
 std::vector<std::int64_t> max_norm_atom_ids(
     const std::vector<std::int64_t>& ids,
     std::uint64_t& max_norm_sq) {
@@ -629,6 +644,12 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   const std::vector<std::int64_t> inventory = require_inventory(cert);
   if (inventory.empty()) {
     throw std::runtime_error("terminal_source_inventory must be nonempty");
+  }
+  const std::int64_t endpoint_atom_id = coordinate_atom_id_for_point(endpoint);
+  if (!std::binary_search(inventory.begin(), inventory.end(),
+                          endpoint_atom_id)) {
+    throw std::runtime_error(
+        "terminal_source_inventory omits source_path endpoint atom");
   }
 
   if (require_u64(summary, "count") != inventory.size()) {

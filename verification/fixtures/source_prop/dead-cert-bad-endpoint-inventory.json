@@ -1,7 +1,7 @@
 {
   "schema": "lb_source_dead_cert_draft_v1",
-  "certificate_id": "cert-first-quadrant-valid",
-  "profile_id": "profile-first-quadrant-valid",
+  "certificate_id": "cert-bad-endpoint-inventory",
+  "profile_id": "profile-valid",
   "metadata": {
     "source_mode": "ORIGIN_SOURCE",
     "source_id": "omega",
@@ -11,20 +11,19 @@
     "bz_status": "BZ_CLEAN_DIAGNOSTIC",
     "artifact_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   },
-  "k_sq": 36,
-  "terminal_radius": 10,
+  "k_sq": 26,
+  "terminal_radius": 20,
   "negative_guard_pass": true,
-  "endpoint": { "a": 7, "b": 2, "norm_sq": 53 },
+  "endpoint": { "a": 0, "b": 3, "norm_sq": 9 },
   "source_path": [
-    { "a": 5, "b": 2, "norm_sq": 29 },
-    { "a": 7, "b": 2, "norm_sq": 53 }
+    { "a": 0, "b": 3, "norm_sq": 9 }
   ],
   "terminal_source_inventory_summary": {
-    "count": 3,
+    "count": 2,
     "digest_algorithm": "sha256:lb_source_inventory_v1",
-    "digest_hex": "25b6ddc165aff2984343cc888b4f5ebdc563f360a361c69af5d5a1514a22abca",
-    "max_norm_sq": 53,
-    "max_norm_atom_ids": [30064771074]
+    "digest_hex": "71b8f5f4a856d853385dcf7757a4fa4a86247452e7c769722235cab7319de11a",
+    "max_norm_sq": 4,
+    "max_norm_atom_ids": [2]
   },
-  "terminal_source_inventory": [1, 2, 30064771074]
+  "terminal_source_inventory": [1, 2]
 }

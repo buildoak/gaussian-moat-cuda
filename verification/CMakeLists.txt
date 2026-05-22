@@ -81,6 +81,7 @@ add_test(NAME source_dead_gap_fixture_valid
 foreach(bad_source_dead_cert
     dead-cert-bad-artifact-hash
     dead-cert-bad-digest
+    dead-cert-bad-endpoint-inventory
     dead-cert-bad-inventory-extrema
     dead-cert-bad-negative-guard
     dead-cert-bad-pending-metadata
