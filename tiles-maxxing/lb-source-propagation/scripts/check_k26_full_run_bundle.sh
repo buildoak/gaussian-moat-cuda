@@ -5,6 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   check_k26_full_run_bundle.sh OUT_DIR --source-dead-checker PATH
+                                 [--source-dead-gap-checker PATH]
 
 Validate a completed K26 source/origin bundle. This is stricter than the remote
 smoke artifact checker: it expects the paid/full-run prefix result, strict
@@ -19,6 +20,7 @@ Required artifact names:
   k26-continuation-result.json
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
+  k26-source-dead-gap.json
   k26-source-dead-cert.json
   k26-full-run-artifacts.sha256
 USAGE
@@ -31,12 +33,17 @@ fi
 
 out_dir="$1"
 shift
+source_dead_gap_checker=""
 source_dead_checker=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --source-dead-checker)
       source_dead_checker="$2"
+      shift 2
+      ;;
+    --source-dead-gap-checker)
+      source_dead_gap_checker="$2"
       shift 2
       ;;
     -h|--help)
@@ -57,6 +64,10 @@ if [[ -z "$source_dead_checker" ]]; then
 fi
 if [[ ! -x "$source_dead_checker" ]]; then
   echo "source-dead checker is not executable: $source_dead_checker" >&2
+  exit 2
+fi
+if [[ -n "$source_dead_gap_checker" && ! -x "$source_dead_gap_checker" ]]; then
+  echo "source-dead gap checker is not executable: $source_dead_gap_checker" >&2
   exit 2
 fi
 if [[ ! -d "$out_dir" ]]; then
@@ -153,11 +164,12 @@ prefix="$out_dir/k26-prefix-result.json"
 continuation="$out_dir/k26-continuation-result.json"
 prefix_manifest="$out_dir/k26-prefix-manifest.txt"
 prefix_witness="$out_dir/k26-prefix-witness.txt"
+gap="$out_dir/k26-source-dead-gap.json"
 cert="$out_dir/k26-source-dead-cert.json"
 artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
 
 for artifact in "$commands" "$bz" "$profile" "$prefix" "$continuation" \
-    "$prefix_manifest" "$prefix_witness" "$cert" "$artifact_manifest"; do
+    "$prefix_manifest" "$prefix_witness" "$gap" "$cert" "$artifact_manifest"; do
   require_file "$artifact"
 done
 
@@ -183,6 +195,7 @@ require_manifest_hash "$prefix" k26-prefix-result.json
 require_manifest_hash "$continuation" k26-continuation-result.json
 require_manifest_hash "$prefix_manifest" k26-prefix-manifest.txt
 require_manifest_hash "$prefix_witness" k26-prefix-witness.txt
+require_manifest_hash "$gap" k26-source-dead-gap.json
 require_manifest_hash "$cert" k26-source-dead-cert.json
 
 require_grep '"schema":"lb_source_k26_run_commands_v1"' "$commands" \
@@ -289,6 +302,29 @@ require_grep '"max_source_norm_sq":[1-9][0-9]*' "$continuation" \
   "K26 continuation max source norm"
 require_grep '"max_source_norm_atom_ids":\[[0-9]' "$continuation" \
   "K26 continuation max-norm tie set"
+
+require_grep '"schema":"lb_source_k26_source_dead_gap_v1"' "$gap" \
+  "K26 source-dead gap schema"
+require_grep '"proof_status":"DIAGNOSTIC_NON_CLAIM"' "$gap" \
+  "K26 source-dead gap non-claim status"
+require_grep '"blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"' "$gap" \
+  "K26 source-dead gap blocker"
+require_grep '"continuation_artifact":.*"name":"k26-continuation-result.json".*"sha256":"[0-9a-f]{64}"' "$gap" \
+  "K26 source-dead gap continuation binding"
+require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' "$gap" \
+  "K26 source-dead gap target path provenance"
+require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
+  "K26 source-dead gap missing coordinate source path"
+
+if [[ -n "$source_dead_gap_checker" ]]; then
+  gap_checker_output="$("$source_dead_gap_checker" "$gap")"
+  if ! grep -q '"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS"' \
+      <<<"$gap_checker_output"; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: source-dead gap checker did not accept gap artifact" >&2
+    echo "$gap_checker_output" >&2
+    exit 1
+  fi
+fi
 
 require_grep '"schema":"lb_source_dead_cert_draft_v1"' "$cert" \
   "K26 source-dead cert schema"

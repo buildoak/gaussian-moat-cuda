@@ -68,15 +68,18 @@ verifier, the campaign should use the conservative value.
 The bundle-level acceptance gate is:
 
 ```bash
-check_k26_full_run_bundle.sh OUT_DIR --source-dead-checker source_dead_cert_check
+check_k26_full_run_bundle.sh OUT_DIR \
+  --source-dead-checker source_dead_cert_check \
+  --source-dead-gap-checker source_dead_gap_check
 ```
 
 It expects `k26-prefix-result.json`, `k26-continuation-result.json`, the K26
 command/profile/BZ evidence JSON, prefix manifest/witness, the
+`k26-source-dead-gap.json` diagnostic, the
 `k26-full-run-artifacts.sha256` hash manifest, and
 `k26-source-dead-cert.json`. It rejects the bundle if any required artifact
 hash does not match the manifest, if the BZ digest is not identical across
-artifacts, if the
+artifacts, if the gap artifact is malformed, if the
 continuation did not run with `seam_bridge_policy=require_full_bridge`, if any
 source coordinate carry atom remained unbridged, if TileOp overflow occurred,
 if terminal source death was not reached at `R_final=1015645`, if the terminal

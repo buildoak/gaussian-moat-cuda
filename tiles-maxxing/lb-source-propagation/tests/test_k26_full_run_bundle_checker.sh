@@ -23,6 +23,19 @@ fi
 SH
 chmod +x "$fake_source_dead_checker"
 
+fake_source_dead_gap_checker="$tmp/fake-source-dead-gap-checker"
+cat > "$fake_source_dead_gap_checker" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+if grep -q '"schema":"lb_source_k26_source_dead_gap_v1"' "$1"; then
+  echo '{"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS"}'
+else
+  echo 'SOURCE_DEAD_GAP_REJECT: bad fixture' >&2
+  exit 1
+fi
+SH
+chmod +x "$fake_source_dead_gap_checker"
+
 write_manifest() {
   local dir="$1"
   : > "$dir/k26-full-run-artifacts.sha256"
@@ -35,6 +48,7 @@ write_manifest() {
       k26-continuation-result.json \
       k26-prefix-manifest.txt \
       k26-prefix-witness.txt \
+      k26-source-dead-gap.json \
       k26-source-dead-cert.json; do
     digest="$(shasum -a 256 "$dir/$name" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
     printf '%s  %s\n' "$digest" "$name" \
@@ -63,6 +77,9 @@ JSON
   cat > "$dir/k26-source-dead-cert.json" <<'JSON'
 {"schema":"lb_source_dead_cert_draft_v1","k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]}}
 JSON
+  cat > "$dir/k26-source-dead-gap.json" <<'JSON'
+{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim","target_atom_path_length":3,"target_atom_path":[1615075207963900,-25220051735553,1615075207964004],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]},"missing_for_source_dead_cert":["coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","claim-grade verifier binding the coordinate path to terminal inventory"]}
+JSON
   echo 'manifest' > "$dir/k26-prefix-manifest.txt"
   echo 'witness' > "$dir/k26-prefix-witness.txt"
   write_manifest "$dir"
@@ -70,15 +87,42 @@ JSON
 
 good="$tmp/good"
 write_bundle "$good"
-"$checker" "$good" --source-dead-checker "$fake_source_dead_checker" \
+"$checker" "$good" \
+  --source-dead-checker "$fake_source_dead_checker" \
+  --source-dead-gap-checker "$fake_source_dead_gap_checker" \
   > "$tmp/good.log"
 grep -q 'K26_FULL_RUN_BUNDLE_SUMMARY_ONLY_NON_CLAIM_PASS' "$tmp/good.log"
+
+bad_gap="$tmp/bad-gap"
+write_bundle "$bad_gap"
+perl -0pi -e 's/SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING/WRONG_BLOCKER/' \
+  "$bad_gap/k26-source-dead-gap.json"
+if "$checker" "$bad_gap" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-gap.log" 2>&1; then
+  echo "checker accepted stale artifact hash after gap mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26-source-dead-gap.json' \
+  "$tmp/bad-gap.log"
+write_manifest "$bad_gap"
+if "$checker" "$bad_gap" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-gap-rehashed.log" 2>&1; then
+  echo "checker accepted malformed source-dead gap artifact" >&2
+  exit 1
+fi
+grep -q 'K26 source-dead gap blocker' "$tmp/bad-gap-rehashed.log"
 
 bad_digest="$tmp/bad-digest"
 write_bundle "$bad_digest"
 perl -0pi -e 's/7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95/0000000000000000000000000000000000000000000000000000000000000000/' \
   "$bad_digest/k26_source_run_profile.json"
-if "$checker" "$bad_digest" --source-dead-checker "$fake_source_dead_checker" \
+if "$checker" "$bad_digest" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
     > "$tmp/bad-digest.log" 2>&1; then
   echo "checker accepted stale artifact hash after profile mutation" >&2
   exit 1
@@ -86,7 +130,9 @@ fi
 grep -q 'artifact hash mismatch for k26_source_run_profile.json' \
   "$tmp/bad-digest.log"
 write_manifest "$bad_digest"
-if "$checker" "$bad_digest" --source-dead-checker "$fake_source_dead_checker" \
+if "$checker" "$bad_digest" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
     > "$tmp/bad-digest-rehashed.log" 2>&1; then
   echo "checker accepted mismatched BZ digest" >&2
   exit 1
@@ -97,7 +143,9 @@ bad_bridge="$tmp/bad-bridge"
 write_bundle "$bad_bridge"
 perl -0pi -e 's/"unbridged_coordinate_carry_atoms":0/"unbridged_coordinate_carry_atoms":1/' \
   "$bad_bridge/k26-continuation-result.json"
-if "$checker" "$bad_bridge" --source-dead-checker "$fake_source_dead_checker" \
+if "$checker" "$bad_bridge" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
     > "$tmp/bad-bridge.log" 2>&1; then
   echo "checker accepted stale artifact hash after continuation mutation" >&2
   exit 1
@@ -105,7 +153,9 @@ fi
 grep -q 'artifact hash mismatch for k26-continuation-result.json' \
   "$tmp/bad-bridge.log"
 write_manifest "$bad_bridge"
-if "$checker" "$bad_bridge" --source-dead-checker "$fake_source_dead_checker" \
+if "$checker" "$bad_bridge" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
     > "$tmp/bad-bridge-rehashed.log" 2>&1; then
   echo "checker accepted unbridged coordinate carry" >&2
   exit 1
@@ -116,7 +166,9 @@ bad_cert_summary="$tmp/bad-cert-summary"
 write_bundle "$bad_cert_summary"
 perl -0pi -e 's/"digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"/"digest_hex":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"/' \
   "$bad_cert_summary/k26-source-dead-cert.json"
-if "$checker" "$bad_cert_summary" --source-dead-checker "$fake_source_dead_checker" \
+if "$checker" "$bad_cert_summary" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
     > "$tmp/bad-cert-summary.log" 2>&1; then
   echo "checker accepted stale artifact hash after cert summary mutation" >&2
   exit 1
@@ -124,7 +176,9 @@ fi
 grep -q 'artifact hash mismatch for k26-source-dead-cert.json' \
   "$tmp/bad-cert-summary.log"
 write_manifest "$bad_cert_summary"
-if "$checker" "$bad_cert_summary" --source-dead-checker "$fake_source_dead_checker" \
+if "$checker" "$bad_cert_summary" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
     > "$tmp/bad-cert-summary-rehashed.log" 2>&1; then
   echo "checker accepted cert summary that disagrees with continuation" >&2
   exit 1
@@ -135,7 +189,9 @@ grep -q 'K26 cert inventory digest binding' \
 missing="$tmp/missing"
 write_bundle "$missing"
 rm "$missing/k26-source-dead-cert.json"
-if "$checker" "$missing" --source-dead-checker "$fake_source_dead_checker" \
+if "$checker" "$missing" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
     > "$tmp/missing.log" 2>&1; then
   echo "checker accepted missing source-dead cert" >&2
   exit 1

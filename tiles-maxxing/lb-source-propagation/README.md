@@ -205,16 +205,18 @@ The full-run bundle gate is:
 ```bash
 tiles-maxxing/lb-source-propagation/scripts/check_k26_full_run_bundle.sh \
   /path/to/k26-full-run-artifacts \
-  --source-dead-checker /path/to/source_dead_cert_check
+  --source-dead-checker /path/to/source_dead_cert_check \
+  --source-dead-gap-checker /path/to/source_dead_gap_check
 ```
 
 It is intentionally stricter than the remote smoke checker. It expects the
 K26 prefix result, strict-bridge continuation result, BZ schedule evidence,
-run profile, run command contract, and `k26-source-dead-cert.json`; it rejects
-digest mismatches, unbridged coordinate carry, overflow, wrong component size,
-missing source-dead draft, a source-dead draft whose terminal inventory summary
-does not match the executed continuation result, or a source-dead draft not
-accepted by the independent checker.
+run profile, run command contract, `k26-source-dead-gap.json`, and
+`k26-source-dead-cert.json`; it rejects digest mismatches, malformed gap
+artifacts, unbridged coordinate carry, overflow, wrong component size, missing
+source-dead draft, a source-dead draft whose terminal inventory summary does
+not match the executed continuation result, or a source-dead draft not accepted
+by the independent checker.
 
 The paid/full-run harness is:
 

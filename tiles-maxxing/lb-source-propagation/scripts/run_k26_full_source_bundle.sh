@@ -312,6 +312,10 @@ if [[ -z "$source_dead_checker" ]]; then
   exit 2
 fi
 
-"$bundle_checker" "$out_dir" --source-dead-checker "$source_dead_checker" \
+bundle_checker_args=("$out_dir" --source-dead-checker "$source_dead_checker")
+if [[ -n "$source_dead_gap_checker" ]]; then
+  bundle_checker_args+=(--source-dead-gap-checker "$source_dead_gap_checker")
+fi
+"$bundle_checker" "${bundle_checker_args[@]}" \
   | tee "$out_dir/k26-full-run-bundle-check.log"
 write_status "K26_FULL_RUN_BUNDLE_CHECKED"
