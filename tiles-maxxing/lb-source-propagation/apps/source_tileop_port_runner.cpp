@@ -30,6 +30,7 @@ struct Config {
   std::uint64_t band_width = 128;
   std::size_t max_atoms = 1000000;
   bool seed_inner_flags = false;
+  std::vector<std::uint64_t> schedule_radii;
   std::optional<std::string> manifest_in;
   std::optional<std::string> prefix_witness_in;
   std::optional<std::string> manifest_out;
@@ -78,6 +79,30 @@ bool parse_uint64(std::string_view text, std::uint64_t& out) {
   }
 }
 
+bool parse_schedule_radii(std::string_view text,
+                          std::vector<std::uint64_t>& out) {
+  out.clear();
+  std::size_t start = 0;
+  while (start <= text.size()) {
+    const std::size_t comma = text.find(',', start);
+    const std::size_t end =
+        comma == std::string_view::npos ? text.size() : comma;
+    if (end == start) {
+      return false;
+    }
+    std::uint64_t value = 0;
+    if (!parse_uint64(text.substr(start, end - start), value)) {
+      return false;
+    }
+    out.push_back(value);
+    if (comma == std::string_view::npos) {
+      break;
+    }
+    start = comma + 1;
+  }
+  return out.size() >= 2;
+}
+
 void usage(const char* prog) {
   std::cout
       << "Usage: " << prog << " [OPTIONS]\n"
@@ -91,6 +116,8 @@ void usage(const char* prog) {
       << "  --r-start R           starting radius (default 248)\n"
       << "  --r-final R           final radius (default 512)\n"
       << "  --band-width W        radial band width (default 128)\n"
+      << "  --schedule-radii CSV  explicit increasing radial boundaries;\n"
+      << "                        first must equal --r-start and last --r-final\n"
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
       << "                        (default 1000000)\n"
       << "  --seed-inner-flags    seed first band from TileOp inner flags\n"
@@ -145,6 +172,11 @@ bool parse_args(int argc, char** argv, Config& config) {
         std::cerr << "invalid --band-width: " << value << "\n";
         return false;
       }
+    } else if (take_value("--schedule-radii", value)) {
+      if (!parse_schedule_radii(value, config.schedule_radii)) {
+        std::cerr << "invalid --schedule-radii: " << value << "\n";
+        return false;
+      }
     } else if (take_value("--max-atoms", value)) {
       std::uint64_t parsed = 0;
       if (!parse_uint64(value, parsed) ||
@@ -189,6 +221,26 @@ bool parse_args(int argc, char** argv, Config& config) {
     std::cerr << "--band-width must be at least ceil_sqrt(K_SQ)\n";
     return false;
   }
+  if (!config.schedule_radii.empty()) {
+    if (config.schedule_radii.front() != config.r_start ||
+        config.schedule_radii.back() != config.r_final) {
+      std::cerr << "--schedule-radii must start at --r-start and end at "
+                   "--r-final\n";
+      return false;
+    }
+    for (std::size_t i = 1; i < config.schedule_radii.size(); ++i) {
+      if (config.schedule_radii[i] <= config.schedule_radii[i - 1]) {
+        std::cerr << "--schedule-radii must be strictly increasing\n";
+        return false;
+      }
+      if (config.schedule_radii[i] - config.schedule_radii[i - 1] <
+          lb_source::ceil_sqrt(campaign::k_sq_value)) {
+        std::cerr << "--schedule-radii segment is thinner than "
+                     "ceil_sqrt(K_SQ)\n";
+        return false;
+      }
+    }
+  }
   if (config.seed_inner_flags && config.manifest_in.has_value()) {
     std::cerr << "--seed-inner-flags cannot be combined with --manifest-in\n";
     return false;
@@ -198,6 +250,35 @@ bool parse_args(int argc, char** argv, Config& config) {
     return false;
   }
   return true;
+}
+
+std::vector<std::uint64_t> build_schedule_radii(const Config& config) {
+  if (!config.schedule_radii.empty()) {
+    return config.schedule_radii;
+  }
+  std::vector<std::uint64_t> radii;
+  for (std::uint64_t r = config.r_start; r < config.r_final;) {
+    radii.push_back(r);
+    r = std::min(config.r_final, r + config.band_width);
+  }
+  radii.push_back(config.r_final);
+  return radii;
+}
+
+std::uint64_t min_schedule_width(const std::vector<std::uint64_t>& radii) {
+  std::uint64_t out = std::numeric_limits<std::uint64_t>::max();
+  for (std::size_t i = 1; i < radii.size(); ++i) {
+    out = std::min(out, radii[i] - radii[i - 1]);
+  }
+  return out == std::numeric_limits<std::uint64_t>::max() ? 0 : out;
+}
+
+std::uint64_t max_schedule_width(const std::vector<std::uint64_t>& radii) {
+  std::uint64_t out = 0;
+  for (std::size_t i = 1; i < radii.size(); ++i) {
+    out = std::max(out, radii[i] - radii[i - 1]);
+  }
+  return out;
 }
 
 lb_source::CarryManifest read_manifest_or_die(const std::string& path) {
@@ -611,7 +692,7 @@ int main(int argc, char** argv) {
 
   std::optional<lb_source::SeparatorState> incoming;
   lb_source::ProcessResult last;
-  std::uint64_t previous_outer = config.r_start;
+  const std::vector<std::uint64_t> schedule_radii = build_schedule_radii(config);
   std::uint64_t bands_processed = 0;
   std::uint64_t campaign_tiles_processed = 0;
   std::uint64_t tileop_overflows = 0;
@@ -620,9 +701,10 @@ int main(int argc, char** argv) {
   std::uint64_t seam_edges = 0;
   std::map<lb_source::AtomId, std::uint64_t> norm_by_id;
 
-  while (previous_outer < config.r_final) {
-    const std::uint64_t outer =
-        std::min(config.r_final, previous_outer + config.band_width);
+  for (std::size_t segment = 0; segment + 1 < schedule_radii.size();
+       ++segment) {
+    const std::uint64_t previous_outer = schedule_radii[segment];
+    const std::uint64_t outer = schedule_radii[segment + 1];
     campaign::CampaignConstants constants;
     campaign::Grid grid;
     try {
@@ -702,7 +784,6 @@ int main(int argc, char** argv) {
       break;
     }
     incoming = last.outgoing;
-    previous_outer = outer;
   }
 
   bool manifest_written = false;
@@ -742,6 +823,14 @@ int main(int argc, char** argv) {
             << ",\"r_start\":" << config.r_start
             << ",\"r_final\":" << config.r_final
             << ",\"band_width\":" << config.band_width
+            << ",\"schedule_mode\":\""
+            << (config.schedule_radii.empty() ? "fixed_width"
+                                               : "explicit_radii")
+            << "\",\"schedule_boundary_count\":" << schedule_radii.size()
+            << ",\"schedule_min_width\":"
+            << min_schedule_width(schedule_radii)
+            << ",\"schedule_max_width\":"
+            << max_schedule_width(schedule_radii)
             << ",\"bands_processed\":" << bands_processed
             << ",\"campaign_tiles_processed\":" << campaign_tiles_processed
             << ",\"tileop_overflows\":" << tileop_overflows

@@ -116,7 +116,7 @@ int main() {
       "emit terminal inventory summary without explicit 14.5B-member JSON expansion",
       "emit SOURCE_DEAD_CERT only after positive endpoint path and negative final guard are both verified"};
   constexpr const char* kMissingRunnerFeatures[] = {
-      "source_tileop_port_runner currently accepts --band-width, not an explicit variable boundary schedule",
+      "full K26 source runner has not executed the repaired variable-boundary schedule",
       "coordinate-to-port seam bridge remains diagnostic",
       "terminal inventory is not yet represented by a scalable claim-grade accumulator",
       "no K26 full-run artifact hash or non-pending build metadata exists"};

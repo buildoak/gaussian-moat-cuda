@@ -212,9 +212,9 @@ before positive on ties. The current repaired boundaries shift `122880`,
 `k26_source_run_profile` binds the repaired schedule to the intended full-run
 shape: exact coordinate prefix for row `0`, then TileOp-port continuation for
 rows `1..123` from an origin-prefix manifest and witness. It also records the
-next concrete implementation gap: `source_tileop_port_runner` currently accepts
-only `--band-width`, while the repaired schedule needs explicit variable
-boundaries.
+next concrete implementation gap: the TileOp-port runner can now consume
+explicit variable boundaries, but no full K26 source run has executed that
+schedule yet.
 
 ## Integration Boundary
 

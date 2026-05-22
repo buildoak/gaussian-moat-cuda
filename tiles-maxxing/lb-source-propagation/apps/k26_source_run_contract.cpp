@@ -94,7 +94,7 @@ int main() {
 
   constexpr const char* kBlockingGaps[] = {
       "CPU TileOp-fed diagnostic runner exists, but no full-scale K26 source runner feeds the sidecar from campaign TileOps",
-      "repaired K26 schedule requires explicit variable boundaries; source_tileop_port_runner currently accepts only --band-width",
+      "source_tileop_port_runner supports explicit variable boundaries, but no full K26 source run has executed them",
       "current production compositors compute ANY-SPAN/ANY-SHELL-MOAT, not SOURCE_ORIGIN_K26",
       "diagnostic origin-prefix-to-port bridge exists, but the K36 smoke still reaches terminal source death after one TileOp-port band: 133 source coordinate carry atoms enter as the original separator, 106 have first-band port bridges, 27 are unbridged, 7 canonical port atoms are reached via 374 bridge edges",
       "no accepted seam-bridge theorem yet proves that unbridged coordinate carry atoms and first-band port death are sufficient for K26 source/origin death",

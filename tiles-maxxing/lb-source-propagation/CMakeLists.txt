@@ -175,7 +175,7 @@ add_test(NAME k26_source_run_profile
   COMMAND k26_source_run_profile)
 set_tests_properties(k26_source_run_profile PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"source_tileop_port_runner currently accepts --band-width, not an explicit variable boundary schedule"
+    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"full K26 source runner has not executed the repaired variable-boundary schedule"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME remote_smoke_artifact_checker
@@ -261,6 +261,18 @@ set_tests_properties(source_tileop_port_runner_smoke PROPERTIES
     "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"port_atoms\":[1-9][0-9]*.*\"seam_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"manifest_written\":false"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME source_tileop_port_runner_schedule_smoke
+  COMMAND source_tileop_port_runner
+    --r-start 248
+    --r-final 512
+    --band-width 128
+    --schedule-radii 248,375,512
+    --seed-inner-flags)
+set_tests_properties(source_tileop_port_runner_schedule_smoke PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"schedule_min_width\":127.*\"schedule_max_width\":137.*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"accepted\":true.*\"terminal_source_dead\":true"
+  FAIL_REGULAR_EXPRESSION
+    "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_manifest_smoke
   COMMAND source_tileop_port_runner
     --r-start 248
@@ -272,5 +284,19 @@ set_tests_properties(source_tileop_port_runner_manifest_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
     "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"unbridged_coordinate_carry_atoms\":[0-9][0-9]*.*\"bridged_port_carry_atoms\":[1-9][0-9]*.*\"bridge_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"source_inventory_count\":[1-9][0-9]*.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\".*\"max_source_norm_sq\":[1-9][0-9]*.*\"manifest_written\":false"
+  FAIL_REGULAR_EXPRESSION
+    "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME source_tileop_port_runner_manifest_schedule_smoke
+  COMMAND source_tileop_port_runner
+    --r-start 248
+    --r-final 512
+    --band-width 128
+    --schedule-radii 248,375,512
+    --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt
+    --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt)
+set_tests_properties(source_tileop_port_runner_manifest_schedule_smoke PROPERTIES
+  DEPENDS source_origin_prefix_manifest_smoke
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\""
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")

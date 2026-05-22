@@ -82,7 +82,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" 17
+require_ctest_log "$out_dir/ctest.log" 19
 require_ctest_log "$out_dir/verification-ctest.log" 43
 
 for artifact in \
@@ -146,7 +146,7 @@ require_grep '"index":123' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final row index"
 require_grep '"r_outer":1015645' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final radius"
-require_grep 'local sidecar ctest 16/16' \
+require_grep 'local sidecar ctest 19/19' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan sidecar gate"
 
 require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' \
@@ -192,7 +192,7 @@ require_grep '"prefix_row_index":0' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile prefix row"
 require_grep '"tileop_port_first_row_index":1' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile TileOp start row"
-require_grep 'source_tileop_port_runner currently accepts --band-width, not an explicit variable boundary schedule' \
+require_grep 'full K26 source runner has not executed the repaired variable-boundary schedule' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile runner gap"
 
 for json in "$out_dir"/*.json "$out_dir/status.txt"; do
