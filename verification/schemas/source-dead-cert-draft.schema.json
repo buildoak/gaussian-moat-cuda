@@ -38,6 +38,30 @@
       "else": {
         "required": ["terminal_source_inventory"]
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "metadata": {
+            "properties": {
+              "geometry_id": { "const": "SOURCE_ORIGIN_K26" }
+            },
+            "required": ["geometry_id"]
+          }
+        },
+        "required": ["metadata"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "properties": {
+              "bz_status": {
+                "const": "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE"
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "properties": {

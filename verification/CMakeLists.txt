@@ -89,6 +89,7 @@ foreach(bad_source_dead_cert
     dead-cert-bad-endpoint-atom-id
     dead-cert-bad-endpoint-inventory
     dead-cert-bad-inventory-extrema
+    dead-cert-bad-k26-bz-status
     dead-cert-bad-negative-guard
     dead-cert-bad-path-inventory
     dead-cert-bad-path-provenance

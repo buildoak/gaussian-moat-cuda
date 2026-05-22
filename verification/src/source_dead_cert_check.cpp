@@ -126,6 +126,8 @@ void require_nonpending_metadata(const nlohmann::json& metadata) {
       source_mode != "CERTIFIED_SEED") {
     throw std::runtime_error("metadata.source_mode is not accepted");
   }
+  const std::string geometry_id = require_string(metadata, "geometry_id");
+  const std::string bz_status = require_string(metadata, "bz_status");
 
   for (const char* field : {"source_id", "geometry_id", "commit_id",
                             "build_id", "bz_status", "artifact_hash"}) {
@@ -142,6 +144,11 @@ void require_nonpending_metadata(const nlohmann::json& metadata) {
   if (!artifact_hash_shape(require_string(metadata, "artifact_hash"))) {
     throw std::runtime_error(
         "metadata.artifact_hash must be sha256:<64 lowercase hex chars>");
+  }
+  if (geometry_id == "SOURCE_ORIGIN_K26" &&
+      bz_status != "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE") {
+    throw std::runtime_error(
+        "SOURCE_ORIGIN_K26 cert requires repaired K26 BZ status");
   }
 }
 
