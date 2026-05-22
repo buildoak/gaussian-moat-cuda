@@ -172,12 +172,12 @@ may not include `.git` metadata:
 tiles-maxxing/lb-source-propagation/scripts/check_phase1_diff_scope.sh
 ```
 
-The tests cover composed bands versus one big band, false welding,
-source-only-carry loss, neutral partition merges, terminal inventory, hard
-overflow rejection, `K=32` carry width, associativity across band groupings,
-certified source seed application/rejection, carry-manifest round-trip/rejection,
-exact draft JSON output, CPU TileOp producer smoke, and sqrt(26) Tsuchimura
-preflight/run-contract constants.
+The tests cover five- and ten-band composed runs versus one big band, false
+welding, source-only-carry loss, neutral partition merges, terminal inventory,
+hard overflow rejection, `K=32` carry width, associativity across band
+groupings, certified source seed application/rejection, carry-manifest
+round-trip/rejection, exact draft JSON output, CPU TileOp producer smoke, and
+sqrt(26) Tsuchimura preflight/run-contract constants.
 
 ## Remote Smoke
 

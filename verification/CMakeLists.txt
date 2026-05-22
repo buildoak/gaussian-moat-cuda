@@ -47,6 +47,7 @@ add_test(NAME no_campaign_includes
           -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/no_campaign_includes.cmake)
 
 foreach(source_prop_case
+    composed-ten-vs-big-equivalence
     composed-vs-big-equivalence
     false-weld
     k32-carry-width-minimum

@@ -117,7 +117,7 @@ if [[ ! -d "$out_dir" ]]; then
 fi
 
 require_ctest_log "$out_dir/ctest.log" 24
-require_ctest_log "$out_dir/verification-ctest.log" 64
+require_ctest_log "$out_dir/verification-ctest.log" 65
 
 for artifact in \
   environment.txt \
