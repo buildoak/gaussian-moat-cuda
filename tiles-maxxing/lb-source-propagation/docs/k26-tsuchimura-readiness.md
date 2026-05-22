@@ -94,11 +94,16 @@ run_k26_full_source_bundle.sh --build-dir BUILD_DIR --out-dir OUT_DIR
 It writes the command, BZ, profile, prefix, and continuation artifacts using
 the strict `--require-full-bridge` continuation schedule. It is deliberately
 certificate-gated: without a supplied `k26-source-dead-cert.json` it still
-writes a partial `k26-full-run-artifacts.sha256` manifest and stops with
-`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. With a supplied cert,
-the manifest binds the cert with the command/profile/BZ/prefix/continuation
-artifacts before the checker runs. This keeps a paid sqrt(26) attempt
-reproducible without relaxing the `SOURCE_DEAD_CERT` logic.
+writes `k26-source-dead-gap.json`, a partial
+`k26-full-run-artifacts.sha256` manifest, and stops with
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. The gap artifact binds
+the continuation artifact and records the exact missing layer: a coordinate
+Gaussian-prime source path from the origin prefix to the canonical endpoint,
+plus a verifier that expands the mixed coordinate/port atom chain into
+claim-grade coordinate provenance. With a supplied cert, the manifest binds the
+cert with the command/profile/BZ/prefix/continuation/gap artifacts before the
+checker runs. This keeps a paid sqrt(26) attempt reproducible without relaxing
+the `SOURCE_DEAD_CERT` logic.
 
 ## Executable Contract
 

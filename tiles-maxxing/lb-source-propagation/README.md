@@ -230,8 +230,11 @@ manufacture a source-dead certificate. If no `k26-source-dead-cert.json` is
 available, it writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt` after
 the prefix and continuation artifacts are produced. It also writes
+`k26-source-dead-gap.json`, binding the continuation artifact and naming the
+missing coordinate Gaussian-prime source-path layer. It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
-continuation, manifest, witness, and any supplied cert artifacts by SHA-256.
+continuation, manifest, witness, gap, and any supplied cert artifacts by
+SHA-256.
 If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
 the hash manifest, and runs the full bundle checker with the supplied
 `--source-dead-checker`.

@@ -21,6 +21,7 @@ Artifacts written under OUT_DIR:
   k26-continuation-result.json
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
+  k26-source-dead-gap.json
   k26-full-run-artifacts.sha256
   status.txt
 
@@ -103,6 +104,7 @@ mkdir -p "$out_dir"
 
 status_file="$out_dir/status.txt"
 artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
+source_dead_gap="$out_dir/k26-source-dead-gap.json"
 write_status() {
   local status="$1"
   {
@@ -124,6 +126,7 @@ write_artifact_manifest() {
     k26-continuation-result.json
     k26-prefix-manifest.txt
     k26-prefix-witness.txt
+    k26-source-dead-gap.json
     k26-source-dead-cert.json
   )
   : > "$artifact_manifest"
@@ -154,6 +157,62 @@ run_json() {
     cat "$stderr_file" >&2
     exit 1
   fi
+}
+
+json_string_value() {
+  local path="$1"
+  local field="$2"
+  sed -nE "s/.*\"${field}\":\"([^\"]+)\".*/\\1/p" "$path" | head -n 1
+}
+
+json_number_value() {
+  local path="$1"
+  local field="$2"
+  sed -nE "s/.*\"${field}\":([0-9]+).*/\\1/p" "$path" | head -n 1
+}
+
+json_array_value() {
+  local path="$1"
+  local field="$2"
+  sed -nE "s/.*\"${field}\":(\[[0-9, -]*\]).*/\\1/p" "$path" | head -n 1
+}
+
+require_extracted() {
+  local value="$1"
+  local label="$2"
+  if [[ -z "$value" ]]; then
+    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_GAP_${label}_MISSING"
+    echo "could not extract ${label} from k26-continuation-result.json" >&2
+    exit 1
+  fi
+}
+
+write_source_dead_gap() {
+  local continuation="$out_dir/k26-continuation-result.json"
+  local continuation_digest
+  continuation_digest="$(shasum -a 256 "$continuation" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+  require_extracted "$continuation_digest" "CONTINUATION_HASH"
+
+  local path_provenance atom_path atom_path_length inventory_count
+  local inventory_digest max_norm max_ties
+  path_provenance="$(json_string_value "$continuation" path_provenance)"
+  atom_path="$(json_array_value "$continuation" atom_path)"
+  atom_path_length="$(json_number_value "$continuation" atom_path_length)"
+  inventory_count="$(json_number_value "$continuation" source_inventory_count)"
+  inventory_digest="$(json_string_value "$continuation" source_inventory_digest_hex)"
+  max_norm="$(json_number_value "$continuation" max_source_norm_sq)"
+  max_ties="$(json_array_value "$continuation" max_source_norm_atom_ids)"
+  require_extracted "$path_provenance" "PATH_PROVENANCE"
+  require_extracted "$atom_path" "ATOM_PATH"
+  require_extracted "$atom_path_length" "ATOM_PATH_LENGTH"
+  require_extracted "$inventory_count" "INVENTORY_COUNT"
+  require_extracted "$inventory_digest" "INVENTORY_DIGEST"
+  require_extracted "$max_norm" "MAX_SOURCE_NORM"
+  require_extracted "$max_ties" "MAX_SOURCE_NORM_TIES"
+
+  cat > "$source_dead_gap" <<JSON
+{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"},"target_path_provenance":"$path_provenance","target_atom_path_length":$atom_path_length,"target_atom_path":$atom_path,"terminal_source_inventory_summary":{"count":$inventory_count,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"$inventory_digest","max_norm_sq":$max_norm,"max_norm_atom_ids":$max_ties},"missing_for_source_dead_cert":["coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","per-port representative coordinate path expansion for TileOp atom-chain edges","claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"]}
+JSON
 }
 
 run_json K26_COMMANDS "$out_dir/k26_source_run_commands.json" \
@@ -202,6 +261,7 @@ run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
     --manifest-in "$out_dir/k26-prefix-manifest.txt" \
     --prefix-witness-in "$out_dir/k26-prefix-witness.txt"
 
+write_source_dead_gap
 write_artifact_manifest
 
 if [[ -n "$cert_in" ]]; then

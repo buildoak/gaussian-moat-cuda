@@ -86,9 +86,22 @@ grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING' \
   "$blocked_out/status.txt"
 test -f "$blocked_out/k26-prefix-result.json"
 test -f "$blocked_out/k26-continuation-result.json"
+test -f "$blocked_out/k26-source-dead-gap.json"
 test -f "$blocked_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-continuation-result.json' \
   "$blocked_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-source-dead-gap.json' \
+  "$blocked_out/k26-full-run-artifacts.sha256"
+grep -q '"schema":"lb_source_k26_source_dead_gap_v1"' \
+  "$blocked_out/k26-source-dead-gap.json"
+grep -q '"blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"' \
+  "$blocked_out/k26-source-dead-gap.json"
+grep -q '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' \
+  "$blocked_out/k26-source-dead-gap.json"
+grep -q '"target_atom_path":\[1615070786816,-9223372036854775800,1615070786916\]' \
+  "$blocked_out/k26-source-dead-gap.json"
+grep -q 'coordinate Gaussian-prime source_path' \
+  "$blocked_out/k26-source-dead-gap.json"
 if grep -q 'k26-source-dead-cert.json' \
     "$blocked_out/k26-full-run-artifacts.sha256"; then
   echo "blocked partial manifest unexpectedly included missing cert" >&2
@@ -122,6 +135,8 @@ grep -q 'K26_FULL_RUN_BUNDLE_CHECKED' "$checked_out/status.txt"
 grep -q 'K26_FULL_RUN_BUNDLE_SUMMARY_ONLY_NON_CLAIM_PASS' \
   "$checked_out/k26-full-run-bundle-check.log"
 grep -q 'k26-source-dead-cert.json' \
+  "$checked_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-source-dead-gap.json' \
   "$checked_out/k26-full-run-artifacts.sha256"
 
 echo "k26 full-run harness self-test PASS"
