@@ -8,8 +8,10 @@
 namespace {
 
 constexpr std::uint64_t kSq = 26;
-constexpr std::uint64_t kEndpointA = 943460;
-constexpr std::uint64_t kEndpointB = 376039;
+constexpr std::uint64_t kTsuchimuraEndpointA = 943460;
+constexpr std::uint64_t kTsuchimuraEndpointB = 376039;
+constexpr std::uint64_t kCanonicalEndpointA = 376039;
+constexpr std::uint64_t kCanonicalEndpointB = 943460;
 constexpr std::uint64_t kEndpointNorm = 1031522101121ULL;
 constexpr std::uint64_t kExpectedComponentSize = 14542615005ULL;
 constexpr std::uint64_t kConservativeTerminalRadius = 1015645;
@@ -27,8 +29,10 @@ std::uint64_t square_u64(std::uint64_t value) {
 
 std::uint64_t endpoint_norm() {
   const unsigned __int128 norm =
-      static_cast<unsigned __int128>(kEndpointA) * kEndpointA +
-      static_cast<unsigned __int128>(kEndpointB) * kEndpointB;
+      static_cast<unsigned __int128>(kCanonicalEndpointA) *
+          kCanonicalEndpointA +
+      static_cast<unsigned __int128>(kCanonicalEndpointB) *
+          kCanonicalEndpointB;
   if (norm > std::numeric_limits<std::uint64_t>::max()) {
     std::cerr << "endpoint norm overflow\n";
     std::exit(EXIT_FAILURE);
@@ -86,7 +90,7 @@ int main() {
       "per-band H_i manifests: carry_atoms + component_partition + source_bit_per_component",
       "source terminal inventory with count, digest, max norm, and max-coordinate tie set",
       "coordinate-to-port seam bridge report: bridged coordinate carry, unbridged coordinate carry, bridged port atoms, and bridge edges",
-      "positive source chain to 943460+376039i",
+      "positive source chain to canonical octant representative 376039+943460i, symmetry-equivalent to Tsuchimura endpoint 943460+376039i",
       "negative final guard proof at R_final >= 1015645 under conservative K26 shell",
       "zero overflow across all source/origin proof rows",
       "accepted K26 repaired BZ schedule evidence bound into profile metadata",
@@ -107,8 +111,11 @@ int main() {
             << "\"claim_label\":\"SOURCE_ORIGIN_K26\","
             << "\"executable_now\":false,"
             << "\"non_claim\":\"execution contract only; no source/origin run executed\","
-            << "\"target\":{\"endpoint\":{\"a\":" << kEndpointA
-            << ",\"b\":" << kEndpointB
+            << "\"target\":{\"tsuchimura_endpoint\":{\"a\":"
+            << kTsuchimuraEndpointA << ",\"b\":" << kTsuchimuraEndpointB
+            << ",\"norm_sq\":" << kEndpointNorm
+            << "},\"canonical_octant_endpoint\":{\"a\":"
+            << kCanonicalEndpointA << ",\"b\":" << kCanonicalEndpointB
             << ",\"norm_sq\":" << kEndpointNorm
             << "},\"expected_component_size\":" << kExpectedComponentSize
             << "},"

@@ -9,8 +9,10 @@
 namespace {
 
 constexpr std::uint64_t kSq = 26;
-constexpr std::uint64_t kEndpointA = 943460;
-constexpr std::uint64_t kEndpointB = 376039;
+constexpr std::uint64_t kTsuchimuraEndpointA = 943460;
+constexpr std::uint64_t kTsuchimuraEndpointB = 376039;
+constexpr std::uint64_t kCanonicalEndpointA = 376039;
+constexpr std::uint64_t kCanonicalEndpointB = 943460;
 constexpr std::uint64_t kEndpointNorm = 1031522101121ULL;
 constexpr std::uint64_t kExpectedComponentSize = 14542615005ULL;
 
@@ -26,8 +28,10 @@ std::uint64_t square_u64(std::uint64_t value) {
 
 std::uint64_t endpoint_norm() {
   const unsigned __int128 norm =
-      static_cast<unsigned __int128>(kEndpointA) * kEndpointA +
-      static_cast<unsigned __int128>(kEndpointB) * kEndpointB;
+      static_cast<unsigned __int128>(kCanonicalEndpointA) *
+          kCanonicalEndpointA +
+      static_cast<unsigned __int128>(kCanonicalEndpointB) *
+          kCanonicalEndpointB;
   if (norm > std::numeric_limits<std::uint64_t>::max()) {
     std::cerr << "endpoint norm overflow\n";
     std::exit(EXIT_FAILURE);
@@ -95,8 +99,8 @@ int main() {
       .k_sq = kSq,
       .terminal_radius = conservative_r_final,
       .negative_guard_pass = false,
-      .endpoint = {static_cast<std::int64_t>(kEndpointA),
-                   static_cast<std::int64_t>(kEndpointB),
+      .endpoint = {static_cast<std::int64_t>(kCanonicalEndpointA),
+                   static_cast<std::int64_t>(kCanonicalEndpointB),
                    kEndpointNorm},
       .source_path = {},
       .terminal_source_inventory = {},
@@ -105,8 +109,11 @@ int main() {
   std::cout << "{"
             << "\"schema\":\"k26_tsuchimura_preflight_v1\","
             << "\"claim_label\":\"SOURCE_ORIGIN_K26\","
-            << "\"endpoint\":{\"a\":" << kEndpointA
-            << ",\"b\":" << kEndpointB
+            << "\"tsuchimura_endpoint\":{\"a\":" << kTsuchimuraEndpointA
+            << ",\"b\":" << kTsuchimuraEndpointB
+            << ",\"norm_sq\":" << kEndpointNorm << "},"
+            << "\"canonical_octant_endpoint\":{\"a\":" << kCanonicalEndpointA
+            << ",\"b\":" << kCanonicalEndpointB
             << ",\"norm_sq\":" << kEndpointNorm << "},"
             << "\"expected_component_size\":" << kExpectedComponentSize
             << ",\"k_sq\":" << kSq

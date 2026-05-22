@@ -210,6 +210,12 @@ require_grep '"executable_now":false' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands non-executable"
 require_grep '"required_k_sq":26' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands required build"
+require_grep '"tsuchimura_endpoint":.*"a":943460.*"b":376039' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands Tsuchimura endpoint"
+require_grep '"canonical_octant_endpoint":.*"a":376039.*"b":943460' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands canonical endpoint"
+require_grep 'endpoint-a 376039 --endpoint-b 943460' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands canonical runner args"
 require_grep '"r_final":8192' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands prefix radius"
 require_grep '"r_start":8192' \

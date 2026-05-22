@@ -7,7 +7,9 @@ It is not a result claim.
 
 - Claim label: `SOURCE_ORIGIN_K26`, not static-annulus `ANY-SPAN` or
   `ANY-SHELL-MOAT`.
-- Expected endpoint: `943460 + 376039i`.
+- Tsuchimura endpoint: `943460 + 376039i`.
+- Canonical-octant representative used by the sidecar runners:
+  `376039 + 943460i`.
 - Endpoint norm: `1031522101121`.
 - Radius: about `1015638.765`.
 - Expected component size: `14,542,615,005`.
@@ -51,7 +53,9 @@ verifier, the campaign should use the conservative value.
 
 `SOURCE_TERMINAL` is not enough. A `SOURCE_DEAD_CERT` needs:
 
-- positive source path or certificate chain to `943460 + 376039i`;
+- positive source path or certificate chain to the canonical-octant
+  representative `376039 + 943460i`, with explicit symmetry comparison to
+  Tsuchimura's `943460 + 376039i`;
 - negative final guard proof at `R_final >= 1015645` under the current
   conservative integer carry shell;
 - terminal inventory with count/digest/max norm/tie set;
@@ -96,6 +100,21 @@ required evidence, and current blocking gaps. It must keep
   draft checker validates a listed positive source path, negative guard, and
   inventory count/digest consistency, but the real K26 chain and BZ acceptance
   are still missing.
+
+The exact command contract is:
+
+```bash
+k26_source_run_commands
+```
+
+It emits the row-0 coordinate prefix command and the repaired TileOp-port
+continuation schedule. The row-0 prefix command targets the canonical-octant
+representative `376039 + 943460i`; the comparison back to Tsuchimura's
+`943460 + 376039i` is by Gaussian-unit and conjugation symmetry. This command
+is not part of the local smoke gate. A Mac Mini probe of the row-0 prefix was
+still CPU-bound after eight minutes with no completed artifact, so row-0 prefix
+execution should be treated as paid-run work under the Vast budget cap unless a
+smaller diagnostic radius is being tested.
 
 ## Stop Conditions
 

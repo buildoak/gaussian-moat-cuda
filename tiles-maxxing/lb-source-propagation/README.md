@@ -198,8 +198,10 @@ k26_source_run_commands
 
 It prints the origin-prefix command and the repaired
 `source_tileop_port_runner --schedule-radii ...` continuation command. The
-output is a run contract only; it does not execute the full sqrt(26) comparison
-and must not be treated as a `SOURCE_DEAD_CERT`.
+output is a run contract only; it uses the canonical-octant representative
+`376039 + 943460i` for Tsuchimura's endpoint `943460 + 376039i`, does not
+execute the full sqrt(26) comparison, and must not be treated as a
+`SOURCE_DEAD_CERT`.
 
 `k26_source_run_contract` emits the execution contract for the Tsuchimura
 comparison target. It is intentionally a non-claim artifact:

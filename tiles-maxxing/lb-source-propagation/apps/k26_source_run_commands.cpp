@@ -11,8 +11,10 @@
 namespace {
 
 constexpr std::uint64_t kSq = 26;
-constexpr std::uint64_t kEndpointA = 943460;
-constexpr std::uint64_t kEndpointB = 376039;
+constexpr std::uint64_t kTsuchimuraEndpointA = 943460;
+constexpr std::uint64_t kTsuchimuraEndpointB = 376039;
+constexpr std::uint64_t kCanonicalEndpointA = 376039;
+constexpr std::uint64_t kCanonicalEndpointB = 943460;
 constexpr std::uint64_t kEndpointNorm = 1031522101121ULL;
 constexpr std::uint64_t kTerminalRadius = 1015645;
 constexpr std::uint64_t kBandWidth = 8192;
@@ -25,8 +27,10 @@ struct ScheduleStats {
 
 std::uint64_t endpoint_norm() {
   const unsigned __int128 norm =
-      static_cast<unsigned __int128>(kEndpointA) * kEndpointA +
-      static_cast<unsigned __int128>(kEndpointB) * kEndpointB;
+      static_cast<unsigned __int128>(kCanonicalEndpointA) *
+          kCanonicalEndpointA +
+      static_cast<unsigned __int128>(kCanonicalEndpointB) *
+          kCanonicalEndpointB;
   if (norm > std::numeric_limits<std::uint64_t>::max()) {
     std::cerr << "endpoint norm overflow\n";
     std::exit(EXIT_FAILURE);
@@ -143,7 +147,7 @@ int main() {
   const std::string schedule_csv = csv(radii);
   const std::string prefix_command =
       "source_origin_cpu_runner --k-sq 26 --r-final 8192 --band-width 8192 "
-      "--endpoint-a 943460 --endpoint-b 376039 --max-atoms 50000000 "
+      "--endpoint-a 376039 --endpoint-b 943460 --max-atoms 50000000 "
       "--manifest-out k26-prefix-manifest.txt --prefix-witness-out "
       "k26-prefix-witness.txt";
   const std::string continuation_command =
@@ -159,10 +163,12 @@ int main() {
             << "\"executable_now\":false,"
             << "\"non_claim\":\"command contract only; no sqrt(26) source/origin run executed\","
             << "\"build\":{\"required_k_sq\":26,\"cmake_define\":\"-DK_SQ=26\"},"
-            << "\"target\":{\"endpoint\":{\"a\":" << kEndpointA
-            << ",\"b\":" << kEndpointB
+            << "\"target\":{\"tsuchimura_endpoint\":{\"a\":"
+            << kTsuchimuraEndpointA << ",\"b\":" << kTsuchimuraEndpointB
             << ",\"norm_sq\":" << kEndpointNorm
-            << "}},"
+            << "},\"canonical_octant_endpoint\":{\"a\":"
+            << kCanonicalEndpointA << ",\"b\":" << kCanonicalEndpointB
+            << ",\"norm_sq\":" << kEndpointNorm << "}},"
             << "\"prefix\":{\"runner\":\"source_origin_cpu_runner\","
             << "\"r_final\":" << kPrefixOuter
             << ",\"band_width\":" << kBandWidth

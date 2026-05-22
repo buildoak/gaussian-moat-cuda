@@ -8,8 +8,10 @@
 namespace {
 
 constexpr std::uint64_t kSq = 26;
-constexpr std::uint64_t kEndpointA = 943460;
-constexpr std::uint64_t kEndpointB = 376039;
+constexpr std::uint64_t kTsuchimuraEndpointA = 943460;
+constexpr std::uint64_t kTsuchimuraEndpointB = 376039;
+constexpr std::uint64_t kCanonicalEndpointA = 376039;
+constexpr std::uint64_t kCanonicalEndpointB = 943460;
 constexpr std::uint64_t kEndpointNorm = 1031522101121ULL;
 constexpr std::uint64_t kExpectedComponentSize = 14542615005ULL;
 constexpr std::uint64_t kConservativeTerminalRadius = 1015645;
@@ -17,8 +19,10 @@ constexpr std::uint64_t kPreferredBandWidth = 8192;
 
 std::uint64_t endpoint_norm() {
   const unsigned __int128 norm =
-      static_cast<unsigned __int128>(kEndpointA) * kEndpointA +
-      static_cast<unsigned __int128>(kEndpointB) * kEndpointB;
+      static_cast<unsigned __int128>(kCanonicalEndpointA) *
+          kCanonicalEndpointA +
+      static_cast<unsigned __int128>(kCanonicalEndpointB) *
+          kCanonicalEndpointB;
   if (norm > std::numeric_limits<std::uint64_t>::max()) {
     std::cerr << "endpoint norm overflow\n";
     std::exit(EXIT_FAILURE);
@@ -128,8 +132,11 @@ int main() {
       << "\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\","
       << "\"executable_now\":false,"
       << "\"non_claim\":\"run profile only; no sqrt(26) source/origin run executed\","
-      << "\"target\":{\"endpoint\":{\"a\":" << kEndpointA
-      << ",\"b\":" << kEndpointB
+      << "\"target\":{\"tsuchimura_endpoint\":{\"a\":"
+      << kTsuchimuraEndpointA << ",\"b\":" << kTsuchimuraEndpointB
+      << ",\"norm_sq\":" << kEndpointNorm
+      << "},\"canonical_octant_endpoint\":{\"a\":"
+      << kCanonicalEndpointA << ",\"b\":" << kCanonicalEndpointB
       << ",\"norm_sq\":" << kEndpointNorm
       << "},\"expected_component_size\":" << kExpectedComponentSize << "},"
       << "\"build\":{\"required_k_sq\":" << kSq
