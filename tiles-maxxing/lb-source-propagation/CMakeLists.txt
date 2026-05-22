@@ -89,6 +89,11 @@ add_executable(k26_bz_schedule_check
 )
 target_link_libraries(k26_bz_schedule_check PRIVATE lb_source_propagation)
 
+add_executable(k26_source_run_profile
+  apps/k26_source_run_profile.cpp
+)
+target_link_libraries(k26_source_run_profile PRIVATE lb_source_propagation)
+
 add_executable(source_origin_cpu_runner
   apps/source_origin_cpu_runner.cpp
 )
@@ -166,6 +171,13 @@ set_tests_properties(k26_bz_schedule_check PROPERTIES
     "\"schema\":\"lb_source_k26_bz_schedule_check_v1\".*\"proof_status\":\"BZ_REPAIRED_SCHEDULE_DIAGNOSTIC_NON_CLAIM\".*\"accepted_for_claim\":false.*\"band_count\":124.*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"nominal_summary\":.*\"rows_with_bad_norms\":3.*\"repaired_summary\":.*\"bad_norm_count\":0.*\"bz_clean\":true"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME k26_source_run_profile
+  COMMAND k26_source_run_profile)
+set_tests_properties(k26_source_run_profile PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"source_tileop_port_runner currently accepts --band-width, not an explicit variable boundary schedule"
+  FAIL_REGULAR_EXPRESSION
+    "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME remote_smoke_artifact_checker
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_remote_smoke_artifact_checker.sh

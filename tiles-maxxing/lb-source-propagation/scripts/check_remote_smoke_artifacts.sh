@@ -82,7 +82,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" 16
+require_ctest_log "$out_dir/ctest.log" 17
 require_ctest_log "$out_dir/verification-ctest.log" 43
 
 for artifact in \
@@ -96,7 +96,8 @@ for artifact in \
   k26_tsuchimura_preflight.json \
   k26_source_run_contract.json \
   k26_execution_plan.json \
-  k26_bz_schedule_check.json; do
+  k26_bz_schedule_check.json \
+  k26_source_run_profile.json; do
   require_file "$out_dir/$artifact"
 done
 
@@ -174,6 +175,25 @@ require_grep '"bad_norm_count":0' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ repaired clean summary"
 require_grep '"bz_clean":true' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ repaired clean flag"
+
+require_grep '"schema":"lb_source_k26_run_profile_v1"' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile schema"
+require_grep '"claim_label":"SOURCE_ORIGIN_K26"' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile claim label"
+require_grep '"profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM"' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile non-claim status"
+require_grep '"executable_now":false' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile non-executable"
+require_grep '"required_k_sq":26' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile required build"
+require_grep '"bz_schedule":"repaired"' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile repaired schedule"
+require_grep '"prefix_row_index":0' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile prefix row"
+require_grep '"tileop_port_first_row_index":1' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile TileOp start row"
+require_grep 'source_tileop_port_runner currently accepts --band-width, not an explicit variable boundary schedule' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile runner gap"
 
 for json in "$out_dir"/*.json "$out_dir/status.txt"; do
   if grep -Eq 'SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS' "$json"; then

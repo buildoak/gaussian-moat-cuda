@@ -169,9 +169,9 @@ This builds/tests the sidecar, runs the independent `verification/` CTest
 suite, and runs the CPU TileOp source smoke. It does not start K32, does not
 run a long campaign, and does not claim a moat result. The smoke artifact set
 includes `source_origin_cpu_runner_smoke.json`, `k26_source_run_contract.json`,
-`k26_execution_plan` output, and `k26_bz_schedule_check.json`, which must
-remain non-claim artifacts until the blockers listed in the K26 contract are
-closed.
+`k26_execution_plan` output, `k26_bz_schedule_check.json`, and
+`k26_source_run_profile.json`, which must remain non-claim artifacts until the
+blockers listed in the K26 contract are closed.
 
 The remote smoke finishes by running:
 
@@ -208,6 +208,13 @@ the nominal 124-row, width-8192 schedule is not BZ-clean: rows `15`, `58`, and
 schedule using the nearest clean internal boundary, choosing negative delta
 before positive on ties. The current repaired boundaries shift `122880`,
 `475136`, and `622592` down by `1`; all repaired rows are BZ-clean.
+
+`k26_source_run_profile` binds the repaired schedule to the intended full-run
+shape: exact coordinate prefix for row `0`, then TileOp-port continuation for
+rows `1..123` from an origin-prefix manifest and witness. It also records the
+next concrete implementation gap: `source_tileop_port_runner` currently accepts
+only `--band-width`, while the repaired schedule needs explicit variable
+boundaries.
 
 ## Integration Boundary
 

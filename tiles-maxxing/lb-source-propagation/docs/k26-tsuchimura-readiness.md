@@ -74,6 +74,9 @@ required evidence, and current blocking gaps. It must keep
 - a full-scale K26 source runner that feeds the sidecar from campaign TileOps
   using the same stable coordinate/canonical-port identity as the diagnostic
   CPU TileOp-fed runner;
+- explicit variable-boundary schedule support in the TileOp-port runner. The
+  repaired K26 schedule keeps 124 rows but shifts three internal boundaries by
+  `-1`, so a fixed `--band-width 8192` runner is not sufficient;
 - promotion of the TileOp port-graph primitive into the full band scheduler;
   transient TileOp group labels must remain internal only. The current
   `source_tileop_port_runner` can consume an origin-prefix manifest/witness and

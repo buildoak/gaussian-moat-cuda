@@ -149,7 +149,8 @@ int main() {
   constexpr const char* kCurrentBlockers[] = {
       "remote 4090 smoke has not passed on current head under the active price cap",
       "full-scale K26 source runner is not accepted",
-      "K26 repaired BZ schedule is diagnostic and not yet bound into a full source/origin runner profile",
+      "source_tileop_port_runner cannot yet consume the repaired variable boundary schedule",
+      "K26 repaired BZ schedule is bound into a draft run profile but not yet an executed full-run profile",
       "coordinate-to-port seam bridge remains diagnostic",
       "no full-scale SOURCE_DEAD_CERT artifact exists"};
 

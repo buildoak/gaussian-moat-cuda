@@ -29,12 +29,12 @@ write_ctest_log() {
   } > "$path"
 }
 
-write_ctest_log "$tmp/ctest.log" 16
+write_ctest_log "$tmp/ctest.log" 17
 write_ctest_log "$tmp/verification-ctest.log" 43
 
 cat > "$tmp/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, and K26 BZ schedule diagnostic only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule diagnostic, and K26 run profile draft only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 
@@ -79,6 +79,10 @@ JSON
 
 cat > "$tmp/k26_bz_schedule_check.json" <<'JSON'
 {"schema":"lb_source_k26_bz_schedule_check_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"BZ_REPAIRED_SCHEDULE_DIAGNOSTIC_NON_CLAIM","accepted_for_claim":false,"band_count":124,"repair":{"repaired_boundary_count":3,"max_abs_boundary_shift":1},"nominal_summary":{"rows_checked":124,"rows_with_bad_norms":3,"bad_norm_count":3,"bz_clean":false},"repaired_summary":{"rows_checked":124,"rows_with_bad_norms":0,"bad_norm_count":0,"bz_clean":true},"non_claim":"exact K26 bad-zone schedule diagnostic only; repaired rows are BZ-clean but no source/origin run was executed"}
+JSON
+
+cat > "$tmp/k26_source_run_profile.json" <<'JSON'
+{"schema":"lb_source_k26_run_profile_v1","claim_label":"SOURCE_ORIGIN_K26","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","executable_now":false,"build":{"required_k_sq":26},"schedule":{"bz_schedule":"repaired","band_count":124,"prefix_row_index":0,"tileop_port_first_row_index":1},"missing_runner_features":["source_tileop_port_runner currently accepts --band-width, not an explicit variable boundary schedule"],"non_claim":"run profile only; no sqrt(26) source/origin run executed"}
 JSON
 
 "$checker" "$tmp" > "$tmp/pass.log"
