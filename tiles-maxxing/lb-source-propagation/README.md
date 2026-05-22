@@ -90,6 +90,12 @@ diagnostic positive-witness checks, the prefix runner can also emit
 `--prefix-witness-in` and splices the origin-prefix path to the continuation
 path.
 
+`source_tileop_port_runner` schedules radial bands through the TileOp port
+graph directly. Its smoke mode seeds the first band from `geo_I` inner flags and
+is intentionally labeled `GEO_I_PORT_DIAGNOSTIC`; on the tiny K36 fixture this
+source dies before the final carry shell, which is useful evidence that the
+runner reports terminal death instead of inventing a live source manifest.
+
 ## Small Source Runner
 
 `source_origin_cpu_runner` is a small-radius diagnostic runner. It enumerates

@@ -90,7 +90,7 @@ void test_port_graph_reaches_adjacent_tile() {
   const lb_source::TileOpPortGraphResult graph =
       lb_source::make_tileop_port_band({
           .k_sq = 36,
-          .outer_radius = 100,
+          .outer_radius = 573,
           .coords = {coord(0, 0), coord(0, 1)},
           .tileops = {lower, upper},
           .seed_inner_flags = true,

@@ -95,6 +95,14 @@ target_link_libraries(source_tileop_cpu_runner
     lb_source_campaign_tileop
 )
 
+add_executable(source_tileop_port_runner
+  apps/source_tileop_port_runner.cpp
+)
+target_link_libraries(source_tileop_port_runner
+  PRIVATE
+    lb_source_tileop_port_graph
+)
+
 enable_testing()
 
 add_executable(source_prop_tests tests/test_source_propagation.cpp)
@@ -198,5 +206,16 @@ set_tests_properties(source_tileop_cpu_runner_manifest_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
     "\"schema\":\"lb_source_tileop_cpu_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"source_reached\":true.*\"accepted\":true.*\"source_path_length\":[1-9][0-9]*"
+  FAIL_REGULAR_EXPRESSION
+    "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME source_tileop_port_runner_smoke
+  COMMAND source_tileop_port_runner
+    --r-start 248
+    --r-final 512
+    --band-width 128
+    --seed-inner-flags)
+set_tests_properties(source_tileop_port_runner_smoke PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"port_atoms\":[1-9][0-9]*.*\"seam_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"manifest_written\":false"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")

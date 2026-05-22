@@ -1,6 +1,9 @@
 #include "lb_source/tileop_port_graph.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <iostream>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -18,8 +21,25 @@ struct PortRef {
 
 using CoordKey = std::pair<std::int32_t, std::int32_t>;
 
-std::uint64_t square_u64(std::uint64_t value) {
-  return value * value;
+std::uint64_t tile_support_norm_sq(const campaign::TileCoord& coord) {
+  const std::int64_t a_hi =
+      coord.a_lo + static_cast<std::int64_t>(campaign::S);
+  const std::int64_t b_hi =
+      coord.b_lo + static_cast<std::int64_t>(campaign::S);
+  if (a_hi < 0 || b_hi < 0) {
+    std::cerr << "negative TileOp support coordinate\n";
+    std::exit(EXIT_FAILURE);
+  }
+  const unsigned __int128 norm =
+      static_cast<unsigned __int128>(a_hi) *
+          static_cast<unsigned __int128>(a_hi) +
+      static_cast<unsigned __int128>(b_hi) *
+          static_cast<unsigned __int128>(b_hi);
+  if (norm > std::numeric_limits<std::uint64_t>::max()) {
+    std::cerr << "TileOp support norm overflow\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return static_cast<std::uint64_t>(norm);
 }
 
 std::optional<AtomId> checked_port_atom_id(const campaign::TileCoord& coord,
@@ -85,11 +105,11 @@ TileOpPortGraphResult make_tileop_port_band(
   std::map<CoordKey, std::size_t> index_by_coord;
   std::set<std::pair<AtomId, AtomId>> edges;
   std::map<std::pair<CoordKey, int>, std::vector<PortRef>> ports_by_face;
-  const std::uint64_t carry_norm = square_u64(input.outer_radius);
 
   for (std::size_t t = 0; t < input.coords.size(); ++t) {
     const campaign::TileCoord& coord = input.coords[t];
     const campaign::TileOp& op = input.tileops[t];
+    const std::uint64_t atom_norm = tile_support_norm_sq(coord);
     if (!index_by_coord.emplace(CoordKey{coord.i, coord.j}, t).second) {
       result.diagnostic = "duplicate TileOp coordinate";
       return result;
@@ -116,7 +136,7 @@ TileOpPortGraphResult make_tileop_port_band(
         const bool source =
             input.seed_inner_flags && campaign::bit_test(op.inner_flags,
                                                          port.label);
-        result.band.atoms.push_back({port.id, carry_norm, source});
+        result.band.atoms.push_back({port.id, atom_norm, source});
         ++result.port_atoms;
 
         auto [it, inserted] = first_port_by_label.emplace(port.label, port.id);

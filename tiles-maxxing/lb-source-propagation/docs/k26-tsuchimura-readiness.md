@@ -63,7 +63,10 @@ required evidence, and current blocking gaps. It must keep
   using the same stable coordinate/canonical-port identity as the diagnostic
   CPU TileOp-fed runner;
 - promotion of the TileOp port-graph primitive into the full band scheduler;
-  transient TileOp group labels must remain internal only;
+  transient TileOp group labels must remain internal only. The current
+  `source_tileop_port_runner` is a diagnostic scheduler only: it proves the
+  TileOp-port graph can be band-scheduled and can honestly report source death,
+  but it does not yet bridge the origin-prefix witness into port atoms.
 - accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
 - accepted K26 non-square BZ evidence;
