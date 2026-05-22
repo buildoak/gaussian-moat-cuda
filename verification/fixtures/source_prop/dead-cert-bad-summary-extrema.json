@@ -9,7 +9,7 @@
     "commit_id": "abc123",
     "build_id": "local-test",
     "bz_status": "BZ_CLEAN_DIAGNOSTIC",
-    "artifact_hash": "sha256:test"
+    "artifact_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   },
   "proof_status": "SUMMARY_ONLY_NON_CLAIM",
   "non_claim": "summary-only accumulator shape check; listed inventory is external",

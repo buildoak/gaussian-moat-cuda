@@ -1,6 +1,6 @@
 {
   "schema": "lb_source_dead_cert_draft_v1",
-  "certificate_id": "cert-valid",
+  "certificate_id": "cert-bad-artifact-hash",
   "profile_id": "profile-valid",
   "metadata": {
     "source_mode": "ORIGIN_SOURCE",
@@ -9,7 +9,7 @@
     "commit_id": "abc123",
     "build_id": "local-test",
     "bz_status": "BZ_CLEAN_DIAGNOSTIC",
-    "artifact_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    "artifact_hash": "sha256:not-a-real-digest"
   },
   "k_sq": 26,
   "terminal_radius": 20,

@@ -9,7 +9,7 @@
     "commit_id": "pending-run",
     "build_id": "local-test",
     "bz_status": "BZ_CLEAN_DIAGNOSTIC",
-    "artifact_hash": "sha256:test"
+    "artifact_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   },
   "k_sq": 26,
   "terminal_radius": 20,

@@ -105,6 +105,21 @@ bool pending_like(std::string_view value) {
          value.rfind("requires-", 0) == 0;
 }
 
+bool artifact_hash_shape(std::string_view value) {
+  constexpr std::string_view kPrefix = "sha256:";
+  if (value.size() != kPrefix.size() + 64 ||
+      value.substr(0, kPrefix.size()) != kPrefix) {
+    return false;
+  }
+  for (std::size_t i = kPrefix.size(); i < value.size(); ++i) {
+    const unsigned char ch = static_cast<unsigned char>(value[i]);
+    if (!(std::isdigit(ch) || (ch >= 'a' && ch <= 'f'))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void require_nonpending_metadata(const nlohmann::json& metadata) {
   const std::string source_mode = require_string(metadata, "source_mode");
   if (source_mode != "ORIGIN_SOURCE" && source_mode != "WIRED_SOURCE" &&
@@ -123,6 +138,10 @@ void require_nonpending_metadata(const nlohmann::json& metadata) {
       throw std::runtime_error(std::string("metadata.") + field +
                                " is still pending");
     }
+  }
+  if (!artifact_hash_shape(require_string(metadata, "artifact_hash"))) {
+    throw std::runtime_error(
+        "metadata.artifact_hash must be sha256:<64 lowercase hex chars>");
   }
 }
 
