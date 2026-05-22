@@ -72,6 +72,14 @@ stitch through bad evidence. This is still a primitive, not the full K26 runner:
 it does not yet schedule the 124 K26 bands or bind terminal inventory/BZ
 evidence.
 
+The same header also exposes `bridge_coordinate_prime_to_ports(...)`, a
+diagnostic bridge from a concrete sieved coordinate prime to the canonical
+TileOp port atoms carrying its local visible component. The helper recomputes
+the TileOp byte payload from `(coord, constants, primes)` before returning
+ports, so stale or mismatched TileOps cannot silently seed source carry. It
+returns canonical port atoms only; local TileOp group labels remain transient
+and must not be persisted.
+
 `source_tileop_cpu_runner` is the next diagnostic bridge: it builds campaign
 `Grid` objects per radial band, calls `campaign::process_tile` on each active
 tile as the TileOp contact point, deduplicates `campaign::sieve_tile` Gaussian

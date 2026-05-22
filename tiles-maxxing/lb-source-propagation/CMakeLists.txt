@@ -62,6 +62,8 @@ target_link_libraries(lb_source_tileop_port_graph
 target_include_directories(lb_source_tileop_port_graph
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
 )
 
 add_executable(source_prop_smoke apps/source_prop_smoke.cpp)

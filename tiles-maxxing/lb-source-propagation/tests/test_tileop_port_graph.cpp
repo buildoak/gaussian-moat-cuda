@@ -8,7 +8,11 @@
 #include <string>
 #include <vector>
 
+#include "campaign/campaign_constants.h"
 #include "campaign/constants.h"
+#include "campaign/grid.h"
+#include "campaign/sieve.h"
+#include "campaign/tileop.h"
 
 namespace {
 
@@ -75,6 +79,66 @@ bool component_has_source(const lb_source::SeparatorState& state,
     }
   }
   return false;
+}
+
+std::vector<lb_source::AtomId> encoded_ports_for_label(
+    const campaign::TileCoord& tile_coord,
+    const campaign::TileOp& op,
+    std::uint8_t label) {
+  std::vector<lb_source::AtomId> out;
+  for (int face_idx = 0; face_idx < campaign::NUM_FACES; ++face_idx) {
+    const campaign::Face face = static_cast<campaign::Face>(face_idx);
+    const int offset = campaign::face_offset(op, face);
+    for (std::uint8_t ordinal = 0; ordinal < op.n[face_idx]; ++ordinal) {
+      if (op.face_groups[offset + ordinal] != label) {
+        continue;
+      }
+      out.push_back(port_id(tile_coord.i, tile_coord.j, face, ordinal));
+    }
+  }
+  return out;
+}
+
+struct BridgeFixture {
+  campaign::TileCoord tile_coord;
+  campaign::CampaignConstants constants;
+  campaign::TileOp op;
+  campaign::Prime prime;
+  std::vector<campaign::Prime> primes;
+  lb_source::CoordinatePortBridgeResult bridge;
+};
+
+std::optional<BridgeFixture> first_bridgeable_real_tileop() {
+  const campaign::CampaignConstants constants =
+      campaign::CampaignConstants::from_radii(248, 512, 36);
+  const campaign::Grid grid = campaign::Grid::build(248, 512, 36);
+  const std::vector<campaign::TileCoord> coords = grid.enumerate_active_tiles();
+
+  for (const campaign::TileCoord& tile_coord : coords) {
+    const campaign::TileOp op =
+        campaign::process_tile(tile_coord, constants, grid);
+    if ((op.tile_flags & campaign::OVERFLOW_BIT) != 0 ||
+        (op.tile_flags & campaign::EMPTY_BIT) != 0) {
+      continue;
+    }
+    const std::vector<campaign::Prime> primes =
+        campaign::sieve_tile(tile_coord, constants);
+
+    for (const campaign::Prime& prime : primes) {
+      const lb_source::CoordinatePortBridgeResult bridge =
+          lb_source::bridge_coordinate_prime_to_ports({
+              .coord = tile_coord,
+              .constants = constants,
+              .tileop = op,
+              .target = prime,
+              .primes = primes,
+          });
+      if (bridge.accepted()) {
+        return BridgeFixture{tile_coord, constants, op, prime, primes, bridge};
+      }
+    }
+  }
+  return std::nullopt;
 }
 
 void test_port_graph_reaches_adjacent_tile() {
@@ -144,6 +208,64 @@ void test_port_graph_overflow_forces_source_reject() {
   CHECK_EQ(result.reject, lb_source::RejectReason::kOverflow);
 }
 
+void test_coordinate_bridge_matches_real_tileop_ports() {
+  const std::optional<BridgeFixture> fixture = first_bridgeable_real_tileop();
+  CHECK_TRUE(fixture.has_value());
+  CHECK_TRUE(!fixture->bridge.port_atoms.empty());
+  CHECK_TRUE(fixture->bridge.tileop_label != 0);
+  CHECK_EQ(fixture->bridge.port_atoms,
+           encoded_ports_for_label(fixture->tile_coord, fixture->op,
+                                   fixture->bridge.tileop_label));
+  for (const lb_source::AtomId atom : fixture->bridge.port_atoms) {
+    const std::optional<lb_source::PortAtom> decoded =
+        lb_source::decode_port_atom_id(atom);
+    CHECK_TRUE(decoded.has_value());
+    CHECK_EQ(decoded->tile_i, fixture->tile_coord.i);
+    CHECK_EQ(decoded->tile_j, fixture->tile_coord.j);
+  }
+}
+
+void test_coordinate_bridge_rejects_missing_prime() {
+  const campaign::CampaignConstants constants =
+      campaign::CampaignConstants::from_radii(248, 512, 36);
+  const campaign::Grid grid = campaign::Grid::build(248, 512, 36);
+  const campaign::TileCoord tile_coord = grid.enumerate_active_tiles().front();
+  const campaign::TileOp op =
+      campaign::process_tile(tile_coord, constants, grid);
+  const std::vector<campaign::Prime> primes =
+      campaign::sieve_tile(tile_coord, constants);
+
+  const lb_source::CoordinatePortBridgeResult bridge =
+      lb_source::bridge_coordinate_prime_to_ports({
+          .coord = tile_coord,
+          .constants = constants,
+          .tileop = op,
+          .target = campaign::Prime{.a = 1, .b = 1, .norm_sq = 2},
+          .primes = primes,
+      });
+  CHECK_TRUE(!bridge.accepted());
+  CHECK_EQ(bridge.diagnostic, std::string("target prime not found in tile sieve"));
+}
+
+void test_coordinate_bridge_rejects_stale_tileop() {
+  const std::optional<BridgeFixture> fixture = first_bridgeable_real_tileop();
+  CHECK_TRUE(fixture.has_value());
+
+  campaign::TileOp stale = fixture->op;
+  stale.reserved[0] = 1;
+  const lb_source::CoordinatePortBridgeResult bridge =
+      lb_source::bridge_coordinate_prime_to_ports({
+          .coord = fixture->tile_coord,
+          .constants = fixture->constants,
+          .tileop = stale,
+          .target = fixture->prime,
+          .primes = fixture->primes,
+      });
+  CHECK_TRUE(!bridge.accepted());
+  CHECK_EQ(bridge.diagnostic,
+           std::string("TileOp bytes do not match coord/constants/primes"));
+}
+
 void run(const char* name, void (*fn)()) {
   const int before = g_failures;
   fn();
@@ -161,6 +283,12 @@ int main() {
       test_port_graph_rejects_port_count_mismatch);
   run("port_graph_overflow_forces_source_reject",
       test_port_graph_overflow_forces_source_reject);
+  run("coordinate_bridge_matches_real_tileop_ports",
+      test_coordinate_bridge_matches_real_tileop_ports);
+  run("coordinate_bridge_rejects_missing_prime",
+      test_coordinate_bridge_rejects_missing_prime);
+  run("coordinate_bridge_rejects_stale_tileop",
+      test_coordinate_bridge_rejects_stale_tileop);
 
   if (g_failures != 0) {
     std::cerr << g_failures << " test failure(s)\n";
