@@ -214,6 +214,20 @@ require_grep '"canonical_octant_endpoint":.*"a":376039.*"b":943460.*"norm_sq":10
   "K26 command canonical endpoint"
 require_grep '--endpoint-a 376039 --endpoint-b 943460' "$commands" \
   "K26 command prefix endpoint flags"
+require_grep '"r_start":8192' "$commands" \
+  "K26 command continuation start"
+require_grep '"r_final":1015645' "$commands" \
+  "K26 command continuation final radius"
+require_grep '"schedule_boundary_count":124' "$commands" \
+  "K26 command schedule boundary count"
+require_grep '"schedule_segment_count":123' "$commands" \
+  "K26 command schedule segment count"
+require_grep '"schedule_min_width":8029' "$commands" \
+  "K26 command schedule minimum width"
+require_grep '"schedule_max_width":8193' "$commands" \
+  "K26 command schedule maximum width"
+require_grep '"schedule_radii_csv":"8192,.*122879,.*475135,.*622591,.*1015645"' "$commands" \
+  "K26 command repaired schedule radii"
 require_grep '"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1"' "$commands" \
   "K26 command BZ digest algorithm"
 require_grep '"seam_bridge_policy":"require_full_bridge"' "$commands" \
@@ -253,6 +267,22 @@ require_grep '"canonical_octant_endpoint":.*"a":376039.*"b":943460.*"norm_sq":10
   "K26 profile canonical endpoint"
 require_grep '"expected_component_size":14542615005' "$profile" \
   "K26 profile Tsuchimura component size"
+require_grep '"terminal_radius":1015645' "$profile" \
+  "K26 profile terminal radius"
+require_grep '"preferred_band_width":8192' "$profile" \
+  "K26 profile preferred band width"
+require_grep '"band_count":124' "$profile" \
+  "K26 profile band count"
+require_grep '"repaired_boundary_count":3' "$profile" \
+  "K26 profile repaired boundary count"
+require_grep '"max_abs_boundary_shift":1' "$profile" \
+  "K26 profile max boundary shift"
+require_grep '"nominal_dirty_row_indices":\[15,58,75\]' "$profile" \
+  "K26 profile dirty BZ row indices"
+require_grep '"prefix_row_index":0' "$profile" \
+  "K26 profile prefix row"
+require_grep '"tileop_port_first_row_index":1' "$profile" \
+  "K26 profile TileOp continuation row"
 require_grep '"accepted_for_schedule":true' "$profile" \
   "K26 profile BZ schedule binding"
 require_grep '"accepted_for_claim":false' "$profile" \
