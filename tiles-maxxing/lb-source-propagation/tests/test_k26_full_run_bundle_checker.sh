@@ -180,6 +180,21 @@ if "$checker" "$bad_gap_bz" \
 fi
 grep -q 'K26 gap BZ digest binding' "$tmp/bad-gap-bz.log"
 
+bad_gap_missing_list="$tmp/bad-gap-missing-list"
+write_bundle "$bad_gap_missing_list"
+perl -0pi -e 's/"claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"/"claim-grade verifier binding the coordinate path"/' \
+  "$bad_gap_missing_list/k26-source-dead-gap.json"
+write_manifest "$bad_gap_missing_list"
+if "$checker" "$bad_gap_missing_list" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-gap-missing-list.log" 2>&1; then
+  echo "checker accepted source-dead gap with incomplete missing-obligation list" >&2
+  exit 1
+fi
+grep -q 'K26 source-dead gap missing terminal inventory' \
+  "$tmp/bad-gap-missing-list.log"
+
 bad_command_target="$tmp/bad-command-target"
 write_bundle "$bad_command_target"
 perl -0pi -e 's/"canonical_octant_endpoint":\{"a":376039,"b":943460/"canonical_octant_endpoint":{"a":376038,"b":943460/' \

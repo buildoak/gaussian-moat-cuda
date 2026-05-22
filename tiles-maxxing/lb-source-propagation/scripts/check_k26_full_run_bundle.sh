@@ -403,6 +403,12 @@ require_grep '"terminal_inventory_obligation":.*"required_mode":"claim_grade_ter
   "K26 source-dead gap terminal inventory obligation"
 require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
   "K26 source-dead gap missing coordinate source path"
+require_grep '"missing_for_source_dead_cert":.*terminal inventory' "$gap" \
+  "K26 source-dead gap missing terminal inventory"
+require_grep '"missing_for_source_dead_cert":.*BZ schedule' "$gap" \
+  "K26 source-dead gap missing BZ schedule binding"
+require_grep '"missing_for_source_dead_cert":.*verifier' "$gap" \
+  "K26 source-dead gap missing verifier binding"
 
 actual_continuation_digest="$(
   shasum -a 256 "$continuation" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
