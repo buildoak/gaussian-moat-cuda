@@ -10,6 +10,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <queue>
 #include <set>
 #include <string>
 #include <string_view>
@@ -539,6 +540,101 @@ void append_atom_id_array(std::ostream& out,
   out << ']';
 }
 
+void insert_adjacency_edge(
+    std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>& adjacency,
+    lb_source::AtomId lhs, lb_source::AtomId rhs) {
+  if (lhs == rhs) {
+    return;
+  }
+  adjacency[lhs].push_back(rhs);
+  adjacency[rhs].push_back(lhs);
+}
+
+void add_partition_adjacency(
+    std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>& adjacency,
+    const lb_source::SeparatorState& state) {
+  for (const std::vector<lb_source::AtomId>& component :
+       state.component_partition) {
+    if (component.empty()) {
+      continue;
+    }
+    const lb_source::AtomId anchor = component.front();
+    for (std::size_t i = 1; i < component.size(); ++i) {
+      insert_adjacency_edge(adjacency, anchor, component[i]);
+    }
+  }
+}
+
+void add_band_adjacency(
+    std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>& adjacency,
+    const lb_source::BandInput& band) {
+  for (const auto& edge : band.edges) {
+    insert_adjacency_edge(adjacency, edge.first, edge.second);
+  }
+}
+
+void canonicalize_adjacency(
+    std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>& adjacency) {
+  for (auto& [id, neighbors] : adjacency) {
+    (void)id;
+    std::sort(neighbors.begin(), neighbors.end());
+    neighbors.erase(std::unique(neighbors.begin(), neighbors.end()),
+                    neighbors.end());
+  }
+}
+
+std::vector<lb_source::AtomId> atom_path_to_target(
+    std::vector<lb_source::AtomId> source_ids, lb_source::AtomId target_id,
+    const std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>&
+        adjacency) {
+  std::sort(source_ids.begin(), source_ids.end());
+  source_ids.erase(std::unique(source_ids.begin(), source_ids.end()),
+                   source_ids.end());
+
+  std::queue<lb_source::AtomId> pending;
+  std::map<lb_source::AtomId, lb_source::AtomId> parent_by_id;
+  for (const lb_source::AtomId source_id : source_ids) {
+    if (!parent_by_id.emplace(source_id, source_id).second) {
+      continue;
+    }
+    pending.push(source_id);
+  }
+
+  while (!pending.empty()) {
+    const lb_source::AtomId current = pending.front();
+    pending.pop();
+    if (current == target_id) {
+      break;
+    }
+    const auto neighbors = adjacency.find(current);
+    if (neighbors == adjacency.end()) {
+      continue;
+    }
+    for (const lb_source::AtomId neighbor : neighbors->second) {
+      if (!parent_by_id.emplace(neighbor, current).second) {
+        continue;
+      }
+      pending.push(neighbor);
+    }
+  }
+
+  if (parent_by_id.find(target_id) == parent_by_id.end()) {
+    return {};
+  }
+
+  std::vector<lb_source::AtomId> reversed;
+  lb_source::AtomId current = target_id;
+  while (true) {
+    reversed.push_back(current);
+    const lb_source::AtomId parent = parent_by_id.at(current);
+    if (parent == current) {
+      break;
+    }
+    current = parent;
+  }
+  return {reversed.rbegin(), reversed.rend()};
+}
+
 std::vector<campaign::TileOp> build_tileops(
     const std::vector<campaign::TileCoord>& coords,
     const campaign::CampaignConstants& constants,
@@ -761,6 +857,9 @@ int main(int argc, char** argv) {
   bool target_seen = false;
   std::uint64_t target_port_atoms = 0;
   std::uint64_t target_bridge_edges = 0;
+  std::vector<lb_source::AtomId> provenance_source_ids;
+  std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>
+      provenance_adjacency;
   if (config.manifest_in.has_value()) {
     coordinate_manifest = read_manifest_or_die(*config.manifest_in);
     if (coordinate_manifest->k_sq !=
@@ -785,6 +884,10 @@ int main(int argc, char** argv) {
       }
       manifest_source_carry_atoms +=
           coordinate_manifest->separator.component_partition[c].size();
+      provenance_source_ids.insert(
+          provenance_source_ids.end(),
+          coordinate_manifest->separator.component_partition[c].begin(),
+          coordinate_manifest->separator.component_partition[c].end());
     }
     if (config.prefix_witness_in.has_value()) {
       prefix_witness = read_prefix_witness_or_die(*config.prefix_witness_in);
@@ -892,6 +995,8 @@ int main(int argc, char** argv) {
            coordinate_manifest->separator.carry_atoms) {
         norm_by_id.emplace(atom.id, atom.norm_sq);
       }
+      add_partition_adjacency(provenance_adjacency,
+                              coordinate_manifest->separator);
       const PortManifestBridgeResult bridge =
           bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
                                               coords, tileops, bridged_band);
@@ -909,6 +1014,7 @@ int main(int argc, char** argv) {
           {.max_atoms = config.max_atoms,
            .max_carry_atoms = config.max_atoms,
            .max_components = config.max_atoms});
+      add_band_adjacency(provenance_adjacency, bridged_band);
       bridged_coordinate_carry_atoms =
           bridge.bridged_coordinate_carry_atoms;
       unbridged_coordinate_carry_atoms =
@@ -921,6 +1027,14 @@ int main(int argc, char** argv) {
           {.max_atoms = config.max_atoms,
            .max_carry_atoms = config.max_atoms,
            .max_components = config.max_atoms});
+      add_band_adjacency(provenance_adjacency, band);
+      if (config.seed_inner_flags && bands_processed == 0) {
+        for (const lb_source::BandAtom& atom : band.atoms) {
+          if (atom.certified_source) {
+            provenance_source_ids.push_back(atom.id);
+          }
+        }
+      }
     }
     port_atoms += graph.port_atoms;
     internal_edges += graph.internal_edges;
@@ -966,6 +1080,16 @@ int main(int argc, char** argv) {
   const bool target_source_reached =
       target_id.has_value() &&
       std::binary_search(inventory.begin(), inventory.end(), *target_id);
+  canonicalize_adjacency(provenance_adjacency);
+  const std::vector<lb_source::AtomId> target_atom_path =
+      target_source_reached
+          ? atom_path_to_target(provenance_source_ids, *target_id,
+                                provenance_adjacency)
+          : std::vector<lb_source::AtomId>{};
+  if (target_source_reached && target_atom_path.empty()) {
+    std::cerr << "target source reachability lacks atom-chain provenance\n";
+    return EXIT_FAILURE;
+  }
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_port_runner_v1\","
@@ -1014,7 +1138,13 @@ int main(int argc, char** argv) {
               << ",\"bridge_edges\":" << target_bridge_edges
               << ",\"source_reached\":"
               << (target_source_reached ? "true" : "false")
-              << ",\"path_provenance\":\"component_reachability_only\"";
+              << ",\"path_provenance\":\""
+              << (target_atom_path.empty()
+                      ? "component_reachability_only"
+                      : "mixed_coordinate_port_atom_chain_non_claim")
+              << "\",\"atom_path_length\":" << target_atom_path.size()
+              << ",\"atom_path\":";
+    append_atom_id_array(std::cout, target_atom_path);
   }
   std::cout << "}"
             << ",\"accepted\":" << (accepted ? "true" : "false")

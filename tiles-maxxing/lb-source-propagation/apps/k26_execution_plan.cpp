@@ -158,7 +158,7 @@ int main() {
       "source_tileop_port_runner can consume explicit variable boundaries, but K26 has not been executed",
       "K26 repaired BZ schedule is bound into a draft run profile but not yet an executed full-run profile",
       "coordinate-to-port seam bridge remains diagnostic",
-      "TileOp-port target reachability currently lacks coordinate source-path provenance",
+      "TileOp-port target reachability currently has mixed atom-chain provenance, not coordinate source-path provenance",
       "no full-scale SOURCE_DEAD_CERT artifact exists"};
 
   std::cout << "{"

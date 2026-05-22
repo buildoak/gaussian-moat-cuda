@@ -252,9 +252,10 @@ execute the full sqrt(26) comparison, and must not be treated as a
 coordinate carry atom lacks a first-band TileOp-port bridge, the run must stop,
 and the canonical endpoint must be seen and source-reached in the continuation
 artifact before the full bundle checker can pass. The TileOp-port target field
-currently reports `path_provenance=component_reachability_only`: that is
-component membership in the diagnostic port graph, not a coordinate source-path
-witness suitable for a `SOURCE_DEAD_CERT`.
+now reports `path_provenance=mixed_coordinate_port_atom_chain_non_claim` plus a
+stable atom id chain when target reachability is proved. That is stronger than
+a boolean component bit, but it is still a mixed coordinate/port graph witness,
+not a coordinate Gaussian-prime source path suitable for a `SOURCE_DEAD_CERT`.
 
 `k26_source_run_contract` emits the execution contract for the Tsuchimura
 comparison target. It is intentionally a non-claim artifact:

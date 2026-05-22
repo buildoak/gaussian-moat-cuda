@@ -319,7 +319,7 @@ add_test(NAME source_tileop_port_runner_target_smoke
 set_tests_properties(source_tileop_port_runner_target_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"target\":\\{\"enabled\":true,\"a\":0,\"b\":251,\"norm_sq\":63001,\"seen\":true,\"port_atoms\":[1-9][0-9]*,\"bridge_edges\":[1-9][0-9]*,\"source_reached\":true,\"path_provenance\":\"component_reachability_only\"\\}.*\"accepted\":true.*\"terminal_source_dead\":true"
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"target\":\\{\"enabled\":true,\"a\":0,\"b\":251,\"norm_sq\":63001,\"seen\":true,\"port_atoms\":[1-9][0-9]*,\"bridge_edges\":[1-9][0-9]*,\"source_reached\":true,\"path_provenance\":\"mixed_coordinate_port_atom_chain_non_claim\",\"atom_path_length\":[1-9][0-9]*,\"atom_path\":\\[[0-9,-]+\\]\\}.*\"accepted\":true.*\"terminal_source_dead\":true"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_manifest_full_bridge_reject

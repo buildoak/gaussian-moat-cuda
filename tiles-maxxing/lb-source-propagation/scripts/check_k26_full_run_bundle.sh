@@ -267,6 +267,12 @@ require_grep '"unbridged_coordinate_carry_atoms":0' "$continuation" \
   "K26 continuation full bridge"
 require_grep '"target":\{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true.*"source_reached":true' "$continuation" \
   "K26 continuation target source reachability"
+require_grep '"path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' "$continuation" \
+  "K26 continuation target atom-chain provenance"
+require_grep '"atom_path_length":[1-9][0-9]*' "$continuation" \
+  "K26 continuation target atom-chain length"
+require_grep '"atom_path":\[[0-9,-]+' "$continuation" \
+  "K26 continuation target atom-chain"
 require_grep '"accepted":true' "$continuation" \
   "K26 continuation accepted"
 require_grep '"terminal_source_dead":true' "$continuation" \
