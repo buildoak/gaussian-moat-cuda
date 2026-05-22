@@ -167,7 +167,7 @@ add_test(NAME k26_execution_plan
   COMMAND k26_execution_plan)
 set_tests_properties(k26_execution_plan PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 22/22"
+    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 23/23"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_bz_schedule_check
@@ -199,6 +199,10 @@ add_test(NAME k26_full_run_bundle_checker
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_k26_full_run_bundle_checker.sh
     ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_k26_full_run_bundle.sh)
+add_test(NAME k26_full_run_harness
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_k26_full_run_harness.sh
+    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_k26_full_source_bundle.sh)
 add_test(NAME source_origin_cpu_runner_smoke
   COMMAND source_origin_cpu_runner
     --k-sq 26

@@ -80,6 +80,18 @@ if terminal source death was not reached at `R_final=1015645`, if the terminal
 inventory count is not `14,542,615,005`, or if the independent
 `source_dead_cert_check` does not accept the source-dead draft.
 
+The executable harness for producing the bundle shape is:
+
+```bash
+run_k26_full_source_bundle.sh --build-dir BUILD_DIR --out-dir OUT_DIR
+```
+
+It writes the command, BZ, profile, prefix, and continuation artifacts using
+the strict `--require-full-bridge` continuation schedule. It is deliberately
+certificate-gated: without a supplied `k26-source-dead-cert.json` it stops with
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. This keeps a paid
+sqrt(26) attempt reproducible without relaxing the `SOURCE_DEAD_CERT` logic.
+
 ## Executable Contract
 
 The local executable contract is:

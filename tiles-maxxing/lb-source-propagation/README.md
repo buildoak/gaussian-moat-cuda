@@ -210,6 +210,23 @@ digest mismatches, unbridged coordinate carry, overflow, wrong component size,
 missing source-dead draft, or a source-dead draft not accepted by the
 independent checker.
 
+The paid/full-run harness is:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
+  --build-dir /tmp/gm-lbsp-remote-smoke \
+  --out-dir /workspace/k26-full-source-bundle
+```
+
+It runs the exact K26 command/profile/BZ emitters, then executes the row-0
+coordinate prefix and strict-bridge TileOp-port continuation. It does not
+manufacture a source-dead certificate. If no `k26-source-dead-cert.json` is
+available, it writes
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt` after
+the prefix and continuation artifacts are produced. If a cert is supplied with
+`--cert-in`, it copies it into the bundle and runs the full bundle checker with
+the supplied `--source-dead-checker`.
+
 The exact non-claim command contract for the eventual K26 run is emitted by:
 
 ```bash
