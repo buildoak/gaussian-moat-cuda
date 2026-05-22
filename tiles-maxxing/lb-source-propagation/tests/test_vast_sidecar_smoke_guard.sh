@@ -19,7 +19,7 @@ if [[ "$1" == "search" && "$2" == "offers" ]]; then
   if [[ "${VAST_MOCK_NO_OFFERS:-0}" == "1" ]]; then
     echo '[]'
   else
-    echo '[{"id":12345,"dph_total":0.29}]'
+    echo '[{"id":12345,"dph_total":0.29,"host_id":777},{"id":23456,"dph_total":0.31,"host_id":888}]'
   fi
   exit 0
 fi
@@ -49,6 +49,20 @@ if grep -q '^create instance ' "$VAST_MOCK_LOG"; then
   echo "dry-run unexpectedly created a Vast instance" >&2
   exit 1
 fi
+
+: > "$VAST_MOCK_LOG"
+PATH="$tmp/bin:$PATH" "$guard" \
+  --exclude-offer-id 12345 \
+  --exclude-host-id 777 \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26 \
+  > "$tmp/excluded.log"
+grep -q 'QUALIFYING_OFFER id=23456 dph=0.31' "$tmp/excluded.log"
+grep -q 'EXCLUDED_OFFER_IDS 12345' "$tmp/excluded.log"
+grep -q 'EXCLUDED_HOST_IDS 777' "$tmp/excluded.log"
+grep -q -- '--exclude-offer-id 12345' "$tmp/excluded.log"
+grep -q -- '--exclude-host-id 777' "$tmp/excluded.log"
 
 : > "$VAST_MOCK_LOG"
 if PATH="$tmp/bin:$PATH" VAST_MOCK_NO_OFFERS=1 "$guard" \

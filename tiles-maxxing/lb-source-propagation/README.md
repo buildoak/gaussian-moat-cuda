@@ -228,6 +228,18 @@ deploys the current tree, runs `remote_sidecar_smoke.sh`, pulls artifacts into
 `check_remote_smoke_artifacts.sh --expect-head --expect-branch --expect-k-sq`,
 and destroys the created instance on exit.
 
+If a Vast offer or host repeatedly creates an instance whose advertised SSH
+port never opens, exclude it on the next attempt:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/vast_sidecar_smoke_guard.sh \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26 \
+  --exclude-offer-id 30257785 \
+  --exclude-host-id 53663
+```
+
 After a qualifying Vast 4090 is rented and the repo is copied to the host, run:
 
 ```bash

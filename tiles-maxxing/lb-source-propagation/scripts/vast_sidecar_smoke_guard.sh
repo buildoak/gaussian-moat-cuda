@@ -7,6 +7,8 @@ Usage:
   vast_sidecar_smoke_guard.sh [--execute] [--max-dph PRICE] [--max-budget USD]
                               [--k-sq N]
                               [--offer-id ID] [--remote DIR] [--pull-dir DIR]
+                              [--exclude-offer-id ID]
+                              [--exclude-host-id ID]
                               [--offer-wait-seconds N]
                               [--offer-poll-seconds N]
                               [--wait-ssh-seconds N] [--ssh-poll-seconds N]
@@ -22,7 +24,8 @@ to destroy the created instance after success or failure.
 
 Optional offer polling handles transient market races, and optional SSH
 readiness polling can stop or destroy a newly-created instance when SSH never
-opens.
+opens. Exclusion flags are for avoiding hosts/offers that have already failed
+SSH readiness during the current campaign.
 
 Hard defaults from the LB source-propagation goal:
   --max-dph     0.37
@@ -48,6 +51,8 @@ stop_on_ssh_timeout=0
 run_remote_smoke=0
 destroy_on_exit=0
 created_instance_id=""
+exclude_offer_ids=()
+exclude_host_ids=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -77,6 +82,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pull-dir)
       pull_dir="$2"
+      shift 2
+      ;;
+    --exclude-offer-id)
+      exclude_offer_ids+=("$2")
+      shift 2
+      ;;
+    --exclude-host-id)
+      exclude_host_ids+=("$2")
       shift 2
       ;;
     --offer-wait-seconds)
@@ -152,6 +165,12 @@ require_nonnegative_integer "$wait_ssh_seconds" "--wait-ssh-seconds"
 require_nonnegative_integer "$ssh_poll_seconds" "--ssh-poll-seconds"
 require_nonnegative_integer "$offer_wait_seconds" "--offer-wait-seconds"
 require_nonnegative_integer "$offer_poll_seconds" "--offer-poll-seconds"
+for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
+  require_nonnegative_integer "$id" "--exclude-offer-id"
+done
+for id in "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}"; do
+  require_nonnegative_integer "$id" "--exclude-host-id"
+done
 if [[ "$wait_ssh_seconds" != "0" && "$ssh_poll_seconds" == "0" ]]; then
   echo "--ssh-poll-seconds must be positive when SSH readiness polling is enabled" >&2
   exit 2
@@ -173,6 +192,14 @@ cleanup_instance() {
   return "$status"
 }
 trap cleanup_instance EXIT
+
+join_words() {
+  local IFS=" "
+  printf '%s\n' "$*"
+}
+
+exclude_offer_ids_joined="$(join_words "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}")"
+exclude_host_ids_joined="$(join_words "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}")"
 
 parse_created_instance_id() {
   CREATE_OUTPUT="$1" python3 <<'PY'
@@ -211,11 +238,13 @@ instance_id = int(sys.argv[1])
 for item in json.load(sys.stdin):
     if int(item.get("id", -1)) == instance_id:
         print(
-            "{} {} {} {}".format(
+            "{}\t{}\t{}\t{}\t{}\t{}".format(
                 item.get("cur_state") or "",
                 item.get("intended_status") or "",
+                item.get("actual_status") or "",
                 item.get("ssh_host") or "",
                 item.get("ssh_port") or "",
+                str(item.get("status_msg") or "").replace("\n", " ")[:180],
             )
         )
         break
@@ -225,15 +254,17 @@ for item in json.load(sys.stdin):
 wait_for_ssh_ready() {
   local instance_id="$1"
   local deadline="$((SECONDS + wait_ssh_seconds))"
-  local state intended host port
+  local state intended actual host port status_msg
   while (( SECONDS <= deadline )); do
     state=""
     intended=""
+    actual=""
     host=""
     port=""
-    read -r state intended host port < <(instance_ssh_fields "$instance_id" || true) || true
+    status_msg=""
+    IFS=$'\t' read -r state intended actual host port status_msg < <(instance_ssh_fields "$instance_id" || true) || true
     if [[ -n "${host:-}" && -n "${port:-}" ]]; then
-      echo "SSH_PROBE id=${instance_id} state=${state:-unknown} intended=${intended:-unknown} host=${host} port=${port}"
+      echo "SSH_PROBE id=${instance_id} state=${state:-unknown} intended=${intended:-unknown} actual=${actual:-unknown} host=${host} port=${port} status_msg=${status_msg:-none}"
       if ssh -o StrictHostKeyChecking=accept-new \
           -o ConnectTimeout=8 \
           -p "$port" "root@${host}" 'echo SSH_READY && hostname' >/dev/null; then
@@ -256,8 +287,8 @@ wait_for_ssh_ready() {
 
 require_ssh_endpoint() {
   local instance_id="$1"
-  local state intended host port
-  read -r state intended host port < <(instance_ssh_fields "$instance_id" || true) || true
+  local state intended actual host port status_msg
+  IFS=$'\t' read -r state intended actual host port status_msg < <(instance_ssh_fields "$instance_id" || true) || true
   if [[ -z "${host:-}" || -z "${port:-}" ]]; then
     echo "SSH endpoint unavailable for instance ${instance_id}" >&2
     exit 5
@@ -319,6 +350,25 @@ offers=""
 offer_deadline="$((SECONDS + offer_wait_seconds))"
 while :; do
   offers="$(vastai search offers "$filter" -o 'dph' --raw)"
+  offers="$(
+    EXCLUDE_OFFER_IDS="$exclude_offer_ids_joined" \
+    EXCLUDE_HOST_IDS="$exclude_host_ids_joined" \
+    python3 -c '
+import json
+import os
+import sys
+
+offer_ids = {int(x) for x in os.environ.get("EXCLUDE_OFFER_IDS", "").split() if x}
+host_ids = {int(x) for x in os.environ.get("EXCLUDE_HOST_IDS", "").split() if x}
+data = json.load(sys.stdin)
+filtered = [
+    item for item in data
+    if int(item.get("id", -1)) not in offer_ids
+    and int(item.get("host_id", -1)) not in host_ids
+]
+print(json.dumps(filtered))
+' <<<"$offers"
+  )"
   if [[ -n "$offers" && "$offers" != "[]" ]]; then
     break
   fi
@@ -363,11 +413,29 @@ PY
 
 echo "QUALIFYING_OFFER id=${offer_id} dph=${offer_dph} budget_hours=${soft_hours}"
 echo "LOCAL_SOURCE branch=${local_branch} head=${local_head} k_sq=${k_sq}"
+if [[ -n "$exclude_offer_ids_joined" ]]; then
+  echo "EXCLUDED_OFFER_IDS ${exclude_offer_ids_joined}"
+fi
+if [[ -n "$exclude_host_ids_joined" ]]; then
+  echo "EXCLUDED_HOST_IDS ${exclude_host_ids_joined}"
+fi
 
 one_shot_wait_ssh_seconds="$wait_ssh_seconds"
 if [[ "$one_shot_wait_ssh_seconds" == "0" ]]; then
   one_shot_wait_ssh_seconds="600"
 fi
+one_shot_cmd=("$0" --execute --run-remote-smoke --destroy-on-exit
+  --max-dph "$max_dph" --max-budget "$max_budget" --k-sq "$k_sq"
+  --offer-wait-seconds "$offer_wait_seconds"
+  --offer-poll-seconds "$offer_poll_seconds"
+  --wait-ssh-seconds "$one_shot_wait_ssh_seconds"
+  --ssh-poll-seconds "$ssh_poll_seconds")
+for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
+  one_shot_cmd+=(--exclude-offer-id "$id")
+done
+for id in "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}"; do
+  one_shot_cmd+=(--exclude-host-id "$id")
+done
 
 create_cmd=(vastai create instance "$offer_id"
   --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel
@@ -401,7 +469,7 @@ ACCEPTANCE_CHECK:
   tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh ${pull_dir} --expect-head ${local_head} --expect-branch ${local_branch} --expect-k-sq ${k_sq}
 
 ONE_SHOT_REMOTE_SMOKE:
-  $(shell_join "$0" --execute --run-remote-smoke --destroy-on-exit --max-dph "$max_dph" --max-budget "$max_budget" --k-sq "$k_sq" --offer-wait-seconds "$offer_wait_seconds" --offer-poll-seconds "$offer_poll_seconds" --wait-ssh-seconds "$one_shot_wait_ssh_seconds" --ssh-poll-seconds "$ssh_poll_seconds")
+  $(shell_join "${one_shot_cmd[@]}")
 EOF
 
 if [[ "$execute" -eq 0 ]]; then
