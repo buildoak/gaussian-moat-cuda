@@ -565,39 +565,23 @@ std::ostream& write_carry_manifest(std::ostream& out,
 
 CarryManifestReadResult read_carry_manifest(std::istream& in) {
   CarryManifestReadResult result;
-  std::vector<std::string> tokens;
   std::string token;
-  while (in >> token) {
-    tokens.push_back(token);
-  }
-
-  std::size_t cursor = 0;
   const auto fail = [&](std::string diagnostic) {
     result = {};
     result.diagnostic = std::move(diagnostic);
     return result;
   };
-  const auto next = [&]() -> const std::string* {
-    if (cursor >= tokens.size()) {
-      return nullptr;
-    }
-    return &tokens[cursor++];
-  };
   const auto expect = [&](std::string_view expected) -> bool {
-    const std::string* actual = next();
-    return actual != nullptr && *actual == expected;
+    return (in >> token) && token == expected;
   };
   const auto read_uint64 = [&](std::uint64_t& value) -> bool {
-    const std::string* actual = next();
-    return actual != nullptr && parse_uint64_token(*actual, value);
+    return (in >> token) && parse_uint64_token(token, value);
   };
   const auto read_int64 = [&](std::int64_t& value) -> bool {
-    const std::string* actual = next();
-    return actual != nullptr && parse_int64_token(*actual, value);
+    return (in >> token) && parse_int64_token(token, value);
   };
   const auto read_size = [&](std::size_t& value) -> bool {
-    const std::string* actual = next();
-    return actual != nullptr && parse_size_token(*actual, value);
+    return (in >> token) && parse_size_token(token, value);
   };
 
   if (!expect("LB_SOURCE_CARRY_MANIFEST_V1")) {
@@ -677,7 +661,7 @@ CarryManifestReadResult read_carry_manifest(std::istream& in) {
   if (!expect("END")) {
     return fail("missing manifest END marker");
   }
-  if (cursor != tokens.size()) {
+  if (in >> token) {
     return fail("unexpected trailing manifest tokens");
   }
 

@@ -51,7 +51,7 @@ struct Point {
 struct PrefixWitness {
   std::uint64_t k_sq = 0;
   std::uint64_t outer_radius = 0;
-  std::map<lb_source::AtomId, std::vector<Point>> path_by_target;
+  std::set<lb_source::AtomId> target_ids;
 };
 
 struct PortManifestBridgeResult {
@@ -341,13 +341,104 @@ lb_source::CarryManifest read_manifest_or_die(const std::string& path) {
     std::cerr << "cannot open --manifest-in path: " << path << "\n";
     std::exit(EXIT_FAILURE);
   }
-  lb_source::CarryManifestReadResult decoded =
-      lb_source::read_carry_manifest(in);
-  if (!decoded.accepted()) {
-    std::cerr << "invalid --manifest-in: " << decoded.diagnostic << "\n";
+
+  const auto fail = [](const std::string& diagnostic) {
+    std::cerr << "invalid --manifest-in: " << diagnostic << "\n";
     std::exit(EXIT_FAILURE);
+  };
+  const auto expect = [&](std::string_view expected) {
+    std::string token;
+    if (!(in >> token) || token != expected) {
+      fail("missing " + std::string(expected));
+    }
+  };
+
+  lb_source::CarryManifest manifest;
+  expect("LB_SOURCE_CARRY_MANIFEST_V1");
+  expect("k_sq");
+  if (!(in >> manifest.k_sq)) fail("missing or invalid k_sq");
+  expect("outer_radius");
+  if (!(in >> manifest.outer_radius)) {
+    fail("missing or invalid outer_radius");
   }
-  return decoded.manifest;
+  expect("carry_width");
+  if (!(in >> manifest.carry_width)) {
+    fail("missing or invalid carry_width");
+  }
+
+  std::size_t carry_count = 0;
+  expect("carry_atoms");
+  if (!(in >> carry_count)) fail("missing or invalid carry atom count");
+  manifest.separator.carry_atoms.reserve(carry_count);
+  std::set<lb_source::AtomId> carry_ids;
+  for (std::size_t i = 0; i < carry_count; ++i) {
+    std::string token;
+    lb_source::CarryAtom atom;
+    if (!(in >> token) || token != "carry_atom" || !(in >> atom.id) ||
+        !(in >> atom.norm_sq)) {
+      fail("missing or invalid carry atom");
+    }
+    if (!carry_ids.insert(atom.id).second) {
+      fail("duplicate carry atom");
+    }
+    manifest.separator.carry_atoms.push_back(atom);
+  }
+
+  std::size_t component_count = 0;
+  expect("components");
+  if (!(in >> component_count)) fail("missing or invalid component count");
+  manifest.separator.component_partition.reserve(component_count);
+  manifest.separator.source_bit_per_component.reserve(component_count);
+  manifest.separator.component_inventory.reserve(component_count);
+
+  std::set<lb_source::AtomId> partition_ids;
+  for (std::size_t c = 0; c < component_count; ++c) {
+    std::string token;
+    std::uint64_t source_bit = 0;
+    std::size_t partition_count = 0;
+    if (!(in >> token) || token != "component" || !(in >> source_bit) ||
+        source_bit > 1 || !(in >> partition_count) ||
+        partition_count == 0) {
+      fail("missing or invalid component header");
+    }
+    std::vector<lb_source::AtomId> partition;
+    partition.reserve(partition_count);
+    for (std::size_t i = 0; i < partition_count; ++i) {
+      lb_source::AtomId id = 0;
+      if (!(in >> id)) fail("missing or invalid component atom");
+      if (carry_ids.find(id) == carry_ids.end()) {
+        fail("component references non-carry atom");
+      }
+      if (!partition_ids.insert(id).second) {
+        fail("carry atom appears in multiple components");
+      }
+      partition.push_back(id);
+    }
+
+    std::size_t inventory_count = 0;
+    if (!(in >> inventory_count) || inventory_count == 0) {
+      fail("missing or invalid inventory count");
+    }
+    std::vector<lb_source::AtomId> inventory;
+    inventory.reserve(inventory_count);
+    for (std::size_t i = 0; i < inventory_count; ++i) {
+      lb_source::AtomId id = 0;
+      if (!(in >> id)) fail("missing or invalid inventory atom");
+      inventory.push_back(id);
+    }
+
+    manifest.separator.source_bit_per_component.push_back(source_bit != 0);
+    manifest.separator.component_partition.push_back(std::move(partition));
+    manifest.separator.component_inventory.push_back(std::move(inventory));
+  }
+
+  if (partition_ids != carry_ids) {
+    fail("component partition does not cover all carry atoms");
+  }
+  expect("END");
+  std::string trailing;
+  if (in >> trailing) fail("unexpected trailing manifest tokens");
+  return manifest;
 }
 
 void fail_prefix_witness(const std::string& diagnostic) {
@@ -402,8 +493,9 @@ PrefixWitness read_prefix_witness_or_die(const std::string& path) {
       fail_prefix_witness("empty source path");
     }
 
-    std::vector<Point> path_points;
-    path_points.reserve(static_cast<std::size_t>(path_count));
+    Point first_point;
+    Point last_point;
+    Point previous_point;
     for (std::uint64_t j = 0; j < path_count; ++j) {
       Point point;
       if (!(in >> token) || token != "point" || !(in >> point.a) ||
@@ -415,23 +507,23 @@ PrefixWitness read_prefix_witness_or_die(const std::string& path) {
         fail_prefix_witness("invalid path coordinate");
       }
       (void)checked_coordinate_atom_id(point.a, point.b);
-      path_points.push_back(point);
-    }
-
-    if (path_points.front().norm_sq > witness.k_sq) {
-      fail_prefix_witness("path does not start from an origin source seed");
-    }
-    if (path_points.back().a != target.a || path_points.back().b != target.b ||
-        path_points.back().norm_sq != target.norm_sq) {
-      fail_prefix_witness("path does not end at its target");
-    }
-    for (std::size_t j = 1; j < path_points.size(); ++j) {
-      if (dist_sq(path_points[j - 1], path_points[j]) > witness.k_sq) {
+      if (j == 0) {
+        first_point = point;
+      } else if (dist_sq(previous_point, point) > witness.k_sq) {
         fail_prefix_witness("path step exceeds k_sq");
       }
+      previous_point = point;
+      last_point = point;
     }
-    if (!witness.path_by_target.emplace(target_id, std::move(path_points))
-             .second) {
+
+    if (first_point.norm_sq > witness.k_sq) {
+      fail_prefix_witness("path does not start from an origin source seed");
+    }
+    if (last_point.a != target.a || last_point.b != target.b ||
+        last_point.norm_sq != target.norm_sq) {
+      fail_prefix_witness("path does not end at its target");
+    }
+    if (!witness.target_ids.insert(target_id).second) {
       fail_prefix_witness("duplicate witness target");
     }
   }
@@ -924,15 +1016,15 @@ int main(int argc, char** argv) {
         }
         for (const lb_source::AtomId id :
              coordinate_manifest->separator.component_partition[c]) {
-          if (prefix_witness->path_by_target.find(id) ==
-              prefix_witness->path_by_target.end()) {
+          if (prefix_witness->target_ids.find(id) ==
+              prefix_witness->target_ids.end()) {
             std::cerr << "prefix witness is missing a source carry atom\n";
             return EXIT_FAILURE;
           }
           ++prefix_witness_targets;
         }
       }
-      if (prefix_witness_targets != prefix_witness->path_by_target.size()) {
+      if (prefix_witness_targets != prefix_witness->target_ids.size()) {
         std::cerr << "prefix witness contains non-source carry targets\n";
         return EXIT_FAILURE;
       }
