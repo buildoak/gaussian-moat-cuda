@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -19,6 +20,8 @@ constexpr std::uint64_t kEndpointA = 376039;
 constexpr std::uint64_t kEndpointB = 943460;
 constexpr std::uint64_t kEndpointNormSq = 1031522101121ULL;
 constexpr std::int64_t kEndpointAtomId = 1615075207964004LL;
+constexpr std::int32_t kEndpointTileI = 1468;
+constexpr std::int32_t kEndpointTileJ = 3685;
 constexpr std::uint64_t kExpectedComponentSize = 14542615005ULL;
 
 std::string type_name(const nlohmann::json& value) {
@@ -113,12 +116,29 @@ std::uint64_t coordinate_atom_norm_sq(std::int64_t id) {
   return static_cast<std::uint64_t>(norm);
 }
 
-bool valid_port_atom_id(std::int64_t id) {
+struct PortAtom {
+  std::int32_t tile_i = 0;
+  std::int32_t tile_j = 0;
+};
+
+std::optional<PortAtom> decode_port_atom_id(std::int64_t id) {
   if (id >= 0 || id == std::numeric_limits<std::int64_t>::min()) {
-    return false;
+    return std::nullopt;
   }
   const std::uint64_t raw = static_cast<std::uint64_t>(-1 - id);
-  return (raw >> 58) == 0;
+  if ((raw >> 58) != 0) {
+    return std::nullopt;
+  }
+  const std::uint64_t tile_i = raw >> 34;
+  const std::uint64_t tile_j = (raw >> 10) & ((1ULL << 24) - 1ULL);
+  if (tile_i > static_cast<std::uint64_t>(
+                   std::numeric_limits<std::int32_t>::max()) ||
+      tile_j > static_cast<std::uint64_t>(
+                   std::numeric_limits<std::int32_t>::max())) {
+    return std::nullopt;
+  }
+  return PortAtom{static_cast<std::int32_t>(tile_i),
+                  static_cast<std::int32_t>(tile_j)};
 }
 
 void require_point(const nlohmann::json& object, const char* field,
@@ -207,7 +227,7 @@ void verify_gap(const nlohmann::json& gap) {
       ++coordinate_atoms;
       continue;
     }
-    if (!valid_port_atom_id(id)) {
+    if (!decode_port_atom_id(id).has_value()) {
       throw std::runtime_error("target atom path contains invalid TileOp port atom id");
     }
     ++port_atoms;
@@ -217,6 +237,13 @@ void verify_gap(const nlohmann::json& gap) {
   }
   if (port_atoms == 0) {
     throw std::runtime_error("target atom path has no TileOp port atom");
+  }
+  const std::optional<PortAtom> endpoint_port =
+      decode_port_atom_id(atom_path[atom_path.size() - 2]);
+  if (!endpoint_port.has_value() ||
+      endpoint_port->tile_i != kEndpointTileI ||
+      endpoint_port->tile_j != kEndpointTileJ) {
+    throw std::runtime_error("target atom path does not enter endpoint through the K26 endpoint tile");
   }
 
   const nlohmann::json& summary =

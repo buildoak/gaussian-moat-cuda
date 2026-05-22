@@ -96,6 +96,7 @@ endforeach()
 foreach(bad_source_dead_gap
     dead-gap-bad-claim-status
     dead-gap-bad-endpoint-atom
+    dead-gap-bad-endpoint-port-tile
     dead-gap-bad-inventory-tie
     dead-gap-bad-port-atom)
   add_test(NAME source_dead_gap_fixture_${bad_source_dead_gap}_reject
