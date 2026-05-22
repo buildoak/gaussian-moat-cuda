@@ -211,23 +211,28 @@ execute the full sqrt(26) comparison, and must not be treated as a
 `k26_source_run_contract` emits the execution contract for the Tsuchimura
 comparison target. It is intentionally a non-claim artifact:
 `"executable_now": false` remains correct until a campaign-scale source runner,
-scalable terminal inventory digest, accepted K26 BZ evidence, and
+scalable terminal inventory digest, full-run K26 BZ digest binding, and
 `SOURCE_DEAD_CERT` verifier exist.
 
 `k26_execution_plan` emits the machine-checkable execution plan for the same
 target. It expands the conservative `R_final=1015645` guard into 124 radial
 rows at preferred width 8192, records the final row width 8029, binds the active
 Vast budget caps, and uses the BZ-repaired row boundaries emitted by
-`k26_bz_schedule_check`. This is still a non-claim artifact and must keep
-`"executable_now": false` until the K26 blockers are closed.
+`k26_bz_schedule_check`. It also carries the repaired BZ schedule digest so the
+eventual full-run profile can bind the exact schedule it consumed. This is
+still a non-claim artifact and must keep `"executable_now": false` until the
+K26 blockers are closed.
 
-`k26_bz_schedule_check` is an exact integer diagnostic for K26 non-square
-bad-zone reconciliation. It deliberately does not make a claim. It records that
-the nominal 124-row, width-8192 schedule is not BZ-clean: rows `15`, `58`, and
-`75` contain Gaussian-prime norms in a bad zone. It then emits a repaired
-schedule using the nearest clean internal boundary, choosing negative delta
-before positive on ties. The current repaired boundaries shift `122880`,
-`475136`, and `622592` down by `1`; all repaired rows are BZ-clean.
+`k26_bz_schedule_check` is exact integer evidence for K26 non-square bad-zone
+reconciliation. It records that the nominal 124-row, width-8192 schedule is not
+BZ-clean: rows `15`, `58`, and `75` contain Gaussian-prime norms in a bad zone.
+It then emits a repaired schedule using the nearest clean internal boundary,
+choosing negative delta before positive on ties. The current repaired
+boundaries shift `122880`, `475136`, and `622592` down by `1`; all repaired
+rows are BZ-clean. Its status is `BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE`, with
+digest `sha256:lb_source_k26_repaired_bz_schedule_v1:7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95`.
+That accepts the schedule evidence only; it is not `SOURCE_ORIGIN_K26` or
+`SOURCE_DEAD_CERT`.
 
 `k26_source_run_profile` binds the repaired schedule to the intended full-run
 shape: exact coordinate prefix for row `0`, then TileOp-port continuation for

@@ -1,4 +1,5 @@
 #include "lb_source/source_propagation.h"
+#include "lb_source/k26_bz_schedule.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -415,19 +416,33 @@ int main() {
   const std::vector<RowEvidence> repaired_rows = make_rows(nominal, repaired);
   const ScheduleSummary nominal_summary = summarize_rows(nominal_rows);
   const ScheduleSummary repaired_summary = summarize_rows(repaired_rows);
+  if (repaired_summary.bad_norm_count != 0) {
+    std::cerr << "K26 repaired BZ schedule is not clean\n";
+    return EXIT_FAILURE;
+  }
+  if (repaired != lb_source::k26_bz::canonical_repaired_boundaries()) {
+    std::cerr << "K26 dynamic BZ repair no longer matches canonical schedule\n";
+    return EXIT_FAILURE;
+  }
+  const std::string digest_hex =
+      lb_source::k26_bz::repaired_schedule_digest_hex(nominal, repaired);
 
   std::cout << "{"
             << "\"schema\":\"lb_source_k26_bz_schedule_check_v1\","
             << "\"claim_label\":\"SOURCE_ORIGIN_K26\","
-            << "\"proof_status\":\"BZ_REPAIRED_SCHEDULE_DIAGNOSTIC_NON_CLAIM\","
+            << "\"proof_status\":\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\","
+            << "\"accepted_for_schedule\":true,"
             << "\"accepted_for_claim\":false,"
-            << "\"non_claim\":\"exact K26 bad-zone schedule diagnostic only; repaired rows are BZ-clean but no source/origin run was executed\","
+            << "\"non_claim\":\"exact K26 bad-zone schedule evidence only; repaired rows are BZ-clean but no source/origin run was executed\","
             << "\"k_sq\":" << kSq
             << ",\"ceil_sqrt_k\":" << lb_source::ceil_sqrt(kSq)
             << ",\"terminal_radius\":" << kConservativeTerminalRadius
             << ",\"preferred_band_width\":" << kPreferredBandWidth
             << ",\"band_count\":"
             << band_count_for(kConservativeTerminalRadius, kPreferredBandWidth)
+            << ",\"schedule_digest_algorithm\":\""
+            << lb_source::k26_bz::schedule_digest_algorithm
+            << "\",\"schedule_digest_hex\":\"" << digest_hex << "\""
             << ",\"repair\":{\"strategy\":\"nearest clean internal boundary, negative delta before positive on ties\","
             << "\"repaired_boundary_count\":"
             << repaired_boundary_count(nominal, repaired)

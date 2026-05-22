@@ -35,11 +35,14 @@ verifier, the campaign should use the conservative value.
 5. The run is wired to source/origin seed logic, not `geo_I` flags.
 6. Every source/origin proof row rejects overflow.
 7. Non-square `K=26` has per-row BZ evidence, and every accepted row is
-   BZ-clean. The exact schedule diagnostic shows the nominal 124-row
+   BZ-clean. The exact schedule evidence shows the nominal 124-row
    width-8192 schedule is not BZ-clean at rows `15`, `58`, and `75`, then
    repairs the internal boundaries `122880`, `475136`, and `622592` down by
-   `1`. The repaired schedule is BZ-clean but remains diagnostic until it is
-   bound into full-run metadata.
+   `1`. The repaired schedule is BZ-clean, emits
+   `BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE`, and carries digest
+   `sha256:lb_source_k26_repaired_bz_schedule_v1:7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95`.
+   This accepts the schedule evidence only; it is still not source/origin proof
+   until an executed full-run profile binds the same digest.
 8. Coordinate-to-port seam bridging is accepted or explicitly reported as
    diagnostic evidence. The current K36 smoke keeps `133` source coordinate
    carry atoms as the original incoming separator, inserts `374` bridge edges
@@ -100,7 +103,7 @@ required evidence, and current blocking gaps. It must keep
   source/death certificate.
 - accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
-- accepted K26 non-square BZ evidence bound to the repaired schedule;
+- accepted K26 non-square BZ evidence bound to the repaired schedule digest;
 - an accepted full-scale `SOURCE_DEAD_CERT` artifact. The current independent
   draft checker has two deliberately separate modes: a listed-inventory mode
   that recomputes the count/digest/max-norm/tie-set from the explicit terminal
@@ -108,7 +111,7 @@ required evidence, and current blocking gaps. It must keep
   Tsuchimura-scale accumulator shape plus extrema witnesses and emits
   `SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS`. The latter is the scalable
   K26 contract shape, not a certificate acceptance; the real K26 chain,
-  accumulator provenance, and BZ acceptance are still missing.
+  accumulator provenance, and full-run BZ digest binding are still missing.
 
 The exact command contract is:
 

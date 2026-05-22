@@ -93,7 +93,7 @@ int main() {
       "positive source chain to canonical octant representative 376039+943460i, symmetry-equivalent to Tsuchimura endpoint 943460+376039i",
       "negative final guard proof at R_final >= 1015645 under conservative K26 shell",
       "zero overflow across all source/origin proof rows",
-      "accepted K26 repaired BZ schedule evidence bound into profile metadata",
+      "accepted K26 repaired BZ schedule evidence digest bound into profile metadata",
       "commit, build, run profile, and artifact hashes"};
 
   constexpr const char* kBlockingGaps[] = {
@@ -103,7 +103,7 @@ int main() {
       "diagnostic origin-prefix-to-port bridge exists, but the K36 smoke still reaches terminal source death after one TileOp-port band: 133 source coordinate carry atoms enter as the original separator, 106 have first-band port bridges, 27 are unbridged, 7 canonical port atoms are reached via 374 bridge edges",
       "no accepted seam-bridge theorem yet proves that unbridged coordinate carry atoms and first-band port death are sufficient for K26 source/origin death",
       "sidecar inventory count/digest/max-norm/tie-set checks exist, but endpoint-chain and inventory handling are not accepted at 14.5B scale",
-      "exact K26 BZ schedule diagnostic has repaired the nominal dirty rows, but the repaired schedule is not yet accepted into full-run metadata",
+      "exact K26 BZ schedule evidence has a stable digest, but no executed source/origin run has bound it into full-run metadata",
       "independent SOURCE_DEAD_CERT draft checker exists, but no full-scale K26 certificate artifact passes it"};
 
   std::cout << "{"

@@ -1,9 +1,12 @@
 #include "lb_source/source_propagation.h"
+#include "lb_source/k26_bz_schedule.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <string>
+#include <vector>
 
 namespace {
 
@@ -36,14 +39,7 @@ std::uint64_t band_count_for(std::uint64_t terminal_radius,
 }
 
 std::uint64_t repaired_boundary(std::uint64_t nominal) {
-  switch (nominal) {
-    case 122880:
-    case 475136:
-    case 622592:
-      return nominal - 1;
-    default:
-      return nominal;
-  }
+  return lb_source::k26_bz::repaired_boundary(nominal);
 }
 
 std::int64_t boundary_shift(std::uint64_t nominal) {
@@ -85,7 +81,7 @@ void emit_rows() {
               << ",\"width\":" << width
               << ",\"start_shift\":" << boundary_shift(nominal_start)
               << ",\"outer_shift\":" << boundary_shift(nominal_outer)
-              << ",\"bz_status\":\"K26_REPAIRED_BZ_CLEAN_DIAGNOSTIC\""
+              << ",\"bz_status\":\"K26_REPAIRED_BZ_SCHEDULE_PASS_NON_SOURCE\""
               << ",\"overflow_policy\":\"reject_source_row\"}";
     nominal_start = nominal_outer;
     ++index;
@@ -109,6 +105,12 @@ int main() {
     std::cerr << "unexpected K26 band count\n";
     return EXIT_FAILURE;
   }
+  const std::vector<std::uint64_t> nominal =
+      lb_source::k26_bz::nominal_boundaries();
+  const std::vector<std::uint64_t> repaired =
+      lb_source::k26_bz::canonical_repaired_boundaries();
+  const std::string bz_schedule_digest =
+      lb_source::k26_bz::repaired_schedule_digest_hex(nominal, repaired);
 
   constexpr const char* kRunnerRequirements[] = {
       "build sidecar with -DK_SQ=26 before campaign TileOp ingestion",
@@ -143,6 +145,12 @@ int main() {
       << ",\"cmake_define\":\"-DK_SQ=26\","
       << "\"reason\":\"campaign TileOp constants are compile-time bound\"},"
       << "\"schedule\":{\"bz_schedule\":\"repaired\","
+      << "\"bz_evidence\":{\"status\":\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\","
+      << "\"accepted_for_schedule\":true,"
+      << "\"accepted_for_claim\":false,"
+      << "\"schedule_digest_algorithm\":\""
+      << lb_source::k26_bz::schedule_digest_algorithm
+      << "\",\"schedule_digest_hex\":\"" << bz_schedule_digest << "\"},"
       << "\"terminal_radius\":" << kConservativeTerminalRadius
       << ",\"preferred_band_width\":" << kPreferredBandWidth
       << ",\"band_count\":"

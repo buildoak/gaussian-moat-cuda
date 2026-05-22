@@ -13,6 +13,7 @@ find_package(OpenMP QUIET)
 
 add_library(lb_source_propagation STATIC
   ../cpp-campaign-v2/src/sha256.cpp
+  src/k26_bz_schedule.cpp
   src/source_propagation.cpp
 )
 target_compile_options(lb_source_propagation PRIVATE -Wall -Wextra -Werror)
@@ -166,21 +167,21 @@ add_test(NAME k26_execution_plan
   COMMAND k26_execution_plan)
 set_tests_properties(k26_execution_plan PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 21/21"
+    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 21/21"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_bz_schedule_check
   COMMAND k26_bz_schedule_check)
 set_tests_properties(k26_bz_schedule_check PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_bz_schedule_check_v1\".*\"proof_status\":\"BZ_REPAIRED_SCHEDULE_DIAGNOSTIC_NON_CLAIM\".*\"accepted_for_claim\":false.*\"band_count\":124.*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"nominal_summary\":.*\"rows_with_bad_norms\":3.*\"repaired_summary\":.*\"bad_norm_count\":0.*\"bz_clean\":true"
+    "\"schema\":\"lb_source_k26_bz_schedule_check_v1\".*\"proof_status\":\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"accepted_for_claim\":false.*\"band_count\":124.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"schedule_digest_hex\":\"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_source_run_profile
   COMMAND k26_source_run_profile)
 set_tests_properties(k26_source_run_profile PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"full K26 source runner has not executed the repaired variable-boundary schedule"
+    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"full K26 source runner has not executed the repaired variable-boundary schedule"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_source_run_commands

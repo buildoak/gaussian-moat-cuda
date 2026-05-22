@@ -9,7 +9,7 @@ Usage:
 
 Validate pulled LB source-propagation remote smoke artifacts. This checks the
 sidecar and independent verifier CTest logs, the non-claim K26 preflight,
-contract, execution-plan JSON, K26 BZ schedule diagnostic, and optional
+contract, execution-plan JSON, K26 BZ schedule evidence, and optional
 deployed source provenance.
 USAGE
 }
@@ -65,6 +65,34 @@ require_grep() {
   local label="$3"
   if ! grep -Eq "$pattern" "$path"; then
     echo "artifact check failed: $label ($path)" >&2
+    exit 1
+  fi
+}
+
+json_string_value() {
+  local path="$1"
+  local field="$2"
+  sed -nE "s/.*\"${field}\":\"([^\"]+)\".*/\\1/p" "$path" | head -n 1
+}
+
+require_json_string_value() {
+  local path="$1"
+  local field="$2"
+  local value
+  value="$(json_string_value "$path" "$field")"
+  if [[ -z "$value" ]]; then
+    echo "artifact check failed: missing JSON string field ${field} ($path)" >&2
+    exit 1
+  fi
+  printf '%s\n' "$value"
+}
+
+require_equal() {
+  local expected="$1"
+  local actual="$2"
+  local label="$3"
+  if [[ "$expected" != "$actual" ]]; then
+    echo "artifact check failed: ${label}: expected ${expected}, got ${actual}" >&2
     exit 1
   fi
 }
@@ -141,6 +169,14 @@ require_grep '"max_dph_usd":0\.37' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan dph cap"
 require_grep '"bz_schedule":"repaired"' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan repaired BZ schedule"
+require_grep '"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE"' \
+  "$out_dir/k26_execution_plan.json" "K26 execution plan BZ evidence status"
+require_grep '"accepted_for_schedule":true' \
+  "$out_dir/k26_execution_plan.json" "K26 execution plan BZ schedule accepted"
+require_grep '"accepted_for_claim":false' \
+  "$out_dir/k26_execution_plan.json" "K26 execution plan BZ not source claim"
+require_grep '"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1"' \
+  "$out_dir/k26_execution_plan.json" "K26 execution plan BZ digest algorithm"
 require_grep '"repaired_boundary_count":3' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan repair count"
 require_grep '"max_abs_boundary_shift":1' \
@@ -160,10 +196,16 @@ require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule schema"
 require_grep '"claim_label":"SOURCE_ORIGIN_K26"' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule claim label"
-require_grep '"proof_status":"BZ_REPAIRED_SCHEDULE_DIAGNOSTIC_NON_CLAIM"' \
-  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule non-claim status"
+require_grep '"proof_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE"' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule pass status"
+require_grep '"accepted_for_schedule":true' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule accepted"
 require_grep '"accepted_for_claim":false' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule not accepted"
+require_grep '"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1"' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule digest algorithm"
+require_grep '"schedule_digest_hex":"[0-9a-f]{64}"' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule digest hex"
 require_grep '"band_count":124' \
   "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule band count"
 require_grep '"repaired_boundary_count":3' \
@@ -195,6 +237,14 @@ require_grep '"required_k_sq":26' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile required build"
 require_grep '"bz_schedule":"repaired"' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile repaired schedule"
+require_grep '"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE"' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile BZ evidence status"
+require_grep '"accepted_for_schedule":true' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile BZ schedule accepted"
+require_grep '"accepted_for_claim":false' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile BZ not source claim"
+require_grep '"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1"' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile BZ digest algorithm"
 require_grep '"prefix_row_index":0' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile prefix row"
 require_grep '"tileop_port_first_row_index":1' \
@@ -208,6 +258,12 @@ require_grep '"claim_label":"SOURCE_ORIGIN_K26"' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands claim label"
 require_grep '"executable_now":false' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands non-executable"
+
+bz_digest="$(require_json_string_value "$out_dir/k26_bz_schedule_check.json" schedule_digest_hex)"
+plan_digest="$(require_json_string_value "$out_dir/k26_execution_plan.json" schedule_digest_hex)"
+profile_digest="$(require_json_string_value "$out_dir/k26_source_run_profile.json" schedule_digest_hex)"
+require_equal "$bz_digest" "$plan_digest" "K26 BZ digest plan binding"
+require_equal "$bz_digest" "$profile_digest" "K26 BZ digest profile binding"
 require_grep '"required_k_sq":26' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands required build"
 require_grep '"tsuchimura_endpoint":.*"a":943460.*"b":376039' \
