@@ -103,6 +103,14 @@ graph directly. Its smoke mode seeds the first band from `geo_I` inner flags and
 is intentionally labeled `GEO_I_PORT_DIAGNOSTIC`; on the tiny K36 fixture this
 source dies before the final carry shell, which is useful evidence that the
 runner reports terminal death instead of inventing a live source manifest.
+It can also consume `--manifest-in` plus `--prefix-witness-in` from the
+coordinate-fed prefix runner. In that mode it projects coordinate carry atoms
+onto first-band TileOp port atoms by looking for TileOp-band primes within
+distance `sqrt(K)` of each coordinate carry atom, then bridging those prime
+components to canonical ports. Coordinate carry atoms with no port-visible
+continuation are reported as dropped in the JSON. This is still diagnostic:
+the projection is explicit evidence for the next engineering gate, not an
+accepted source/death certificate.
 
 ## Small Source Runner
 

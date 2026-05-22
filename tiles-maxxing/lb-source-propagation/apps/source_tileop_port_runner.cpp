@@ -8,14 +8,18 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "campaign/campaign_constants.h"
 #include "campaign/constants.h"
 #include "campaign/grid.h"
+#include "campaign/sieve.h"
 #include "campaign/tileop.h"
 
 namespace {
@@ -26,8 +30,36 @@ struct Config {
   std::uint64_t band_width = 128;
   std::size_t max_atoms = 1000000;
   bool seed_inner_flags = false;
+  std::optional<std::string> manifest_in;
+  std::optional<std::string> prefix_witness_in;
   std::optional<std::string> manifest_out;
 };
+
+struct Point {
+  std::int64_t a = 0;
+  std::int64_t b = 0;
+  std::uint64_t norm_sq = 0;
+};
+
+struct PrefixWitness {
+  std::uint64_t k_sq = 0;
+  std::uint64_t outer_radius = 0;
+  std::map<lb_source::AtomId, std::vector<Point>> path_by_target;
+};
+
+struct PortManifestBridgeResult {
+  lb_source::SeparatorState separator;
+  std::uint64_t bridged_coordinate_carry_atoms = 0;
+  std::uint64_t dropped_coordinate_carry_atoms = 0;
+  std::uint64_t dropped_source_coordinate_carry_atoms = 0;
+  std::uint64_t bridged_port_carry_atoms = 0;
+  std::uint64_t bridge_components_before = 0;
+  std::uint64_t bridge_components_after = 0;
+};
+
+std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b);
+lb_source::AtomId checked_coordinate_atom_id(std::int64_t a, std::int64_t b);
+std::uint64_t dist_sq(const Point& lhs, const Point& rhs);
 
 bool parse_uint64(std::string_view text, std::uint64_t& out) {
   try {
@@ -60,6 +92,12 @@ void usage(const char* prog) {
       << "                        (default 1000000)\n"
       << "  --seed-inner-flags    seed first band from TileOp inner flags\n"
       << "                        (geo-I diagnostic only)\n"
+      << "  --manifest-in PATH    read an origin-prefix coordinate carry\n"
+      << "                        manifest at --r-start and bridge it to\n"
+      << "                        canonical TileOp port atoms\n"
+      << "  --prefix-witness-in PATH\n"
+      << "                        read diagnostic origin-prefix paths for\n"
+      << "                        incoming source carry atoms\n"
       << "  --manifest-out PATH   write final carry manifest when source survives\n";
 }
 
@@ -114,6 +152,18 @@ bool parse_args(int argc, char** argv, Config& config) {
       config.max_atoms = static_cast<std::size_t>(parsed);
     } else if (arg == "--seed-inner-flags") {
       config.seed_inner_flags = true;
+    } else if (take_value("--manifest-in", value)) {
+      if (value.empty()) {
+        std::cerr << "--manifest-in must not be empty\n";
+        return false;
+      }
+      config.manifest_in = value;
+    } else if (take_value("--prefix-witness-in", value)) {
+      if (value.empty()) {
+        std::cerr << "--prefix-witness-in must not be empty\n";
+        return false;
+      }
+      config.prefix_witness_in = value;
     } else if (take_value("--manifest-out", value)) {
       if (value.empty()) {
         std::cerr << "--manifest-out must not be empty\n";
@@ -136,7 +186,152 @@ bool parse_args(int argc, char** argv, Config& config) {
     std::cerr << "--band-width must be at least ceil_sqrt(K_SQ)\n";
     return false;
   }
+  if (config.seed_inner_flags && config.manifest_in.has_value()) {
+    std::cerr << "--seed-inner-flags cannot be combined with --manifest-in\n";
+    return false;
+  }
+  if (config.prefix_witness_in.has_value() && !config.manifest_in.has_value()) {
+    std::cerr << "--prefix-witness-in requires --manifest-in\n";
+    return false;
+  }
   return true;
+}
+
+lb_source::CarryManifest read_manifest_or_die(const std::string& path) {
+  std::ifstream in(path);
+  if (!in) {
+    std::cerr << "cannot open --manifest-in path: " << path << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  lb_source::CarryManifestReadResult decoded =
+      lb_source::read_carry_manifest(in);
+  if (!decoded.accepted()) {
+    std::cerr << "invalid --manifest-in: " << decoded.diagnostic << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return decoded.manifest;
+}
+
+void fail_prefix_witness(const std::string& diagnostic) {
+  std::cerr << "invalid --prefix-witness-in: " << diagnostic << "\n";
+  std::exit(EXIT_FAILURE);
+}
+
+PrefixWitness read_prefix_witness_or_die(const std::string& path) {
+  std::ifstream in(path);
+  if (!in) {
+    std::cerr << "cannot open --prefix-witness-in path: " << path << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  PrefixWitness witness;
+  std::string token;
+  if (!(in >> token) || token != "LB_SOURCE_PREFIX_WITNESS_V1") {
+    fail_prefix_witness("missing prefix witness header");
+  }
+  if (!(in >> token) || token != "k_sq" || !(in >> witness.k_sq)) {
+    fail_prefix_witness("missing k_sq");
+  }
+  if (!(in >> token) || token != "outer_radius" ||
+      !(in >> witness.outer_radius)) {
+    fail_prefix_witness("missing outer_radius");
+  }
+  std::uint64_t witness_count = 0;
+  if (!(in >> token) || token != "witness_count" ||
+      !(in >> witness_count)) {
+    fail_prefix_witness("missing witness_count");
+  }
+
+  for (std::uint64_t i = 0; i < witness_count; ++i) {
+    lb_source::AtomId raw_id = 0;
+    Point target;
+    std::uint64_t path_count = 0;
+    if (!(in >> token) || token != "witness" || !(in >> raw_id) ||
+        !(in >> target.a) || !(in >> target.b) ||
+        !(in >> target.norm_sq) || !(in >> path_count)) {
+      fail_prefix_witness("malformed witness row");
+    }
+    if (target.a < 0 || target.b < 0 || target.b < target.a ||
+        norm_sq_i64(target.a, target.b) != target.norm_sq) {
+      fail_prefix_witness("invalid witness target coordinate");
+    }
+    const lb_source::AtomId target_id =
+        checked_coordinate_atom_id(target.a, target.b);
+    if (target_id != raw_id) {
+      fail_prefix_witness("target atom id does not match coordinate");
+    }
+    if (path_count == 0) {
+      fail_prefix_witness("empty source path");
+    }
+
+    std::vector<Point> path_points;
+    path_points.reserve(static_cast<std::size_t>(path_count));
+    for (std::uint64_t j = 0; j < path_count; ++j) {
+      Point point;
+      if (!(in >> token) || token != "point" || !(in >> point.a) ||
+          !(in >> point.b) || !(in >> point.norm_sq)) {
+        fail_prefix_witness("malformed path point");
+      }
+      if (point.a < 0 || point.b < 0 || point.b < point.a ||
+          norm_sq_i64(point.a, point.b) != point.norm_sq) {
+        fail_prefix_witness("invalid path coordinate");
+      }
+      (void)checked_coordinate_atom_id(point.a, point.b);
+      path_points.push_back(point);
+    }
+
+    if (path_points.front().norm_sq > witness.k_sq) {
+      fail_prefix_witness("path does not start from an origin source seed");
+    }
+    if (path_points.back().a != target.a || path_points.back().b != target.b ||
+        path_points.back().norm_sq != target.norm_sq) {
+      fail_prefix_witness("path does not end at its target");
+    }
+    for (std::size_t j = 1; j < path_points.size(); ++j) {
+      if (dist_sq(path_points[j - 1], path_points[j]) > witness.k_sq) {
+        fail_prefix_witness("path step exceeds k_sq");
+      }
+    }
+    if (!witness.path_by_target.emplace(target_id, std::move(path_points))
+             .second) {
+      fail_prefix_witness("duplicate witness target");
+    }
+  }
+
+  if (!(in >> token) || token != "END") {
+    fail_prefix_witness("missing END marker");
+  }
+  if (in >> token) {
+    fail_prefix_witness("unexpected trailing token");
+  }
+  return witness;
+}
+
+std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b) {
+  const unsigned __int128 norm =
+      static_cast<unsigned __int128>(a) * static_cast<unsigned __int128>(a) +
+      static_cast<unsigned __int128>(b) * static_cast<unsigned __int128>(b);
+  if (norm > std::numeric_limits<std::uint64_t>::max()) {
+    std::cerr << "norm overflow\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return static_cast<std::uint64_t>(norm);
+}
+
+lb_source::AtomId checked_coordinate_atom_id(std::int64_t a, std::int64_t b) {
+  const std::optional<lb_source::AtomId> id =
+      lb_source::coordinate_atom_id(a, b);
+  if (!id.has_value()) {
+    std::cerr << "coordinate atom id overflow or non-canonical coordinate\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return *id;
+}
+
+std::uint64_t dist_sq(const Point& lhs, const Point& rhs) {
+  const __int128 da = static_cast<__int128>(lhs.a) - rhs.a;
+  const __int128 db = static_cast<__int128>(lhs.b) - rhs.b;
+  return static_cast<std::uint64_t>(da * da + db * db);
 }
 
 bool has_source_carry(const lb_source::SeparatorState& state) {
@@ -155,6 +350,41 @@ std::uint64_t source_carry_atoms(const lb_source::SeparatorState& state) {
   return count;
 }
 
+class ComponentDsu {
+ public:
+  explicit ComponentDsu(std::size_t n) : parent_(n), rank_(n, 0) {
+    for (std::size_t i = 0; i < n; ++i) {
+      parent_[i] = i;
+    }
+  }
+
+  std::size_t find(std::size_t x) {
+    if (parent_[x] != x) {
+      parent_[x] = find(parent_[x]);
+    }
+    return parent_[x];
+  }
+
+  void unite(std::size_t a, std::size_t b) {
+    a = find(a);
+    b = find(b);
+    if (a == b) {
+      return;
+    }
+    if (rank_[a] < rank_[b]) {
+      std::swap(a, b);
+    }
+    parent_[b] = a;
+    if (rank_[a] == rank_[b]) {
+      ++rank_[a];
+    }
+  }
+
+ private:
+  std::vector<std::size_t> parent_;
+  std::vector<std::uint8_t> rank_;
+};
+
 std::vector<campaign::TileOp> build_tileops(
     const std::vector<campaign::TileCoord>& coords,
     const campaign::CampaignConstants& constants,
@@ -172,12 +402,232 @@ std::vector<campaign::TileOp> build_tileops(
   return tileops;
 }
 
+PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
+    const lb_source::CarryManifest& manifest,
+    const campaign::CampaignConstants& constants,
+    const std::vector<campaign::TileCoord>& coords,
+    const std::vector<campaign::TileOp>& tileops,
+    const lb_source::BandInput& graph_band) {
+  PortManifestBridgeResult result;
+
+  std::map<lb_source::AtomId, std::uint64_t> port_norm_by_id;
+  for (const lb_source::BandAtom& atom : graph_band.atoms) {
+    if (!port_norm_by_id.emplace(atom.id, atom.norm_sq).second) {
+      std::cerr << "TileOp port graph emitted duplicate atom id\n";
+      std::exit(EXIT_FAILURE);
+    }
+  }
+
+  std::map<lb_source::AtomId, lb_source::CoordinateAtom> target_by_id;
+  std::map<lb_source::AtomId, Point> carry_point_by_id;
+  for (const lb_source::CarryAtom& atom : manifest.separator.carry_atoms) {
+    const std::optional<lb_source::CoordinateAtom> decoded =
+        lb_source::decode_coordinate_atom_id(atom.id);
+    if (!decoded.has_value() || decoded->norm_sq != atom.norm_sq) {
+      std::cerr << "manifest carry atom is not a stable coordinate atom\n";
+      std::exit(EXIT_FAILURE);
+    }
+    target_by_id.emplace(atom.id, *decoded);
+    carry_point_by_id.emplace(
+        atom.id, Point{decoded->a, decoded->b, decoded->norm_sq});
+  }
+  result.bridge_components_before =
+      manifest.separator.component_partition.size();
+
+  std::map<lb_source::AtomId, std::set<lb_source::AtomId>> ports_by_coord_id;
+  for (std::size_t t = 0; t < coords.size(); ++t) {
+    const std::vector<campaign::Prime> primes =
+        campaign::sieve_tile(coords[t], constants);
+    for (const campaign::Prime& prime : primes) {
+      const Point prime_point{prime.a, prime.b, prime.norm_sq};
+      std::vector<lb_source::AtomId> adjacent_carry_ids;
+      for (const auto& [coord_id, carry_point] : carry_point_by_id) {
+        if (dist_sq(carry_point, prime_point) <=
+            static_cast<std::uint64_t>(campaign::k_sq_value)) {
+          adjacent_carry_ids.push_back(coord_id);
+        }
+      }
+      if (adjacent_carry_ids.empty()) {
+        continue;
+      }
+      const lb_source::CoordinatePortBridgeResult bridge =
+          lb_source::bridge_coordinate_prime_to_ports({
+              .coord = coords[t],
+              .constants = constants,
+              .tileop = tileops[t],
+              .target = prime,
+              .primes = primes,
+          });
+      if (!bridge.accepted()) {
+        continue;
+      }
+      for (const lb_source::AtomId coord_id : adjacent_carry_ids) {
+        std::set<lb_source::AtomId>& ports = ports_by_coord_id[coord_id];
+        ports.insert(bridge.port_atoms.begin(), bridge.port_atoms.end());
+      }
+    }
+  }
+
+  for (const auto& [coord_id, decoded] : target_by_id) {
+    (void)decoded;
+    const auto ports_it = ports_by_coord_id.find(coord_id);
+    if (ports_it == ports_by_coord_id.end() || ports_it->second.empty()) {
+      ++result.dropped_coordinate_carry_atoms;
+      continue;
+    }
+    ++result.bridged_coordinate_carry_atoms;
+  }
+
+  ComponentDsu dsu(manifest.separator.component_partition.size());
+  std::map<lb_source::AtomId, std::size_t> first_component_by_port;
+  std::vector<std::set<lb_source::AtomId>> component_ports(
+      manifest.separator.component_partition.size());
+  for (std::size_t c = 0; c < manifest.separator.component_partition.size();
+       ++c) {
+    for (const lb_source::AtomId coord_id :
+         manifest.separator.component_partition[c]) {
+      const auto ports_it = ports_by_coord_id.find(coord_id);
+      if (ports_it == ports_by_coord_id.end() || ports_it->second.empty()) {
+        if (manifest.separator.source_bit_per_component[c]) {
+          ++result.dropped_source_coordinate_carry_atoms;
+        }
+        continue;
+      }
+      for (const lb_source::AtomId port_id : ports_it->second) {
+        component_ports[c].insert(port_id);
+        const auto [first_it, inserted] =
+            first_component_by_port.emplace(port_id, c);
+        if (!inserted) {
+          dsu.unite(c, first_it->second);
+        }
+      }
+    }
+  }
+
+  struct Group {
+    std::set<lb_source::AtomId> ports;
+    std::set<lb_source::AtomId> inventory;
+    bool source = false;
+  };
+  std::map<std::size_t, Group> groups;
+  for (std::size_t c = 0; c < component_ports.size(); ++c) {
+    if (component_ports[c].empty()) {
+      continue;
+    }
+    Group& group = groups[dsu.find(c)];
+    group.ports.insert(component_ports[c].begin(), component_ports[c].end());
+    group.source = group.source || manifest.separator.source_bit_per_component[c];
+    const std::vector<lb_source::AtomId>& inventory =
+        manifest.separator.component_inventory.empty()
+            ? manifest.separator.component_partition[c]
+            : manifest.separator.component_inventory[c];
+    group.inventory.insert(inventory.begin(), inventory.end());
+    group.inventory.insert(component_ports[c].begin(), component_ports[c].end());
+  }
+
+  for (const auto& [root, group] : groups) {
+    (void)root;
+    std::vector<lb_source::AtomId> ports(group.ports.begin(),
+                                         group.ports.end());
+    std::vector<lb_source::AtomId> inventory(group.inventory.begin(),
+                                             group.inventory.end());
+    result.separator.component_partition.push_back(ports);
+    result.separator.source_bit_per_component.push_back(group.source);
+    result.separator.component_inventory.push_back(inventory);
+    for (const lb_source::AtomId port_id : ports) {
+      const auto norm_it = port_norm_by_id.find(port_id);
+      if (norm_it == port_norm_by_id.end()) {
+        std::cerr << "bridged port atom is missing from TileOp port graph\n";
+        std::exit(EXIT_FAILURE);
+      }
+      result.separator.carry_atoms.push_back({port_id, norm_it->second});
+    }
+  }
+
+  result.separator = lb_source::canonicalize_separator(result.separator);
+  result.bridged_port_carry_atoms = result.separator.carry_atoms.size();
+  result.bridge_components_after =
+      result.separator.component_partition.size();
+  return result;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   Config config;
   if (!parse_args(argc, argv, config)) {
     return EXIT_FAILURE;
+  }
+
+  std::optional<lb_source::CarryManifest> coordinate_manifest;
+  std::optional<PrefixWitness> prefix_witness;
+  std::string source_mode = config.seed_inner_flags ? "GEO_I_PORT_DIAGNOSTIC"
+                                                    : "NONE";
+  std::uint64_t manifest_source_carry_atoms = 0;
+  std::uint64_t prefix_witness_targets = 0;
+  std::uint64_t bridged_coordinate_carry_atoms = 0;
+  std::uint64_t dropped_coordinate_carry_atoms = 0;
+  std::uint64_t dropped_source_coordinate_carry_atoms = 0;
+  std::uint64_t bridged_port_carry_atoms = 0;
+  std::uint64_t bridge_components_before = 0;
+  std::uint64_t bridge_components_after = 0;
+  if (config.manifest_in.has_value()) {
+    coordinate_manifest = read_manifest_or_die(*config.manifest_in);
+    if (coordinate_manifest->k_sq !=
+        static_cast<std::uint64_t>(campaign::k_sq_value)) {
+      std::cerr << "manifest k_sq does not match compiled K_SQ\n";
+      return EXIT_FAILURE;
+    }
+    if (coordinate_manifest->outer_radius != config.r_start) {
+      std::cerr << "manifest outer_radius must equal --r-start\n";
+      return EXIT_FAILURE;
+    }
+    if (coordinate_manifest->carry_width !=
+        lb_source::ceil_sqrt(coordinate_manifest->k_sq)) {
+      std::cerr << "manifest carry_width mismatch\n";
+      return EXIT_FAILURE;
+    }
+    source_mode = "ORIGIN_PREFIX_PORT_MANIFEST";
+    for (std::size_t c = 0;
+         c < coordinate_manifest->separator.component_partition.size(); ++c) {
+      if (!coordinate_manifest->separator.source_bit_per_component[c]) {
+        continue;
+      }
+      manifest_source_carry_atoms +=
+          coordinate_manifest->separator.component_partition[c].size();
+    }
+    if (config.prefix_witness_in.has_value()) {
+      prefix_witness = read_prefix_witness_or_die(*config.prefix_witness_in);
+      if (prefix_witness->k_sq !=
+          static_cast<std::uint64_t>(campaign::k_sq_value)) {
+        std::cerr << "prefix witness k_sq does not match compiled K_SQ\n";
+        return EXIT_FAILURE;
+      }
+      if (prefix_witness->outer_radius != config.r_start) {
+        std::cerr << "prefix witness outer_radius must equal --r-start\n";
+        return EXIT_FAILURE;
+      }
+      source_mode = "ORIGIN_PREFIX_PORT_WITNESS";
+      for (std::size_t c = 0;
+           c < coordinate_manifest->separator.component_partition.size(); ++c) {
+        if (!coordinate_manifest->separator.source_bit_per_component[c]) {
+          continue;
+        }
+        for (const lb_source::AtomId id :
+             coordinate_manifest->separator.component_partition[c]) {
+          if (prefix_witness->path_by_target.find(id) ==
+              prefix_witness->path_by_target.end()) {
+            std::cerr << "prefix witness is missing a source carry atom\n";
+            return EXIT_FAILURE;
+          }
+          ++prefix_witness_targets;
+        }
+      }
+      if (prefix_witness_targets != prefix_witness->path_by_target.size()) {
+        std::cerr << "prefix witness contains non-source carry targets\n";
+        return EXIT_FAILURE;
+      }
+    }
   }
 
   std::optional<lb_source::SeparatorState> incoming;
@@ -221,13 +671,28 @@ int main(int argc, char** argv) {
             .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
             .outer_radius = outer,
             .coords = coords,
-            .tileops = std::move(tileops),
+            .tileops = tileops,
             .seed_inner_flags = config.seed_inner_flags &&
                                 bands_processed == 0,
         });
     if (!graph.accepted()) {
       std::cerr << "TileOp port graph rejected: " << graph.diagnostic << "\n";
       return EXIT_FAILURE;
+    }
+    if (coordinate_manifest.has_value() && bands_processed == 0) {
+      const PortManifestBridgeResult bridge =
+          bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
+                                              coords, tileops, graph.band);
+      incoming = bridge.separator;
+      bridged_coordinate_carry_atoms =
+          bridge.bridged_coordinate_carry_atoms;
+      dropped_coordinate_carry_atoms =
+          bridge.dropped_coordinate_carry_atoms;
+      dropped_source_coordinate_carry_atoms =
+          bridge.dropped_source_coordinate_carry_atoms;
+      bridged_port_carry_atoms = bridge.bridged_port_carry_atoms;
+      bridge_components_before = bridge.bridge_components_before;
+      bridge_components_after = bridge.bridge_components_after;
     }
     port_atoms += graph.port_atoms;
     internal_edges += graph.internal_edges;
@@ -277,9 +742,7 @@ int main(int argc, char** argv) {
             << "\"schema\":\"lb_source_tileop_port_runner_v1\","
             << "\"claim_label\":\"SOURCE_TILEOP_PORT_DIAGNOSTIC\","
             << "\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\","
-            << "\"source_mode\":\""
-            << (config.seed_inner_flags ? "GEO_I_PORT_DIAGNOSTIC" : "NONE")
-            << "\","
+            << "\"source_mode\":\"" << source_mode << "\","
             << "\"k_sq\":" << campaign::k_sq_value
             << ",\"r_start\":" << config.r_start
             << ",\"r_final\":" << config.r_final
@@ -290,6 +753,21 @@ int main(int argc, char** argv) {
             << ",\"port_atoms\":" << port_atoms
             << ",\"internal_edges\":" << internal_edges
             << ",\"seam_edges\":" << seam_edges
+            << ",\"manifest_source_carry_atoms\":"
+            << manifest_source_carry_atoms
+            << ",\"prefix_witness_targets\":" << prefix_witness_targets
+            << ",\"bridged_coordinate_carry_atoms\":"
+            << bridged_coordinate_carry_atoms
+            << ",\"dropped_coordinate_carry_atoms\":"
+            << dropped_coordinate_carry_atoms
+            << ",\"dropped_source_coordinate_carry_atoms\":"
+            << dropped_source_coordinate_carry_atoms
+            << ",\"bridged_port_carry_atoms\":"
+            << bridged_port_carry_atoms
+            << ",\"bridge_components_before\":"
+            << bridge_components_before
+            << ",\"bridge_components_after\":"
+            << bridge_components_after
             << ",\"accepted\":" << (accepted ? "true" : "false")
             << ",\"reject\":\"" << lb_source::reject_reason_name(last.reject)
             << "\""
