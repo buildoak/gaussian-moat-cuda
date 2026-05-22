@@ -95,6 +95,10 @@ int main() {
       .k_sq = kSq,
       .terminal_radius = conservative_r_final,
       .negative_guard_pass = false,
+      .endpoint = {static_cast<std::int64_t>(kEndpointA),
+                   static_cast<std::int64_t>(kEndpointB),
+                   kEndpointNorm},
+      .source_path = {},
       .terminal_source_inventory = {},
   };
 

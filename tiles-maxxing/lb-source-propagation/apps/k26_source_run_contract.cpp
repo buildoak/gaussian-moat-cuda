@@ -96,7 +96,7 @@ int main() {
       "current production compositors compute ANY-SPAN/ANY-SHELL-MOAT, not SOURCE_ORIGIN_K26",
       "sidecar inventory digest exists, but max norm, tie set, and endpoint-chain verifier are not accepted at 14.5B scale",
       "K26 non-square BZ evidence is preflight-only in this branch",
-      "no accepted SOURCE_DEAD_CERT schema/verifier exists for terminal inventory and guard proof"};
+      "independent SOURCE_DEAD_CERT draft checker exists, but no full-scale K26 certificate artifact passes it"};
 
   std::cout << "{"
             << "\"schema\":\"lb_source_k26_run_contract_v1\","

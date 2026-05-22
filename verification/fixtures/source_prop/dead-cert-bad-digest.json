@@ -14,6 +14,10 @@
   "k_sq": 26,
   "terminal_radius": 20,
   "negative_guard_pass": true,
+  "endpoint": { "a": 0, "b": 3, "norm_sq": 9 },
+  "source_path": [
+    { "a": 0, "b": 3, "norm_sq": 9 }
+  ],
   "terminal_source_inventory_summary": {
     "count": 2,
     "digest_algorithm": "sha256:lb_source_inventory_v1",

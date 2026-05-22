@@ -33,7 +33,7 @@ ctest --test-dir verification/build --output-on-failure
 | `boundary_semantics_test` | Axis, diagonal, collar, clipping, and geo predicate assertions. |
 | `tile_sample_check` | Independent production tile-sample checker. |
 | `span_cert_check` | Independent Gaussian-prime coordinate path checker. |
-| `source_dead_cert_check` | Independent draft checker for source terminal inventory count/digest and negative-guard metadata. |
+| `source_dead_cert_check` | Independent draft checker for positive source path, terminal inventory count/digest, and negative-guard metadata. |
 | `postflight_check` | Compact bundle checker for profile coherence, sample audit, and SPANNING cert status. |
 | `stats/normalize_sweep_rows.py` | Normalizes profiles and post-flight reports into sweep rows. |
 | `stats/summarize_stats.py` | Quick shell summary for `stats_v2` profiles/rows. |
@@ -56,7 +56,7 @@ Post-flight statuses are separate:
 - `TILE_SAMPLE_AUDIT_PASS`
 - `SPAN_PROOF_PASS`
 - `CLAIM_PROOF_MISSING`
-- `SOURCE_DEAD_CERT_DRAFT_PASS` is emitted only by the source-dead draft checker; it validates negative guard, non-placeholder metadata, and terminal inventory count/digest consistency, but does not yet prove a Tsuchimura endpoint chain or K26 BZ acceptance.
+- `SOURCE_DEAD_CERT_DRAFT_PASS` is emitted only by the source-dead draft checker; it validates a positive Gaussian-prime source path to the endpoint, negative guard, non-placeholder metadata, and terminal inventory count/digest consistency. It does not yet prove a full Tsuchimura-scale run or K26 BZ acceptance.
 
 `MOAT_PROOF_PASS` is reserved for future work. Current negative `MOAT` rows can
 pass profile coherence and sample audit, but remain detector/audit evidence

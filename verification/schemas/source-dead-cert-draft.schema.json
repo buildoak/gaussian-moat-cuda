@@ -12,6 +12,8 @@
     "k_sq",
     "terminal_radius",
     "negative_guard_pass",
+    "endpoint",
+    "source_path",
     "terminal_source_inventory_summary",
     "terminal_source_inventory"
   ],
@@ -46,6 +48,12 @@
     "k_sq": { "type": "integer", "minimum": 1 },
     "terminal_radius": { "type": "integer", "minimum": 1 },
     "negative_guard_pass": { "type": "boolean" },
+    "endpoint": { "$ref": "#/$defs/source_path_point" },
+    "source_path": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source_path_point" }
+    },
     "terminal_source_inventory_summary": {
       "type": "object",
       "additionalProperties": false,
@@ -64,6 +72,18 @@
     "terminal_source_inventory": {
       "type": "array",
       "items": { "type": "integer" }
+    }
+  },
+  "$defs": {
+    "source_path_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["a", "b", "norm_sq"],
+      "properties": {
+        "a": { "type": "integer", "minimum": 0 },
+        "b": { "type": "integer", "minimum": 0 },
+        "norm_sq": { "type": "integer", "minimum": 0 }
+      }
     }
   }
 }

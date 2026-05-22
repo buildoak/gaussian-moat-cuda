@@ -65,8 +65,10 @@ required evidence, and current blocking gaps. It must keep
 - accepted terminal inventory verification for count/digest/max norm/tie set at
   14.5B-member scale;
 - accepted K26 non-square BZ evidence;
-- an independent `SOURCE_DEAD_CERT` schema/verifier for the positive source
-  chain and negative final guard proof.
+- an accepted full-scale `SOURCE_DEAD_CERT` artifact. The current independent
+  draft checker validates a listed positive source path, negative guard, and
+  inventory count/digest consistency, but the real K26 chain and BZ acceptance
+  are still missing.
 
 ## Stop Conditions
 

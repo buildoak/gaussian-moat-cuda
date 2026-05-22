@@ -240,6 +240,24 @@ void append_inventory_summary_json(std::ostringstream& out,
   out << '}';
 }
 
+void append_path_point_json(std::ostringstream& out,
+                            const SourcePathPoint& point) {
+  out << "{\"a\":" << point.a << ",\"b\":" << point.b
+      << ",\"norm_sq\":" << point.norm_sq << '}';
+}
+
+void append_path_json(std::ostringstream& out,
+                      const std::vector<SourcePathPoint>& path) {
+  out << '[';
+  for (std::size_t i = 0; i < path.size(); ++i) {
+    if (i != 0) {
+      out << ',';
+    }
+    append_path_point_json(out, path[i]);
+  }
+  out << ']';
+}
+
 void append_metadata_json(std::ostringstream& out,
                           const SourceDraftMetadata& metadata) {
   out << "{\"source_mode\":";
@@ -660,6 +678,11 @@ std::string source_certificate_draft_json(
       << ",\"terminal_radius\":" << certificate.terminal_radius
       << ",\"negative_guard_pass\":"
       << (certificate.negative_guard_pass ? "true" : "false")
+      << ",\"endpoint\":";
+  append_path_point_json(out, certificate.endpoint);
+  out << ",\"source_path\":";
+  append_path_json(out, certificate.source_path);
+  out
       << ",\"terminal_source_inventory_summary\":";
   append_inventory_summary_json(out, inventory_summary);
   out << ",\"terminal_source_inventory\":";

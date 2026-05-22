@@ -117,6 +117,15 @@ struct InventorySummary {
                          const InventorySummary&) = default;
 };
 
+struct SourcePathPoint {
+  std::int64_t a = 0;
+  std::int64_t b = 0;
+  std::uint64_t norm_sq = 0;
+
+  friend bool operator==(const SourcePathPoint&,
+                         const SourcePathPoint&) = default;
+};
+
 struct SourceProfileDraft {
   std::string profile_id;
   SourceDraftMetadata metadata;
@@ -134,6 +143,8 @@ struct SourceCertificateDraft {
   std::uint64_t k_sq = 0;
   std::uint64_t terminal_radius = 0;
   bool negative_guard_pass = false;
+  SourcePathPoint endpoint;
+  std::vector<SourcePathPoint> source_path;
   std::vector<AtomId> terminal_source_inventory;
 };
 

@@ -1,6 +1,6 @@
 {
   "schema": "lb_source_dead_cert_draft_v1",
-  "certificate_id": "cert-valid",
+  "certificate_id": "cert-bad-source-path",
   "profile_id": "profile-valid",
   "metadata": {
     "source_mode": "ORIGIN_SOURCE",
@@ -14,9 +14,10 @@
   "k_sq": 26,
   "terminal_radius": 20,
   "negative_guard_pass": true,
-  "endpoint": { "a": 0, "b": 3, "norm_sq": 9 },
+  "endpoint": { "a": 1, "b": 8, "norm_sq": 65 },
   "source_path": [
-    { "a": 0, "b": 3, "norm_sq": 9 }
+    { "a": 0, "b": 3, "norm_sq": 9 },
+    { "a": 1, "b": 8, "norm_sq": 65 }
   ],
   "terminal_source_inventory_summary": {
     "count": 2,

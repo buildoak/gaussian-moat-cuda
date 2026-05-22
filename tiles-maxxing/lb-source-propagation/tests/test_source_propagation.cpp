@@ -541,6 +541,8 @@ void test_draft_profile_and_certificate_json_output() {
       .k_sq = 36,
       .terminal_radius = 20,
       .negative_guard_pass = true,
+      .endpoint = {0, 3, 9},
+      .source_path = {{0, 3, 9}},
       .terminal_source_inventory = {1, 2},
   };
   const std::string cert_json =
@@ -552,6 +554,10 @@ void test_draft_profile_and_certificate_json_output() {
                  "\"terminal_source_inventory_summary\":{\"count\":2,"
                  "\"digest_algorithm\":\"sha256:lb_source_inventory_v1\","
                  "\"digest_hex\":\"") != std::string::npos);
+  CHECK_TRUE(cert_json.find("\"endpoint\":{\"a\":0,\"b\":3,"
+                            "\"norm_sq\":9}") != std::string::npos);
+  CHECK_TRUE(cert_json.find("\"source_path\":[{\"a\":0,\"b\":3,"
+                            "\"norm_sq\":9}]") != std::string::npos);
   CHECK_TRUE(cert_json.find("\"terminal_source_inventory\":[1,2]") !=
              std::string::npos);
 }
