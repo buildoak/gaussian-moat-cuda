@@ -179,6 +179,8 @@ tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh \
   /workspace/lb-source-remote-smoke
 ```
 
+The checker has its own CTest self-test so stale test counts, executable K26
+plan claims, and missing provenance checks fail locally before a paid run.
 After pulling Vast artifacts, run the same checker with `--expect-head` and
 `--expect-branch` to bind the smoke to the deployed local source.
 

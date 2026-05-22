@@ -81,7 +81,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" 14
+require_ctest_log "$out_dir/ctest.log" 15
 require_ctest_log "$out_dir/verification-ctest.log" 43
 
 for artifact in \
@@ -137,7 +137,7 @@ require_grep '"index":123' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final row index"
 require_grep '"r_outer":1015645' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final radius"
-require_grep 'local sidecar ctest 14/14' \
+require_grep 'local sidecar ctest 15/15' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan sidecar gate"
 
 for json in "$out_dir"/*.json "$out_dir/status.txt"; do

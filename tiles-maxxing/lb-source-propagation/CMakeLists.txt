@@ -154,6 +154,10 @@ set_tests_properties(k26_execution_plan PROPERTIES
     "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME remote_smoke_artifact_checker
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_remote_smoke_artifact_checker.sh
+    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_remote_smoke_artifacts.sh)
 add_test(NAME source_origin_cpu_runner_smoke
   COMMAND source_origin_cpu_runner
     --k-sq 26
