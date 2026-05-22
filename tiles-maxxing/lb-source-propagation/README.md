@@ -63,6 +63,15 @@ This is intentionally a smoke path. `TileOp` group labels are not persisted as
 source carry atoms because they are tile-local; campaign-scale source claims
 must use stable coordinate or canonical-port atoms.
 
+`lb_source/tileop_port_graph.h` is the first campaign-scale bridge primitive.
+It converts a batch of TileOps into a `BandInput` over canonical port atoms:
+ports with the same local TileOp group label become same-tile edges, adjacent
+I/O and L/R face ordinals become seam edges, and any `OVERFLOW_BIT` tile marks
+the band as `force_overflow` so source claims reject rather than silently
+stitch through bad evidence. This is still a primitive, not the full K26 runner:
+it does not yet schedule the 124 K26 bands or bind terminal inventory/BZ
+evidence.
+
 `source_tileop_cpu_runner` is the next diagnostic bridge: it builds campaign
 `Grid` objects per radial band, calls `campaign::process_tile` on each active
 tile as the TileOp contact point, deduplicates `campaign::sieve_tile` Gaussian

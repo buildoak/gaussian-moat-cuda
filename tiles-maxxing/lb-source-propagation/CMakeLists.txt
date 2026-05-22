@@ -50,6 +50,20 @@ if(OpenMP_CXX_FOUND)
   target_link_libraries(lb_source_campaign_tileop PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
+add_library(lb_source_tileop_port_graph STATIC
+  src/tileop_port_graph.cpp
+)
+target_compile_options(lb_source_tileop_port_graph PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(lb_source_tileop_port_graph
+  PUBLIC
+    lb_source_propagation
+    lb_source_campaign_tileop
+)
+target_include_directories(lb_source_tileop_port_graph
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
 add_executable(source_prop_smoke apps/source_prop_smoke.cpp)
 target_link_libraries(source_prop_smoke PRIVATE lb_source_propagation)
 
@@ -95,10 +109,20 @@ target_link_libraries(source_prop_cpu_tileop_smoke
     lb_source_campaign_tileop
 )
 
+add_executable(source_prop_tileop_port_graph_tests
+  tests/test_tileop_port_graph.cpp
+)
+target_link_libraries(source_prop_tileop_port_graph_tests
+  PRIVATE
+    lb_source_tileop_port_graph
+)
+
 add_test(NAME source_prop_tests COMMAND source_prop_tests)
 add_test(NAME source_prop_smoke COMMAND source_prop_smoke)
 add_test(NAME source_prop_cpu_tileop_smoke
   COMMAND source_prop_cpu_tileop_smoke)
+add_test(NAME source_prop_tileop_port_graph_tests
+  COMMAND source_prop_tileop_port_graph_tests)
 add_test(NAME k26_tsuchimura_preflight
   COMMAND k26_tsuchimura_preflight)
 add_test(NAME k26_source_run_contract

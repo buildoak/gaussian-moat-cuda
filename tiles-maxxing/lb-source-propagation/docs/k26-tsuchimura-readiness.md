@@ -62,8 +62,8 @@ required evidence, and current blocking gaps. It must keep
 - a full-scale K26 source runner that feeds the sidecar from campaign TileOps
   using the same stable coordinate/canonical-port identity as the diagnostic
   CPU TileOp-fed runner;
-- promotion of canonical-port atoms from identity support into the full TileOp
-  port-graph runner; transient TileOp group labels must remain internal only;
+- promotion of the TileOp port-graph primitive into the full band scheduler;
+  transient TileOp group labels must remain internal only;
 - accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
 - accepted K26 non-square BZ evidence;

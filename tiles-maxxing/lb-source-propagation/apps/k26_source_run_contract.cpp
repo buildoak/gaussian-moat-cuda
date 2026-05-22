@@ -94,7 +94,7 @@ int main() {
   constexpr const char* kBlockingGaps[] = {
       "CPU TileOp-fed diagnostic runner exists, but no full-scale K26 source runner feeds the sidecar from campaign TileOps",
       "current production compositors compute ANY-SPAN/ANY-SHELL-MOAT, not SOURCE_ORIGIN_K26",
-      "canonical-port atom ids exist, but no full-scale runner has promoted the TileOp port graph into source carry manifests",
+      "canonical-port atom ids and a TileOp port-graph primitive exist, but no full-scale runner has scheduled K26 bands into source carry manifests",
       "sidecar inventory count/digest/max-norm/tie-set checks exist, but endpoint-chain and inventory handling are not accepted at 14.5B scale",
       "K26 non-square BZ evidence is preflight-only in this branch",
       "independent SOURCE_DEAD_CERT draft checker exists, but no full-scale K26 certificate artifact passes it"};
