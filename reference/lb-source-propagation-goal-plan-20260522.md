@@ -28,13 +28,21 @@ Primary new code folder:
 tiles-maxxing/lb-source-propagation/
 ```
 
-Allowed verifier/schema exception:
+Allowed verifier/schema exceptions:
 
 ```text
+verification/CMakeLists.txt
+verification/README.md
 verification/schemas/*source*
 verification/fixtures/source_prop/**
 verification/src/source_prop_oracle.cpp
+verification/src/source_dead_cert_check.cpp
+verification/src/source_dead_gap_check.cpp
 ```
+
+These exceptions are source-propagation verifier surfaces only. They must not
+change existing TileOp layout, CUDA kernels, current campaign CLIs,
+compositors, or static-annulus verdict semantics.
 
 ## Core Model
 

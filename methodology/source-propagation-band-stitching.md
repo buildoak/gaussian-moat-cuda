@@ -145,6 +145,30 @@ source death, the certificate layer must still prove that unbridged coordinate
 carry atoms have no future continuation and that the port graph representation
 preserves every possible source attachment needed by the terminal guard.
 
+For the diagnostic TileOp-port runner, "unbridged" is not a single logical
+state. The runner must distinguish source-connected coordinate carry atoms that:
+
+- bridge into at least one first-band TileOp port;
+- have no legal next-band Gaussian-prime candidate within squared distance
+  `K`;
+- have only dead-end next-band candidates whose local TileOp components have no
+  encoded face ports; or
+- have an unsafe next-band candidate that could carry source reachability
+  farther.
+
+A claim-grade source-death certificate cannot require every coordinate carry
+atom to bridge, because that would reject legitimate dead-end source death. It
+also cannot ignore bridge failures. The required stop condition is:
+
+```text
+source_unbridged_unsafe_candidate_atoms == 0
+```
+
+The current K26 bridge evidence is therefore accepted only as non-claim
+diagnostic evidence unless a verifier-accepted seam lemma binds the coordinate
+carry atoms, TileOp-port components, dead-end classification, terminal
+inventory, and BZ schedule into one certificate contract.
+
 ## Lemma 1: Local TileOp Equivalence
 
 For a fixed band, the existing TileOp construction and port stitching represent
