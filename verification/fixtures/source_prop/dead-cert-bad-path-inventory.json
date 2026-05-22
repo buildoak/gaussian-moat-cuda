@@ -1,6 +1,6 @@
 {
   "schema": "lb_source_dead_cert_draft_v1",
-  "certificate_id": "cert-first-quadrant-valid",
+  "certificate_id": "cert-bad-path-inventory",
   "profile_id": "profile-first-quadrant-valid",
   "metadata": {
     "source_mode": "ORIGIN_SOURCE",
@@ -21,11 +21,11 @@
     { "a": 7, "b": 2, "norm_sq": 53 }
   ],
   "terminal_source_inventory_summary": {
-    "count": 4,
+    "count": 3,
     "digest_algorithm": "sha256:lb_source_inventory_v1",
-    "digest_hex": "d02207f7987770f1684a500477c8b131e08ba9ee4b3e9fd57b8c4a01dde45ab1",
+    "digest_hex": "25b6ddc165aff2984343cc888b4f5ebdc563f360a361c69af5d5a1514a22abca",
     "max_norm_sq": 53,
     "max_norm_atom_ids": [30064771074]
   },
-  "terminal_source_inventory": [1, 2, 21474836482, 30064771074]
+  "terminal_source_inventory": [1, 2, 30064771074]
 }

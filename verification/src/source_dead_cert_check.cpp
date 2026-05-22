@@ -654,6 +654,14 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
     throw std::runtime_error(
         "terminal_source_inventory omits source_path endpoint atom");
   }
+  for (const Point& path_point : source_path) {
+    const std::int64_t path_atom_id = coordinate_atom_id_for_point(path_point);
+    if (!std::binary_search(inventory.begin(), inventory.end(),
+                            path_atom_id)) {
+      throw std::runtime_error(
+          "terminal_source_inventory omits source_path atom");
+    }
+  }
 
   if (require_u64(summary, "count") != inventory.size()) {
     throw std::runtime_error("inventory summary count mismatch");
