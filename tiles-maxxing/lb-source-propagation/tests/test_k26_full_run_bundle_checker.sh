@@ -58,7 +58,7 @@ JSON
 {"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"manifest_written":true,"prefix_witness_written":true}
 JSON
   cat > "$dir/k26-continuation-result.json" <<'JSON'
-{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"require_full_bridge","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","max_source_norm_sq":1031520000000}
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"require_full_bridge","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615070786916]}
 JSON
   cat > "$dir/k26-source-dead-cert.json" <<'JSON'
 {"schema":"lb_source_dead_cert_draft_v1","k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615070786916]}}
@@ -111,6 +111,26 @@ if "$checker" "$bad_bridge" --source-dead-checker "$fake_source_dead_checker" \
   exit 1
 fi
 grep -q 'K26 continuation full bridge' "$tmp/bad-bridge-rehashed.log"
+
+bad_cert_summary="$tmp/bad-cert-summary"
+write_bundle "$bad_cert_summary"
+perl -0pi -e 's/"digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"/"digest_hex":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"/' \
+  "$bad_cert_summary/k26-source-dead-cert.json"
+if "$checker" "$bad_cert_summary" --source-dead-checker "$fake_source_dead_checker" \
+    > "$tmp/bad-cert-summary.log" 2>&1; then
+  echo "checker accepted stale artifact hash after cert summary mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26-source-dead-cert.json' \
+  "$tmp/bad-cert-summary.log"
+write_manifest "$bad_cert_summary"
+if "$checker" "$bad_cert_summary" --source-dead-checker "$fake_source_dead_checker" \
+    > "$tmp/bad-cert-summary-rehashed.log" 2>&1; then
+  echo "checker accepted cert summary that disagrees with continuation" >&2
+  exit 1
+fi
+grep -q 'K26 cert inventory digest binding' \
+  "$tmp/bad-cert-summary-rehashed.log"
 
 missing="$tmp/missing"
 write_bundle "$missing"

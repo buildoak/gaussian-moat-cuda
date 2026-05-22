@@ -212,8 +212,9 @@ It is intentionally stricter than the remote smoke checker. It expects the
 K26 prefix result, strict-bridge continuation result, BZ schedule evidence,
 run profile, run command contract, and `k26-source-dead-cert.json`; it rejects
 digest mismatches, unbridged coordinate carry, overflow, wrong component size,
-missing source-dead draft, or a source-dead draft not accepted by the
-independent checker.
+missing source-dead draft, a source-dead draft whose terminal inventory summary
+does not match the executed continuation result, or a source-dead draft not
+accepted by the independent checker.
 
 The paid/full-run harness is:
 

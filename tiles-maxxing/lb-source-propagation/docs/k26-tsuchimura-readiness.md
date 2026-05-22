@@ -80,8 +80,10 @@ artifacts, if the
 continuation did not run with `seam_bridge_policy=require_full_bridge`, if any
 source coordinate carry atom remained unbridged, if TileOp overflow occurred,
 if terminal source death was not reached at `R_final=1015645`, if the terminal
-inventory count is not `14,542,615,005`, or if the independent
-`source_dead_cert_check` does not accept the source-dead draft.
+inventory count is not `14,542,615,005`, if the cert's terminal inventory
+summary does not match the executed continuation count/digest/max-norm/tie-set,
+or if the independent `source_dead_cert_check` does not accept the source-dead
+draft.
 
 The executable harness for producing the bundle shape is:
 

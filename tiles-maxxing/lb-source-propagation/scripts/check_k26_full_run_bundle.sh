@@ -88,6 +88,18 @@ json_string_value() {
   sed -nE "s/.*\"${field}\":\"([^\"]+)\".*/\\1/p" "$path" | head -n 1
 }
 
+json_number_value() {
+  local path="$1"
+  local field="$2"
+  sed -nE "s/.*\"${field}\":([0-9]+).*/\\1/p" "$path" | head -n 1
+}
+
+json_array_value() {
+  local path="$1"
+  local field="$2"
+  sed -nE "s/.*\"${field}\":(\[[0-9, -]*\]).*/\\1/p" "$path" | head -n 1
+}
+
 require_json_string_value() {
   local path="$1"
   local field="$2"
@@ -95,6 +107,30 @@ require_json_string_value() {
   value="$(json_string_value "$path" "$field")"
   if [[ -z "$value" ]]; then
     echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON string field ${field} ($path)" >&2
+    exit 1
+  fi
+  printf '%s\n' "$value"
+}
+
+require_json_number_value() {
+  local path="$1"
+  local field="$2"
+  local value
+  value="$(json_number_value "$path" "$field")"
+  if [[ -z "$value" ]]; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON number field ${field} ($path)" >&2
+    exit 1
+  fi
+  printf '%s\n' "$value"
+}
+
+require_json_array_value() {
+  local path="$1"
+  local field="$2"
+  local value
+  value="$(json_array_value "$path" "$field")"
+  if [[ -z "$value" ]]; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON array field ${field} ($path)" >&2
     exit 1
   fi
   printf '%s\n' "$value"
@@ -241,8 +277,12 @@ require_grep '"source_inventory_count":14542615005' "$continuation" \
   "K26 continuation Tsuchimura component size"
 require_grep '"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1"' "$continuation" \
   "K26 continuation inventory digest algorithm"
+require_grep '"source_inventory_digest_hex":"[0-9a-f]{64}"' "$continuation" \
+  "K26 continuation inventory digest"
 require_grep '"max_source_norm_sq":[1-9][0-9]*' "$continuation" \
   "K26 continuation max source norm"
+require_grep '"max_source_norm_atom_ids":\[[0-9]' "$continuation" \
+  "K26 continuation max-norm tie set"
 
 require_grep '"schema":"lb_source_dead_cert_draft_v1"' "$cert" \
   "K26 source-dead cert schema"
@@ -265,6 +305,23 @@ require_grep '"max_norm_sq":[1-9][0-9]*' "$cert" \
   "K26 source-dead cert max norm"
 require_grep '"max_norm_atom_ids":\[[0-9]' "$cert" \
   "K26 source-dead cert max-norm tie set"
+
+continuation_inventory_count="$(require_json_number_value "$continuation" source_inventory_count)"
+cert_inventory_count="$(require_json_number_value "$cert" count)"
+continuation_inventory_digest="$(require_json_string_value "$continuation" source_inventory_digest_hex)"
+cert_inventory_digest="$(require_json_string_value "$cert" digest_hex)"
+continuation_max_norm="$(require_json_number_value "$continuation" max_source_norm_sq)"
+cert_max_norm="$(require_json_number_value "$cert" max_norm_sq)"
+continuation_max_ties="$(require_json_array_value "$continuation" max_source_norm_atom_ids)"
+cert_max_ties="$(require_json_array_value "$cert" max_norm_atom_ids)"
+require_equal "$continuation_inventory_count" "$cert_inventory_count" \
+  "K26 cert inventory count binding"
+require_equal "$continuation_inventory_digest" "$cert_inventory_digest" \
+  "K26 cert inventory digest binding"
+require_equal "$continuation_max_norm" "$cert_max_norm" \
+  "K26 cert max source norm binding"
+require_equal "$continuation_max_ties" "$cert_max_ties" \
+  "K26 cert max-norm tie binding"
 
 checker_output="$("$source_dead_checker" "$cert")"
 if grep -q '"status":"SOURCE_DEAD_CERT_DRAFT_PASS"' <<<"$checker_output"; then
