@@ -186,6 +186,21 @@ if match:
 PY
 }
 
+redact_create_output() {
+  CREATE_OUTPUT="$1" python3 <<'PY'
+import os
+import re
+
+text = os.environ.get("CREATE_OUTPUT", "")
+text = re.sub(
+    r"(['\"]instance_api_key['\"]\s*:\s*)['\"][^'\"]+['\"]",
+    r"\1'<redacted>'",
+    text,
+)
+print(text, end="" if text.endswith("\n") else "\n")
+PY
+}
+
 instance_ssh_fields() {
   local instance_id="$1"
   vastai show instances --raw | python3 -c '
@@ -399,7 +414,7 @@ set +e
 create_output="$("${create_cmd[@]}" 2>&1)"
 create_status="$?"
 set -e
-printf '%s\n' "$create_output"
+redact_create_output "$create_output"
 if [[ "$create_status" -ne 0 ]]; then
   exit "$create_status"
 fi
