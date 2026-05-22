@@ -14,6 +14,7 @@
     "terminal_radius",
     "target",
     "continuation_artifact",
+    "bz_evidence",
     "target_path_provenance",
     "target_atom_path_length",
     "target_atom_path",
@@ -44,6 +45,29 @@
       "properties": {
         "name": { "const": "k26-continuation-result.json" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "bz_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "accepted_for_schedule",
+        "accepted_for_claim",
+        "schedule_digest_algorithm",
+        "schedule_digest_hex"
+      ],
+      "properties": {
+        "status": { "const": "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE" },
+        "accepted_for_schedule": { "const": true },
+        "accepted_for_claim": { "const": false },
+        "schedule_digest_algorithm": {
+          "const": "sha256:lb_source_k26_repaired_bz_schedule_v1"
+        },
+        "schedule_digest_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
       }
     },
     "target_path_provenance": {

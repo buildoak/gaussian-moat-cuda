@@ -14,6 +14,13 @@
     "name": "k26-continuation-result.json",
     "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   },
+  "bz_evidence": {
+    "status": "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE",
+    "accepted_for_schedule": true,
+    "accepted_for_claim": false,
+    "schedule_digest_algorithm": "sha256:lb_source_k26_repaired_bz_schedule_v1",
+    "schedule_digest_hex": "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"
+  },
   "target_path_provenance": "mixed_coordinate_port_atom_chain_non_claim",
   "target_atom_path_length": 3,
   "target_atom_path": [1615075207963900, -25220051735553, 1615075207964003],

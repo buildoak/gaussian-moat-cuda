@@ -257,7 +257,9 @@ available, it writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt` after
 the prefix and continuation artifacts are produced. It also writes
 `k26-source-dead-gap.json`, binding the continuation artifact and naming the
-missing coordinate Gaussian-prime source-path layer. When
+missing coordinate Gaussian-prime source-path layer. The gap artifact also
+binds the repaired K26 BZ schedule digest as schedule-only, non-claim evidence.
+When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
 checker before stopping on the missing cert. It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,

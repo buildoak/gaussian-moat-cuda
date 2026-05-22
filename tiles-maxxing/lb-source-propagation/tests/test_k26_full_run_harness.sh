@@ -151,6 +151,10 @@ grep -q '"schema":"lb_source_k26_source_dead_gap_v1"' \
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"' \
   "$blocked_out/k26-source-dead-gap.json"
+grep -q '"bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false' \
+  "$blocked_out/k26-source-dead-gap.json"
+grep -q '"schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"' \
+  "$blocked_out/k26-source-dead-gap.json"
 grep -q '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' \
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"target_atom_path":\[1615075207963900,-25220051735553,1615075207964004\]' \

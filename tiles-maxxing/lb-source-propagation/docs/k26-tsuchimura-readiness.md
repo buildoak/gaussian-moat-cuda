@@ -113,7 +113,9 @@ writes `k26-source-dead-gap.json`, a partial
 the continuation artifact and records the exact missing layer: a coordinate
 Gaussian-prime source path from the origin prefix to the canonical endpoint,
 plus a verifier that expands the mixed coordinate/port atom chain into
-claim-grade coordinate provenance. When invoked with
+claim-grade coordinate provenance. It also binds the repaired K26 BZ schedule
+digest as accepted-for-schedule but not accepted-for-claim evidence. When
+invoked with
 `--source-dead-gap-checker`, the harness verifies this gap artifact with the
 independent `source_dead_gap_check` before reporting the missing cert blocker.
 With a supplied cert, the manifest binds the cert with the

@@ -98,6 +98,7 @@ foreach(bad_source_dead_cert
     PROPERTIES WILL_FAIL TRUE)
 endforeach()
 foreach(bad_source_dead_gap
+    dead-gap-bad-bz-evidence
     dead-gap-bad-claim-status
     dead-gap-bad-endpoint-atom
     dead-gap-bad-endpoint-port-tile

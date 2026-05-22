@@ -34,6 +34,7 @@ ctest --test-dir verification/build --output-on-failure
 | `tile_sample_check` | Independent production tile-sample checker. |
 | `span_cert_check` | Independent Gaussian-prime coordinate path checker. |
 | `source_dead_cert_check` | Independent draft checker for positive source path, negative-guard metadata, listed terminal inventory consistency, and explicit summary-only non-claim inventory contracts. |
+| `source_dead_gap_check` | Independent non-claim checker for the K26 gap artifact: mixed coordinate/port target path provenance, terminal inventory summary, continuation artifact hash, and repaired BZ schedule digest binding. |
 | `postflight_check` | Compact bundle checker for profile coherence, sample audit, and SPANNING cert status. |
 | `stats/normalize_sweep_rows.py` | Normalizes profiles and post-flight reports into sweep rows. |
 | `stats/summarize_stats.py` | Quick shell summary for `stats_v2` profiles/rows. |
@@ -57,6 +58,7 @@ Post-flight statuses are separate:
 - `SPAN_PROOF_PASS`
 - `CLAIM_PROOF_MISSING`
 - `SOURCE_DEAD_CERT_DRAFT_PASS` is emitted only by the source-dead draft checker in listed-inventory mode; it validates a positive Gaussian-prime source path to the endpoint, negative guard, non-placeholder metadata, and terminal inventory count/digest/max-norm/tie-set consistency. `SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS` validates only the shape and extrema witnesses of a summary-only external accumulator. Neither status proves a full Tsuchimura-scale run or K26 BZ acceptance.
+- `SOURCE_DEAD_GAP_NON_CLAIM_PASS` confirms the K26 diagnostic gap artifact is well formed and binds its mixed target path, terminal inventory summary, continuation artifact hash, and repaired BZ schedule digest. It is not a claim-grade source/death certificate.
 
 `MOAT_PROOF_PASS` is reserved for future work. Current negative `MOAT` rows can
 pass profile coherence and sample audit, but remain detector/audit evidence

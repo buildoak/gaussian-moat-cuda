@@ -362,6 +362,10 @@ require_grep '"blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"' "$gap" \
   "K26 source-dead gap blocker"
 require_grep '"continuation_artifact":.*"name":"k26-continuation-result.json".*"sha256":"[0-9a-f]{64}"' "$gap" \
   "K26 source-dead gap continuation binding"
+require_grep '"bz_evidence":.*"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE".*"accepted_for_schedule":true.*"accepted_for_claim":false' "$gap" \
+  "K26 source-dead gap BZ evidence flags"
+require_grep '"bz_evidence":.*"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1".*"schedule_digest_hex":"[0-9a-f]{64}"' "$gap" \
+  "K26 source-dead gap BZ digest"
 require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' "$gap" \
   "K26 source-dead gap target path provenance"
 require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
@@ -373,6 +377,9 @@ actual_continuation_digest="$(
 gap_continuation_digest="$(require_json_string_value "$gap" sha256)"
 require_equal "$actual_continuation_digest" "$gap_continuation_digest" \
   "K26 gap continuation hash binding"
+gap_bz_digest="$(require_json_string_value "$gap" schedule_digest_hex)"
+require_equal "$bz_digest" "$gap_bz_digest" \
+  "K26 gap BZ digest binding"
 continuation_path_provenance="$(
   require_json_string_value "$continuation" path_provenance
 )"

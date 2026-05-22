@@ -65,6 +65,15 @@ std::int64_t require_i64(const nlohmann::json& object, const char* field) {
   return value.get<std::int64_t>();
 }
 
+bool require_bool(const nlohmann::json& object, const char* field) {
+  const nlohmann::json& value = require_field(object, field);
+  if (!value.is_boolean()) {
+    throw std::runtime_error(std::string("field ") + field +
+                             " must be boolean, got " + type_name(value));
+  }
+  return value.get<bool>();
+}
+
 const nlohmann::json& require_object(const nlohmann::json& object,
                                      const char* field) {
   const nlohmann::json& value = require_field(object, field);
@@ -203,6 +212,25 @@ void verify_gap(const nlohmann::json& gap) {
   }
   if (!sha256_hex(require_string(continuation, "sha256"))) {
     throw std::runtime_error("continuation artifact hash is not sha256 hex");
+  }
+
+  const nlohmann::json& bz_evidence = require_object(gap, "bz_evidence");
+  if (require_string(bz_evidence, "status") !=
+      "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE") {
+    throw std::runtime_error("BZ evidence status is not repaired schedule pass");
+  }
+  if (!require_bool(bz_evidence, "accepted_for_schedule")) {
+    throw std::runtime_error("BZ evidence is not accepted for schedule");
+  }
+  if (require_bool(bz_evidence, "accepted_for_claim")) {
+    throw std::runtime_error("BZ evidence must not be accepted for claim");
+  }
+  if (require_string(bz_evidence, "schedule_digest_algorithm") !=
+      "sha256:lb_source_k26_repaired_bz_schedule_v1") {
+    throw std::runtime_error("unexpected BZ schedule digest algorithm");
+  }
+  if (!sha256_hex(require_string(bz_evidence, "schedule_digest_hex"))) {
+    throw std::runtime_error("BZ schedule digest is not sha256 hex");
   }
 
   if (require_string(gap, "target_path_provenance") !=
