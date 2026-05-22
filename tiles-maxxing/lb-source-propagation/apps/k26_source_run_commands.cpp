@@ -191,6 +191,7 @@ int main() {
             << "\",\"schedule_digest_hex\":\"" << bz_schedule_digest << "\""
             << ",\"seam_bridge_policy\":\"require_full_bridge\""
             << ",\"blocked_if_unbridged_coordinate_carry_atoms\":true"
+            << ",\"claim_grade_requires_source_unbridged_with_next_band_candidates\":0"
             << ",\"schedule_radii_csv\":";
   emit_json_string(schedule_csv);
   std::cout << ",\"manifest_in\":\"k26-prefix-manifest.txt\","

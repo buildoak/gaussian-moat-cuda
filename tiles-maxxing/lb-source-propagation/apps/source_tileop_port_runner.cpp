@@ -55,8 +55,18 @@ struct PrefixWitness {
 };
 
 struct PortManifestBridgeResult {
+  std::uint64_t coordinate_carry_atoms_with_next_band_candidates = 0;
   std::uint64_t bridged_coordinate_carry_atoms = 0;
   std::uint64_t unbridged_coordinate_carry_atoms = 0;
+  std::uint64_t unbridged_without_next_band_candidates = 0;
+  std::uint64_t unbridged_with_next_band_candidates = 0;
+  std::uint64_t bridge_rejected_candidate_atoms = 0;
+  std::uint64_t source_coordinate_carry_atoms_with_next_band_candidates = 0;
+  std::uint64_t source_bridged_coordinate_carry_atoms = 0;
+  std::uint64_t source_unbridged_coordinate_carry_atoms = 0;
+  std::uint64_t source_unbridged_without_next_band_candidates = 0;
+  std::uint64_t source_unbridged_with_next_band_candidates = 0;
+  std::uint64_t source_bridge_rejected_candidate_atoms = 0;
   std::uint64_t bridged_port_carry_atoms = 0;
   std::uint64_t bridge_edges = 0;
 };
@@ -777,6 +787,7 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
   }
 
   std::map<lb_source::AtomId, Point> carry_point_by_id;
+  std::set<lb_source::AtomId> source_carry_ids;
   for (const lb_source::CarryAtom& atom : manifest.separator.carry_atoms) {
     const std::optional<lb_source::CoordinateAtom> decoded =
         lb_source::decode_coordinate_atom_id(atom.id);
@@ -787,8 +798,18 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     carry_point_by_id.emplace(
         atom.id, Point{decoded->a, decoded->b, decoded->norm_sq});
   }
+  for (std::size_t c = 0; c < manifest.separator.component_partition.size();
+       ++c) {
+    if (!manifest.separator.source_bit_per_component[c]) {
+      continue;
+    }
+    source_carry_ids.insert(manifest.separator.component_partition[c].begin(),
+                            manifest.separator.component_partition[c].end());
+  }
 
   std::map<lb_source::AtomId, std::set<lb_source::AtomId>> ports_by_coord_id;
+  std::set<lb_source::AtomId> candidate_coord_ids;
+  std::set<lb_source::AtomId> bridge_rejected_coord_ids;
   for (std::size_t t = 0; t < coords.size(); ++t) {
     const std::vector<campaign::Prime> primes =
         campaign::sieve_tile(coords[t], constants);
@@ -804,6 +825,8 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
       if (adjacent_carry_ids.empty()) {
         continue;
       }
+      candidate_coord_ids.insert(adjacent_carry_ids.begin(),
+                                 adjacent_carry_ids.end());
       const lb_source::CoordinatePortBridgeResult bridge =
           lb_source::bridge_coordinate_prime_to_ports({
               .coord = coords[t],
@@ -813,6 +836,8 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
               .primes = primes,
           });
       if (!bridge.accepted()) {
+        bridge_rejected_coord_ids.insert(adjacent_carry_ids.begin(),
+                                         adjacent_carry_ids.end());
         continue;
       }
       for (const lb_source::AtomId coord_id : adjacent_carry_ids) {
@@ -829,9 +854,15 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     const auto ports_it = ports_by_coord_id.find(coord_id);
     if (ports_it == ports_by_coord_id.end() || ports_it->second.empty()) {
       ++result.unbridged_coordinate_carry_atoms;
+      if (source_carry_ids.find(coord_id) != source_carry_ids.end()) {
+        ++result.source_unbridged_coordinate_carry_atoms;
+      }
       continue;
     }
     ++result.bridged_coordinate_carry_atoms;
+    if (source_carry_ids.find(coord_id) != source_carry_ids.end()) {
+      ++result.source_bridged_coordinate_carry_atoms;
+    }
     for (const lb_source::AtomId port_id : ports_it->second) {
       const auto norm_it = port_norm_by_id.find(port_id);
       if (norm_it == port_norm_by_id.end()) {
@@ -846,6 +877,40 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
         std::swap(lhs, rhs);
       }
       bridge_edges.insert({lhs, rhs});
+    }
+  }
+
+  result.coordinate_carry_atoms_with_next_band_candidates =
+      candidate_coord_ids.size();
+  result.bridge_rejected_candidate_atoms = bridge_rejected_coord_ids.size();
+  for (const lb_source::AtomId id : candidate_coord_ids) {
+    if (source_carry_ids.find(id) != source_carry_ids.end()) {
+      ++result.source_coordinate_carry_atoms_with_next_band_candidates;
+    }
+  }
+  for (const lb_source::AtomId id : bridge_rejected_coord_ids) {
+    if (source_carry_ids.find(id) != source_carry_ids.end()) {
+      ++result.source_bridge_rejected_candidate_atoms;
+    }
+  }
+  for (const auto& [coord_id, carry_point] : carry_point_by_id) {
+    (void)carry_point;
+    const auto ports_it = ports_by_coord_id.find(coord_id);
+    const bool bridged =
+        ports_it != ports_by_coord_id.end() && !ports_it->second.empty();
+    if (bridged) {
+      continue;
+    }
+    if (candidate_coord_ids.find(coord_id) != candidate_coord_ids.end()) {
+      ++result.unbridged_with_next_band_candidates;
+      if (source_carry_ids.find(coord_id) != source_carry_ids.end()) {
+        ++result.source_unbridged_with_next_band_candidates;
+      }
+    } else {
+      ++result.unbridged_without_next_band_candidates;
+      if (source_carry_ids.find(coord_id) != source_carry_ids.end()) {
+        ++result.source_unbridged_without_next_band_candidates;
+      }
     }
   }
 
@@ -958,8 +1023,18 @@ int main(int argc, char** argv) {
                                                     : "NONE";
   std::uint64_t manifest_source_carry_atoms = 0;
   std::uint64_t prefix_witness_targets = 0;
+  std::uint64_t coordinate_carry_atoms_with_next_band_candidates = 0;
   std::uint64_t bridged_coordinate_carry_atoms = 0;
   std::uint64_t unbridged_coordinate_carry_atoms = 0;
+  std::uint64_t unbridged_without_next_band_candidates = 0;
+  std::uint64_t unbridged_with_next_band_candidates = 0;
+  std::uint64_t bridge_rejected_candidate_atoms = 0;
+  std::uint64_t source_coordinate_carry_atoms_with_next_band_candidates = 0;
+  std::uint64_t source_bridged_coordinate_carry_atoms = 0;
+  std::uint64_t source_unbridged_coordinate_carry_atoms = 0;
+  std::uint64_t source_unbridged_without_next_band_candidates = 0;
+  std::uint64_t source_unbridged_with_next_band_candidates = 0;
+  std::uint64_t source_bridge_rejected_candidate_atoms = 0;
   std::uint64_t bridged_port_carry_atoms = 0;
   std::uint64_t bridge_edges = 0;
   bool target_seen = false;
@@ -1146,10 +1221,30 @@ int main(int argc, char** argv) {
            .max_carry_atoms = config.max_atoms,
            .max_components = config.max_atoms});
       add_band_adjacency(provenance_adjacency, bridged_band);
+      coordinate_carry_atoms_with_next_band_candidates =
+          bridge.coordinate_carry_atoms_with_next_band_candidates;
       bridged_coordinate_carry_atoms =
           bridge.bridged_coordinate_carry_atoms;
       unbridged_coordinate_carry_atoms =
           bridge.unbridged_coordinate_carry_atoms;
+      unbridged_without_next_band_candidates =
+          bridge.unbridged_without_next_band_candidates;
+      unbridged_with_next_band_candidates =
+          bridge.unbridged_with_next_band_candidates;
+      bridge_rejected_candidate_atoms =
+          bridge.bridge_rejected_candidate_atoms;
+      source_coordinate_carry_atoms_with_next_band_candidates =
+          bridge.source_coordinate_carry_atoms_with_next_band_candidates;
+      source_bridged_coordinate_carry_atoms =
+          bridge.source_bridged_coordinate_carry_atoms;
+      source_unbridged_coordinate_carry_atoms =
+          bridge.source_unbridged_coordinate_carry_atoms;
+      source_unbridged_without_next_band_candidates =
+          bridge.source_unbridged_without_next_band_candidates;
+      source_unbridged_with_next_band_candidates =
+          bridge.source_unbridged_with_next_band_candidates;
+      source_bridge_rejected_candidate_atoms =
+          bridge.source_bridge_rejected_candidate_atoms;
       bridged_port_carry_atoms = bridge.bridged_port_carry_atoms;
       bridge_edges = bridge.bridge_edges;
     } else {
@@ -1204,10 +1299,33 @@ int main(int argc, char** argv) {
                << (segment_accepted
                        ? last.outgoing.component_partition.size()
                        : 0)
+               << ",\"coordinate_carry_atoms_with_next_band_candidates\":"
+               << segment_bridge
+                      .coordinate_carry_atoms_with_next_band_candidates
                << ",\"bridged_coordinate_carry_atoms\":"
                << segment_bridge.bridged_coordinate_carry_atoms
                << ",\"unbridged_coordinate_carry_atoms\":"
                << segment_bridge.unbridged_coordinate_carry_atoms
+               << ",\"unbridged_without_next_band_candidates\":"
+               << segment_bridge.unbridged_without_next_band_candidates
+               << ",\"unbridged_with_next_band_candidates\":"
+               << segment_bridge.unbridged_with_next_band_candidates
+               << ",\"bridge_rejected_candidate_atoms\":"
+               << segment_bridge.bridge_rejected_candidate_atoms
+               << ",\"source_coordinate_carry_atoms_with_next_band_candidates\":"
+               << segment_bridge
+                      .source_coordinate_carry_atoms_with_next_band_candidates
+               << ",\"source_bridged_coordinate_carry_atoms\":"
+               << segment_bridge.source_bridged_coordinate_carry_atoms
+               << ",\"source_unbridged_coordinate_carry_atoms\":"
+               << segment_bridge.source_unbridged_coordinate_carry_atoms
+               << ",\"source_unbridged_without_next_band_candidates\":"
+               << segment_bridge
+                      .source_unbridged_without_next_band_candidates
+               << ",\"source_unbridged_with_next_band_candidates\":"
+               << segment_bridge.source_unbridged_with_next_band_candidates
+               << ",\"source_bridge_rejected_candidate_atoms\":"
+               << segment_bridge.source_bridge_rejected_candidate_atoms
                << ",\"bridged_port_carry_atoms\":"
                << segment_bridge.bridged_port_carry_atoms
                << ",\"bridge_edges\":" << segment_bridge.bridge_edges
@@ -1310,10 +1428,30 @@ int main(int argc, char** argv) {
             << ",\"manifest_source_carry_atoms\":"
             << manifest_source_carry_atoms
             << ",\"prefix_witness_targets\":" << prefix_witness_targets
+            << ",\"coordinate_carry_atoms_with_next_band_candidates\":"
+            << coordinate_carry_atoms_with_next_band_candidates
             << ",\"bridged_coordinate_carry_atoms\":"
             << bridged_coordinate_carry_atoms
             << ",\"unbridged_coordinate_carry_atoms\":"
             << unbridged_coordinate_carry_atoms
+            << ",\"unbridged_without_next_band_candidates\":"
+            << unbridged_without_next_band_candidates
+            << ",\"unbridged_with_next_band_candidates\":"
+            << unbridged_with_next_band_candidates
+            << ",\"bridge_rejected_candidate_atoms\":"
+            << bridge_rejected_candidate_atoms
+            << ",\"source_coordinate_carry_atoms_with_next_band_candidates\":"
+            << source_coordinate_carry_atoms_with_next_band_candidates
+            << ",\"source_bridged_coordinate_carry_atoms\":"
+            << source_bridged_coordinate_carry_atoms
+            << ",\"source_unbridged_coordinate_carry_atoms\":"
+            << source_unbridged_coordinate_carry_atoms
+            << ",\"source_unbridged_without_next_band_candidates\":"
+            << source_unbridged_without_next_band_candidates
+            << ",\"source_unbridged_with_next_band_candidates\":"
+            << source_unbridged_with_next_band_candidates
+            << ",\"source_bridge_rejected_candidate_atoms\":"
+            << source_bridge_rejected_candidate_atoms
             << ",\"bridged_port_carry_atoms\":"
             << bridged_port_carry_atoms
             << ",\"bridge_edges\":" << bridge_edges

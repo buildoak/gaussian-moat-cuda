@@ -44,13 +44,18 @@ verifier, the campaign should use the conservative value.
    This accepts the schedule evidence only; it is still not source/origin proof
    until an executed full-run profile binds the same digest.
 8. Coordinate-to-port seam bridging is accepted or explicitly reported as
-   diagnostic evidence. The current K36 smoke keeps `133` source coordinate
-   carry atoms as the original incoming separator, inserts `374` bridge edges
-   from `106` bridgeable coordinate carry atoms to `7` canonical port atoms,
-   and leaves `27` coordinate carry atoms with no first-band port bridge. Until
-   there is a theorem/verifier gate proving that this hybrid handoff preserves
-   every future source attachment needed by the terminal guard, this cannot
-   support a `SOURCE_DEAD_CERT`.
+   diagnostic evidence. The bridge distinction needed for a death certificate
+   is not "every coordinate carry atom bridges." The needed statement is:
+   every source-connected coordinate carry atom either bridges into the
+   TileOp-port graph or has no legal next-band Gaussian-prime candidate within
+   `sqrt(K)`. The tiny K36 smoke has the clean shape: `82` source carry atoms
+   bridge and `51` source carry atoms have no next-band candidate, so
+   `source_unbridged_with_next_band_candidates=0`. K26 row 0 to row 1 does not
+   yet have that shape: a 2026-05-23 local diagnostic reports `1369` source
+   carry atoms bridged, `1154` source carry atoms unbridged with no candidate,
+   and `57` source carry atoms unbridged despite having next-band candidates.
+   Until those `57` atoms are explained by a bridge-completeness fix or an
+   accepted verifier/theorem, this cannot support a `SOURCE_DEAD_CERT`.
 
 ## Certificate Gap To Close
 
@@ -165,14 +170,15 @@ required evidence, and current blocking gaps. It must keep
   smoke reaches terminal source death after one port band.
 - an accepted seam-bridge rule for moving from coordinate carry atoms into the
   TileOp-port graph. The runner reports `bridged_coordinate_carry_atoms`,
-  `unbridged_coordinate_carry_atoms`, `bridged_port_carry_atoms`, and
+  `unbridged_coordinate_carry_atoms`, next-band candidate counters,
+  source-only versions of those counters, `bridged_port_carry_atoms`, and
   `bridge_edges`; K26 remains blocked until those fields are justified by an
-  accepted lemma and verifier gate. The `--require-full-bridge` runner mode is
-  the strict executable guard: it rejects a manifest handoff whenever any source
-  coordinate carry atom has no first-band TileOp-port bridge. K26 remains
-  diagnostic until it either satisfies that strict guard or an accepted
-  verifier/theorem explains why the unbridged carry atoms cannot affect the
-  source/death certificate.
+  accepted lemma and verifier gate. The old `--require-full-bridge` guard is a
+  conservative hard stop, but the current certificate logic is sharper:
+  `source_unbridged_with_next_band_candidates` must be zero. A K26 first
+  continuation diagnostic on 2026-05-23 reported
+  `source_unbridged_with_next_band_candidates=57`, so the current bridge is
+  incomplete for claim-grade source death.
 - accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
 - accepted K26 non-square BZ evidence bound to the repaired schedule digest;
@@ -196,10 +202,12 @@ continuation schedule. The row-0 prefix command targets the canonical-octant
 representative `376039 + 943460i`; the comparison back to Tsuchimura's
 `943460 + 376039i` is by Gaussian-unit and conjugation symmetry. The
 continuation command includes `--require-full-bridge` and
-`--target-a 376039 --target-b 943460`, so unbridged source coordinate carry
-atoms are a hard stop and the canonical endpoint must be bridged into a
-TileOp-port component and reported as source-reached in the continuation
-artifact. The target field currently reports
+`--target-a 376039 --target-b 943460`, so unbridged coordinate carry atoms are
+a hard stop under the current conservative executable guard. The certificate
+design now needs the sharper guard described above: unbridged source carry is
+acceptable only when there is no legal next-band candidate. The canonical
+endpoint must still be bridged into a TileOp-port component and reported as
+source-reached in the continuation artifact. The target field currently reports
 `path_provenance=mixed_coordinate_port_atom_chain_non_claim` plus a stable atom
 id chain when target reachability is proved. This is still not a coordinate
 Gaussian-prime source-path witness suitable for a `SOURCE_DEAD_CERT`. This
@@ -214,14 +222,30 @@ witness. This is operational readiness evidence for row 0 only; it is still
 not a source/origin comparison, not terminal source death, and not a
 `SOURCE_DEAD_CERT`.
 
+A follow-up local first-continuation diagnostic over `8192 -> 16384` with the
+same prefix artifacts completed in about `470s` and reached
+`terminal_source_dead=true` as a diagnostic. Its seam counters were:
+`coordinate_carry_atoms_with_next_band_candidates=1504`,
+`bridged_coordinate_carry_atoms=1441`,
+`unbridged_coordinate_carry_atoms=1249`,
+`unbridged_without_next_band_candidates=1186`,
+`unbridged_with_next_band_candidates=63`,
+`source_coordinate_carry_atoms_with_next_band_candidates=1426`,
+`source_bridged_coordinate_carry_atoms=1369`,
+`source_unbridged_coordinate_carry_atoms=1211`,
+`source_unbridged_without_next_band_candidates=1154`,
+`source_unbridged_with_next_band_candidates=57`, and
+`source_bridge_rejected_candidate_atoms=72`. This is useful evidence, but it is
+a blocker for `SOURCE_DEAD_CERT`, not a certificate.
+
 ## Stop Conditions
 
 Stop and report without claiming reproduction if:
 
 - source state depends on transient TileOp group labels or union-find roots;
 - any overflow appears in a source/origin row;
-- coordinate-to-port seam bridging leaves unbridged coordinate carry atoms or
-  first-band port death without an accepted proof that this is irrelevant;
+- coordinate-to-port seam bridging leaves source-connected unbridged carry
+  atoms with legal next-band candidates;
 - BZ evidence is missing or mismatched for `K=26`;
 - terminal inventory cannot preserve retired source components;
 - remote runtime or memory threatens the agreed budget.

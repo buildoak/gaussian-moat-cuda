@@ -4,6 +4,9 @@ This is the Phase 1 CPU sidecar for lower-bound source propagation. It is not a
 replacement for the existing TileOp/CUDA campaign; it is the source-stitching
 protocol plus smoke contact with the existing CPU TileOp producer.
 
+The proof model is documented in
+`methodology/source-propagation-band-stitching.md`.
+
 The sidecar models a band handoff as:
 
 ```text
@@ -108,14 +111,18 @@ coordinate-fed prefix runner. In that mode it keeps the original coordinate
 separator as the incoming state, then adds bridge edges from coordinate carry
 atoms to first-band TileOp port atoms by looking for TileOp-band primes within
 distance `sqrt(K)` of each coordinate carry atom. Coordinate carry atoms with
-no first-band port bridge are reported in the JSON. This is still diagnostic:
-the seam bridge is explicit evidence for the next engineering gate, not an
-accepted source/death certificate.
+no first-band port bridge are split into "no legal next-band candidate" and
+"candidate existed but no accepted bridge" counters, with source-only versions
+of the same counters. This is still diagnostic: the seam bridge is explicit
+evidence for the next engineering gate, not an accepted source/death
+certificate.
 The runner also has `--require-full-bridge`, which rejects a manifest handoff
-when any source coordinate carry atom lacks a first-band TileOp-port bridge.
-That strict mode is a guardrail for future claim-grade execution; the current
-K26 plan remains diagnostic until the seam bridge either satisfies this strict
-gate or has an accepted verifier/theorem for the unbridged carry atoms.
+when any coordinate carry atom lacks a first-band TileOp-port bridge. That
+strict mode is a conservative guardrail for future claim-grade execution. The
+sharper certificate condition is
+`source_unbridged_with_next_band_candidates == 0`: source-connected carry atoms
+may be unbridged only when no legal next-band candidate exists. K26 remains
+diagnostic while this counter is nonzero.
 With `--target-a/--target-b`, the runner also inserts a canonical coordinate
 target atom when the target prime is seen in a TileOp band, bridges it to its
 visible TileOp-port component, and reports whether that coordinate target is in
@@ -293,10 +300,12 @@ output is a run contract only; it uses the canonical-octant representative
 `376039 + 943460i` for Tsuchimura's endpoint `943460 + 376039i`, does not
 execute the full sqrt(26) comparison, and must not be treated as a
 `SOURCE_DEAD_CERT`. The emitted continuation command includes
-`--require-full-bridge --target-a 376039 --target-b 943460`; if any source
-coordinate carry atom lacks a first-band TileOp-port bridge, the run must stop,
-and the canonical endpoint must be seen and source-reached in the continuation
-artifact before the full bundle checker can pass. The TileOp-port target field
+`--require-full-bridge --target-a 376039 --target-b 943460`; under the current
+conservative executable guard, any unbridged coordinate carry atom stops the
+run. The claim-grade bridge condition is sharper:
+`source_unbridged_with_next_band_candidates` must be zero, and the canonical
+endpoint must be seen and source-reached in the continuation artifact before
+the full bundle checker can pass. The TileOp-port target field
 now reports `path_provenance=mixed_coordinate_port_atom_chain_non_claim` plus a
 stable atom id chain when target reachability is proved. That is stronger than
 a boolean component bit, but it is still a mixed coordinate/port graph witness,

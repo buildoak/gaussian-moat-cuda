@@ -66,7 +66,7 @@ write_bundle() {
   local dir="$1"
   mkdir -p "$dir"
   cat > "$dir/k26_source_run_commands.json" <<'JSON'
-{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix":{"command":"source_origin_cpu_runner --endpoint-a 376039 --endpoint-b 943460"},"continuation":{"r_start":8192,"r_final":1015645,"schedule_boundary_count":124,"schedule_segment_count":123,"schedule_min_width":8029,"schedule_max_width":8193,"schedule_radii_csv":"8192,122879,475135,622591,1015645","schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"require_full_bridge","blocked_if_unbridged_coordinate_carry_atoms":true,"command":"source_tileop_port_runner --require-full-bridge --target-a 376039 --target-b 943460"}}
+{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix":{"command":"source_origin_cpu_runner --endpoint-a 376039 --endpoint-b 943460"},"continuation":{"r_start":8192,"r_final":1015645,"schedule_boundary_count":124,"schedule_segment_count":123,"schedule_min_width":8029,"schedule_max_width":8193,"schedule_radii_csv":"8192,122879,475135,622591,1015645","schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"require_full_bridge","blocked_if_unbridged_coordinate_carry_atoms":true,"claim_grade_requires_source_unbridged_with_next_band_candidates":0,"command":"source_tileop_port_runner --require-full-bridge --target-a 376039 --target-b 943460"}}
 JSON
   cat > "$dir/k26_bz_schedule_check.json" <<'JSON'
 {"schema":"lb_source_k26_bz_schedule_check_v1","proof_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","repaired_summary":{"bad_norm_count":0,"bz_clean":true}}
@@ -81,7 +81,7 @@ JSON
 {"schema":"lb_source_origin_progress_v1","band_index":0,"r_start":0,"r_outer":8192,"accepted":true}
 JSONL
   cat > "$dir/k26-continuation-result.json" <<'JSON'
-{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"require_full_bridge","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true,"path_provenance":"mixed_coordinate_port_atom_chain_non_claim","atom_path_length":3,"atom_path":[1615075207963900,-25220051735553,1615075207964004]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615075207964004]}
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"require_full_bridge","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"source_unbridged_with_next_band_candidates":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true,"path_provenance":"mixed_coordinate_port_atom_chain_non_claim","atom_path_length":3,"atom_path":[1615075207963900,-25220051735553,1615075207964004]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615075207964004]}
 JSON
   cat > "$dir/k26-continuation-progress.jsonl" <<'JSONL'
 {"schema":"lb_source_tileop_port_progress_v1","band_index":0,"r_start":8192,"r_outer":122879,"accepted":true}
@@ -369,6 +369,21 @@ if "$checker" "$bad_bridge" \
   exit 1
 fi
 grep -q 'K26 continuation full bridge' "$tmp/bad-bridge-rehashed.log"
+
+bad_source_candidate_bridge="$tmp/bad-source-candidate-bridge"
+write_bundle "$bad_source_candidate_bridge"
+perl -0pi -e 's/"source_unbridged_with_next_band_candidates":0/"source_unbridged_with_next_band_candidates":1/' \
+  "$bad_source_candidate_bridge/k26-continuation-result.json"
+write_manifest "$bad_source_candidate_bridge"
+if "$checker" "$bad_source_candidate_bridge" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-source-candidate-bridge.log" 2>&1; then
+  echo "checker accepted source unbridged candidate gap" >&2
+  exit 1
+fi
+grep -q 'K26 continuation source candidate bridge' \
+  "$tmp/bad-source-candidate-bridge.log"
 
 bad_cert_summary="$tmp/bad-cert-summary"
 write_bundle "$bad_cert_summary"
