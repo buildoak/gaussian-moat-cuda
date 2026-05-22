@@ -58,7 +58,8 @@ canonical-octant Gaussian-prime coordinates directly, seeds `Omega` by the
 origin rule `norm_sq <= K`, uses stable coordinate atom ids, stitches radial
 bands through `lb_source::process_band`, and emits
 `lb_source_origin_cpu_runner_v1` JSON with source inventory count, digest, and
-maximum observed source norm.
+maximum observed source norm. When the diagnostic endpoint is source-reached,
+it also emits a deterministic `source_path` from a certified origin seed.
 
 This closes the first executable gap between the abstract sidecar protocol and
 a source/origin run, but it is still a non-claim surface. It is not TileOp/CUDA

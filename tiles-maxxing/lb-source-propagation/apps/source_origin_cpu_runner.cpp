@@ -5,7 +5,9 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <optional>
+#include <queue>
 #include <set>
 #include <string>
 #include <string_view>
@@ -205,6 +207,7 @@ std::uint64_t dist_sq(const Point& lhs, const Point& rhs) {
 
 bool is_gaussian_prime_point(std::int64_t a, std::int64_t b,
                              std::uint64_t norm_sq) {
+  (void)b;
   if (a == 0) {
     return campaign::is_gaussian_prime_norm(norm_sq);
   }
@@ -258,6 +261,104 @@ std::vector<lb_source::AtomId> source_inventory(
   return ids;
 }
 
+void insert_adjacency_edge(
+    std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>& adjacency,
+    lb_source::AtomId lhs, lb_source::AtomId rhs) {
+  adjacency[lhs].push_back(rhs);
+  adjacency[rhs].push_back(lhs);
+}
+
+void canonicalize_adjacency(
+    std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>& adjacency) {
+  for (auto& [id, neighbors] : adjacency) {
+    (void)id;
+    std::sort(neighbors.begin(), neighbors.end());
+    neighbors.erase(std::unique(neighbors.begin(), neighbors.end()),
+                    neighbors.end());
+  }
+}
+
+std::vector<lb_source::AtomId> source_path_to_endpoint(
+    const std::vector<lb_source::AtomId>& source_seed_ids,
+    lb_source::AtomId endpoint_id,
+    const std::map<lb_source::AtomId, Point>& point_by_id,
+    const std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>&
+        adjacency) {
+  if (point_by_id.find(endpoint_id) == point_by_id.end()) {
+    return {};
+  }
+
+  std::vector<lb_source::AtomId> seeds = source_seed_ids;
+  std::sort(seeds.begin(), seeds.end());
+  seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
+
+  std::queue<lb_source::AtomId> pending;
+  std::map<lb_source::AtomId, lb_source::AtomId> parent_by_id;
+  for (const lb_source::AtomId seed_id : seeds) {
+    if (point_by_id.find(seed_id) == point_by_id.end()) {
+      continue;
+    }
+    if (!parent_by_id.emplace(seed_id, seed_id).second) {
+      continue;
+    }
+    pending.push(seed_id);
+  }
+
+  while (!pending.empty()) {
+    const lb_source::AtomId current = pending.front();
+    pending.pop();
+    if (current == endpoint_id) {
+      break;
+    }
+
+    const auto neighbors = adjacency.find(current);
+    if (neighbors == adjacency.end()) {
+      continue;
+    }
+    for (const lb_source::AtomId neighbor : neighbors->second) {
+      if (point_by_id.find(neighbor) == point_by_id.end()) {
+        continue;
+      }
+      if (!parent_by_id.emplace(neighbor, current).second) {
+        continue;
+      }
+      pending.push(neighbor);
+    }
+  }
+
+  if (parent_by_id.find(endpoint_id) == parent_by_id.end()) {
+    return {};
+  }
+
+  std::vector<lb_source::AtomId> reversed_path;
+  lb_source::AtomId current = endpoint_id;
+  while (true) {
+    reversed_path.push_back(current);
+    const lb_source::AtomId parent = parent_by_id.at(current);
+    if (parent == current) {
+      break;
+    }
+    current = parent;
+  }
+  return {reversed_path.rbegin(), reversed_path.rend()};
+}
+
+void append_source_path_json(
+    std::ostream& out,
+    const std::vector<lb_source::AtomId>& source_path,
+    const std::map<lb_source::AtomId, Point>& point_by_id) {
+  out << '[';
+  for (std::size_t i = 0; i < source_path.size(); ++i) {
+    const Point& point = point_by_id.at(source_path[i]);
+    if (i != 0) {
+      out << ',';
+    }
+    out << "{\"a\":" << point.a << ",\"b\":" << point.b
+        << ",\"norm_sq\":" << point.norm_sq << '}';
+  }
+  out << ']';
+}
+
 bool has_source_carry(const lb_source::SeparatorState& state) {
   return std::find(state.source_bit_per_component.begin(),
                    state.source_bit_per_component.end(),
@@ -278,6 +379,9 @@ int main(int argc, char** argv) {
       norm_sq_i64(config.endpoint_a, config.endpoint_b);
 
   std::unordered_map<lb_source::AtomId, std::uint64_t> norm_by_id;
+  std::map<lb_source::AtomId, Point> point_by_id;
+  std::map<lb_source::AtomId, std::vector<lb_source::AtomId>> adjacency;
+  std::vector<lb_source::AtomId> source_seed_ids;
   std::optional<lb_source::SeparatorState> incoming;
   lb_source::ProcessResult last;
   std::uint64_t previous_outer = 0;
@@ -312,6 +416,10 @@ int main(int argc, char** argv) {
       const bool is_origin_seed = point.norm_sq <= config.k_sq;
       band.atoms.push_back({id, point.norm_sq, is_origin_seed});
       norm_by_id.emplace(id, point.norm_sq);
+      point_by_id.emplace(id, point);
+      if (is_origin_seed) {
+        source_seed_ids.push_back(id);
+      }
       if (id == endpoint_id) {
         endpoint_seen = true;
       }
@@ -329,6 +437,7 @@ int main(int argc, char** argv) {
           std::swap(lhs, rhs);
         }
         edges.insert({lhs, rhs});
+        insert_adjacency_edge(adjacency, lhs, rhs);
       }
     }
     band.edges.assign(edges.begin(), edges.end());
@@ -355,6 +464,7 @@ int main(int argc, char** argv) {
     incoming = last.outgoing;
     previous_outer = outer;
   }
+  canonicalize_adjacency(adjacency);
 
   const std::vector<lb_source::AtomId> inventory =
       last.accepted() ? source_inventory(last) : std::vector<lb_source::AtomId>{};
@@ -367,6 +477,11 @@ int main(int argc, char** argv) {
       max_source_norm = std::max(max_source_norm, it->second);
     }
   }
+  const std::vector<lb_source::AtomId> source_path =
+      endpoint_source_reached
+          ? source_path_to_endpoint(source_seed_ids, endpoint_id, point_by_id,
+                                    adjacency)
+          : std::vector<lb_source::AtomId>{};
 
   std::cout << "{"
             << "\"schema\":\"lb_source_origin_cpu_runner_v1\","
@@ -399,7 +514,10 @@ int main(int argc, char** argv) {
             << ",\"source_inventory_digest_hex\":\""
             << inventory_summary.digest_hex << "\""
             << ",\"max_source_norm_sq\":" << max_source_norm
-            << ",\"non_claim\":\"small coordinate-fed sidecar runner; not a TileOp/CUDA SOURCE_DEAD_CERT\""
+            << ",\"source_path_length\":" << source_path.size()
+            << ",\"source_path\":";
+  append_source_path_json(std::cout, source_path, point_by_id);
+  std::cout << ",\"non_claim\":\"small coordinate-fed sidecar runner; not a TileOp/CUDA SOURCE_DEAD_CERT\""
             << "}\n";
 
   return last.accepted() ? EXIT_SUCCESS : EXIT_FAILURE;

@@ -108,6 +108,6 @@ add_test(NAME source_origin_cpu_runner_smoke
     --endpoint-b 3)
 set_tests_properties(source_origin_cpu_runner_smoke PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\".*\"source_reached\":true.*\"accepted\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\""
+    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\".*\"source_reached\":true.*\"accepted\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\".*\"source_path_length\":1.*\"source_path\":\\[\\{\"a\":0,\"b\":3,\"norm_sq\":9\\}\\]"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
