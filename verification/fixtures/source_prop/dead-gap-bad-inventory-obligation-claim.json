@@ -25,7 +25,7 @@
   "bz_evidence": {
     "status": "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE",
     "accepted_for_schedule": true,
-    "accepted_for_claim": true,
+    "accepted_for_claim": false,
     "schedule_digest_algorithm": "sha256:lb_source_k26_repaired_bz_schedule_v1",
     "schedule_digest_hex": "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"
   },
@@ -65,7 +65,7 @@
     "required_mode": "claim_grade_terminal_inventory",
     "observed_mode": "summary_digest_only_non_claim",
     "listed_inventory_present": false,
-    "claim_grade_inventory_accepted": false,
+    "claim_grade_inventory_accepted": true,
     "observed_count": 14542615005,
     "observed_digest_algorithm": "sha256:lb_source_inventory_v1",
     "observed_digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

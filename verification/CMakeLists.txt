@@ -104,6 +104,8 @@ foreach(bad_source_dead_gap
     dead-gap-bad-claim-status
     dead-gap-bad-endpoint-atom
     dead-gap-bad-endpoint-port-tile
+    dead-gap-bad-inventory-obligation-claim
+    dead-gap-bad-inventory-obligation-digest
     dead-gap-bad-inventory-tie
     dead-gap-bad-path-obligation-claim
     dead-gap-bad-path-obligation-count

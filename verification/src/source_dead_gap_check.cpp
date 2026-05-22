@@ -359,6 +359,39 @@ void verify_gap(const nlohmann::json& gap) {
     }
   }
 
+  const nlohmann::json& inventory_obligation =
+      require_object(gap, "terminal_inventory_obligation");
+  if (require_string(inventory_obligation, "required_mode") !=
+      "claim_grade_terminal_inventory") {
+    throw std::runtime_error("terminal inventory obligation has wrong required mode");
+  }
+  if (require_string(inventory_obligation, "observed_mode") !=
+      "summary_digest_only_non_claim") {
+    throw std::runtime_error("terminal inventory obligation has wrong observed mode");
+  }
+  if (require_bool(inventory_obligation, "listed_inventory_present")) {
+    throw std::runtime_error("terminal inventory obligation must report missing listed inventory");
+  }
+  if (require_bool(inventory_obligation, "claim_grade_inventory_accepted")) {
+    throw std::runtime_error("terminal inventory obligation must not accept summary-only inventory");
+  }
+  if (require_u64(inventory_obligation, "observed_count") !=
+      kExpectedComponentSize) {
+    throw std::runtime_error("terminal inventory obligation count mismatch");
+  }
+  if (require_string(inventory_obligation, "observed_digest_algorithm") !=
+      "sha256:lb_source_inventory_v1") {
+    throw std::runtime_error("terminal inventory obligation digest algorithm mismatch");
+  }
+  if (require_string(inventory_obligation, "observed_digest_hex") !=
+      require_string(summary, "digest_hex")) {
+    throw std::runtime_error("terminal inventory obligation digest binding mismatch");
+  }
+  if (require_u64(inventory_obligation, "observed_max_norm_sq") !=
+      kEndpointNormSq) {
+    throw std::runtime_error("terminal inventory obligation max norm mismatch");
+  }
+
   const nlohmann::json& missing =
       require_array(gap, "missing_for_source_dead_cert");
   bool has_coordinate_path_gap = false;

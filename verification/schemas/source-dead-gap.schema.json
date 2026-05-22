@@ -21,6 +21,7 @@
     "target_atom_path",
     "coordinate_path_obligation",
     "terminal_source_inventory_summary",
+    "terminal_inventory_obligation",
     "missing_for_source_dead_cert"
   ],
   "properties": {
@@ -173,6 +174,35 @@
           "minItems": 1,
           "items": { "type": "integer" }
         }
+      }
+    },
+    "terminal_inventory_obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_mode",
+        "observed_mode",
+        "listed_inventory_present",
+        "claim_grade_inventory_accepted",
+        "observed_count",
+        "observed_digest_algorithm",
+        "observed_digest_hex",
+        "observed_max_norm_sq"
+      ],
+      "properties": {
+        "required_mode": { "const": "claim_grade_terminal_inventory" },
+        "observed_mode": { "const": "summary_digest_only_non_claim" },
+        "listed_inventory_present": { "const": false },
+        "claim_grade_inventory_accepted": { "const": false },
+        "observed_count": { "const": 14542615005 },
+        "observed_digest_algorithm": {
+          "const": "sha256:lb_source_inventory_v1"
+        },
+        "observed_digest_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "observed_max_norm_sq": { "const": 1031522101121 }
       }
     },
     "missing_for_source_dead_cert": {

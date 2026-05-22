@@ -176,6 +176,8 @@ grep -q '"target_atom_path":\[1615075207963900,-25220051735553,1615075207964004\
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"coordinate_path_obligation":{"required_provenance":"coordinate_gaussian_prime_path","observed_provenance":"mixed_coordinate_port_atom_chain_non_claim","observed_coordinate_atom_count":2,"observed_port_atom_count":1' \
   "$blocked_out/k26-source-dead-gap.json"
+grep -q '"terminal_inventory_obligation":{"required_mode":"claim_grade_terminal_inventory","observed_mode":"summary_digest_only_non_claim","listed_inventory_present":false,"claim_grade_inventory_accepted":false' \
+  "$blocked_out/k26-source-dead-gap.json"
 grep -q 'coordinate Gaussian-prime source_path' \
   "$blocked_out/k26-source-dead-gap.json"
 grep -q 'SOURCE_DEAD_GAP_NON_CLAIM_PASS' \

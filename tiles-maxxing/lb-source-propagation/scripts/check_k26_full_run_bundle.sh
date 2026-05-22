@@ -399,6 +399,8 @@ require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_cla
   "K26 source-dead gap target path provenance"
 require_grep '"coordinate_path_obligation":.*"required_provenance":"coordinate_gaussian_prime_path".*"observed_provenance":"mixed_coordinate_port_atom_chain_non_claim".*"per_port_coordinate_expansion":"missing".*"claim_grade_path_accepted":false' "$gap" \
   "K26 source-dead gap coordinate path obligation"
+require_grep '"terminal_inventory_obligation":.*"required_mode":"claim_grade_terminal_inventory".*"observed_mode":"summary_digest_only_non_claim".*"listed_inventory_present":false.*"claim_grade_inventory_accepted":false' "$gap" \
+  "K26 source-dead gap terminal inventory obligation"
 require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
   "K26 source-dead gap missing coordinate source path"
 
@@ -480,6 +482,21 @@ require_equal "$continuation_max_norm" "$gap_max_norm" \
   "K26 gap max source norm binding"
 require_equal "$continuation_max_ties" "$gap_max_ties" \
   "K26 gap max-norm tie binding"
+gap_observed_inventory_count="$(
+  require_json_number_value "$gap" observed_count
+)"
+gap_observed_inventory_digest="$(
+  require_json_string_value "$gap" observed_digest_hex
+)"
+gap_observed_max_norm="$(
+  require_json_number_value "$gap" observed_max_norm_sq
+)"
+require_equal "$continuation_inventory_count" "$gap_observed_inventory_count" \
+  "K26 gap terminal inventory obligation count binding"
+require_equal "$continuation_inventory_digest" "$gap_observed_inventory_digest" \
+  "K26 gap terminal inventory obligation digest binding"
+require_equal "$continuation_max_norm" "$gap_observed_max_norm" \
+  "K26 gap terminal inventory obligation max-norm binding"
 
 gap_checker_output="$("$source_dead_gap_checker" "$gap")"
 if ! grep -q '"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS"' \
