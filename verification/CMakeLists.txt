@@ -78,6 +78,9 @@ add_test(NAME source_dead_cert_fixture_summary_nonclaim_valid
 add_test(NAME source_dead_gap_fixture_valid
   COMMAND source_dead_gap_check
     ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-gap-valid.json)
+set_tests_properties(source_dead_gap_fixture_valid PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"status\":\"SOURCE_DEAD_GAP_NON_CLAIM_PASS\".*\"bridge_safety\":\"accepted_non_claim\".*\"coordinate_path_obligation\":\"blocked_coordinate_gaussian_prime_path\".*\"terminal_inventory_obligation\":\"blocked_claim_grade_terminal_inventory\".*\"claim_grade\":false")
 foreach(bad_source_dead_cert
     dead-cert-bad-artifact-hash
     dead-cert-bad-digest

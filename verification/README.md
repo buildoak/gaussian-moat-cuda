@@ -58,7 +58,7 @@ Post-flight statuses are separate:
 - `SPAN_PROOF_PASS`
 - `CLAIM_PROOF_MISSING`
 - `SOURCE_DEAD_CERT_DRAFT_PASS` is emitted only by the source-dead draft checker in listed-inventory mode; it validates a positive Gaussian-prime source path to the endpoint, negative guard, non-placeholder metadata, and terminal inventory count/digest/max-norm/tie-set consistency. `SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS` validates only the shape and extrema witnesses of a summary-only external accumulator. Neither status proves a full Tsuchimura-scale run or K26 BZ acceptance.
-- `SOURCE_DEAD_GAP_NON_CLAIM_PASS` confirms the K26 diagnostic gap artifact is well formed and binds its mixed target path, terminal inventory summary, continuation artifact hash, and repaired BZ schedule digest. It is not a claim-grade source/death certificate.
+- `SOURCE_DEAD_GAP_NON_CLAIM_PASS` confirms the K26 diagnostic gap artifact is well formed and binds its mixed target path, terminal inventory summary, continuation artifact hash, repaired BZ schedule digest, bridge-safety obligation, coordinate-path obligation, and terminal-inventory obligation. The checker output reports bridge safety as accepted non-claim evidence while keeping coordinate path and claim-grade inventory obligations blocked. It is not a claim-grade source/death certificate.
 
 `MOAT_PROOF_PASS` is reserved for future work. Current negative `MOAT` rows can
 pass profile coherence and sample audit, but remain detector/audit evidence

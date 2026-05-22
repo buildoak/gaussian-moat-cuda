@@ -429,7 +429,11 @@ int main(int argc, char** argv) {
     }
     const nlohmann::json gap = nlohmann::json::parse(in);
     verify_gap(gap);
-    std::cout << "{\"status\":\"SOURCE_DEAD_GAP_NON_CLAIM_PASS\"}\n";
+    std::cout << "{\"status\":\"SOURCE_DEAD_GAP_NON_CLAIM_PASS\","
+              << "\"bridge_safety\":\"accepted_non_claim\","
+              << "\"coordinate_path_obligation\":\"blocked_coordinate_gaussian_prime_path\","
+              << "\"terminal_inventory_obligation\":\"blocked_claim_grade_terminal_inventory\","
+              << "\"claim_grade\":false}\n";
     return 0;
   } catch (const std::exception& e) {
     std::cerr << "SOURCE_DEAD_GAP_REJECT: " << e.what() << "\n";
