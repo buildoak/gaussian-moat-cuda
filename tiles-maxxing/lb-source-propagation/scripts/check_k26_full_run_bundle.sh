@@ -375,6 +375,24 @@ fi
 
 require_grep '"schema":"lb_source_dead_cert_draft_v1"' "$cert" \
   "K26 source-dead cert schema"
+require_grep '"certificate_id":"[^"]+"' "$cert" \
+  "K26 source-dead cert certificate id"
+require_grep '"profile_id":"[^"]+"' "$cert" \
+  "K26 source-dead cert profile id"
+cert_source_mode="$(require_json_string_value "$cert" source_mode)"
+cert_geometry_id="$(require_json_string_value "$cert" geometry_id)"
+cert_bz_status="$(require_json_string_value "$cert" bz_status)"
+cert_artifact_hash="$(require_json_string_value "$cert" artifact_hash)"
+require_equal "ORIGIN_SOURCE" "$cert_source_mode" \
+  "K26 source-dead cert source mode"
+require_equal "SOURCE_ORIGIN_K26" "$cert_geometry_id" \
+  "K26 source-dead cert geometry binding"
+require_equal "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE" "$cert_bz_status" \
+  "K26 source-dead cert BZ status binding"
+if ! grep -Eq '"artifact_hash":"sha256:[0-9a-f]{64}"' "$cert"; then
+  echo "K26_FULL_RUN_BUNDLE_REJECT: K26 source-dead cert artifact hash binding ($cert)" >&2
+  exit 1
+fi
 require_grep '"k_sq":26' "$cert" "K26 source-dead cert k_sq"
 require_grep '"terminal_radius":1015645' "$cert" \
   "K26 source-dead cert terminal radius"
