@@ -70,7 +70,7 @@ JSON
 {"schema":"lb_source_k26_bz_schedule_check_v1","proof_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","repaired_summary":{"bad_norm_count":0,"bz_clean":true}}
 JSON
   cat > "$dir/k26_source_run_profile.json" <<'JSON'
-{"schema":"lb_source_k26_run_profile_v1","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","schedule":{"bz_evidence":{"accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"}}}
+{"schema":"lb_source_k26_run_profile_v1","claim_label":"SOURCE_ORIGIN_K26","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"expected_component_size":14542615005},"schedule":{"bz_evidence":{"accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"}}}
 JSON
   cat > "$dir/k26-prefix-result.json" <<'JSON'
 {"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"manifest_written":true,"prefix_witness_written":true}
@@ -180,6 +180,30 @@ if "$checker" "$bad_digest" \
   exit 1
 fi
 grep -q 'K26 BZ digest profile binding' "$tmp/bad-digest-rehashed.log"
+
+bad_profile_claim="$tmp/bad-profile-claim"
+write_bundle "$bad_profile_claim"
+perl -0pi -e 's/"claim_label":"SOURCE_ORIGIN_K26"/"claim_label":"SOURCE_ORIGIN_K34"/' \
+  "$bad_profile_claim/k26_source_run_profile.json"
+if "$checker" "$bad_profile_claim" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-profile-claim.log" 2>&1; then
+  echo "checker accepted stale artifact hash after profile claim mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26_source_run_profile.json' \
+  "$tmp/bad-profile-claim.log"
+write_manifest "$bad_profile_claim"
+if "$checker" "$bad_profile_claim" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-profile-claim-rehashed.log" 2>&1; then
+  echo "checker accepted non-K26 source run profile claim label" >&2
+  exit 1
+fi
+grep -q 'K26 profile claim label' \
+  "$tmp/bad-profile-claim-rehashed.log"
 
 bad_bridge="$tmp/bad-bridge"
 write_bundle "$bad_bridge"

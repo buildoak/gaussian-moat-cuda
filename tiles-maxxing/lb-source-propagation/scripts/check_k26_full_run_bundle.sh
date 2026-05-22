@@ -234,8 +234,16 @@ require_grep '"repaired_summary":.*"bad_norm_count":0.*"bz_clean":true' "$bz" \
 
 require_grep '"schema":"lb_source_k26_run_profile_v1"' "$profile" \
   "K26 profile schema"
+require_grep '"claim_label":"SOURCE_ORIGIN_K26"' "$profile" \
+  "K26 profile claim label"
 require_grep '"profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM"' "$profile" \
   "K26 profile status"
+require_grep '"target":.*"tsuchimura_endpoint":.*"a":943460.*"b":376039.*"norm_sq":1031522101121' "$profile" \
+  "K26 profile Tsuchimura endpoint"
+require_grep '"canonical_octant_endpoint":.*"a":376039.*"b":943460.*"norm_sq":1031522101121' "$profile" \
+  "K26 profile canonical endpoint"
+require_grep '"expected_component_size":14542615005' "$profile" \
+  "K26 profile Tsuchimura component size"
 require_grep '"accepted_for_schedule":true' "$profile" \
   "K26 profile BZ schedule binding"
 require_grep '"accepted_for_claim":false' "$profile" \
