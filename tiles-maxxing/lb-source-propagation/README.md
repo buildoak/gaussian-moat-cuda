@@ -57,6 +57,14 @@ This is intentionally a smoke path. `TileOp` group labels are not persisted as
 source carry atoms because they are tile-local; Phase 2 should promote stable
 coordinate or canonical-port atoms before running campaign-scale source claims.
 
+`source_tileop_cpu_runner` is the next diagnostic bridge: it builds campaign
+`Grid` objects per radial band, calls `campaign::process_tile` on each active
+tile as the TileOp contact point, deduplicates `campaign::sieve_tile` Gaussian
+primes into stable coordinate atom ids, and then stitches those bands through
+the sidecar. This is still a CPU diagnostic, but it proves the sidecar can be
+fed from existing campaign TileOp production surfaces without changing current
+campaign verdict semantics.
+
 ## Small Source Runner
 
 `source_origin_cpu_runner` is a small-radius diagnostic runner. It enumerates

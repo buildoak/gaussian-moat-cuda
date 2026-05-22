@@ -59,10 +59,12 @@ It emits `lb_source_k26_run_contract_v1`, including the target endpoint,
 required evidence, and current blocking gaps. It must keep
 `"executable_now": false` until these pieces exist:
 
-- a campaign-scale source runner that feeds the sidecar from CPU/CUDA TileOps;
+- a full-scale K26 source runner that feeds the sidecar from campaign TileOps
+  using the same stable coordinate/canonical-port identity as the diagnostic
+  CPU TileOp-fed runner;
 - stable coordinate or canonical-port carry atoms, not transient TileOp group
   labels;
-- accepted terminal inventory verification for count/digest/max norm/tie set at
+- accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
 - accepted K26 non-square BZ evidence;
 - an accepted full-scale `SOURCE_DEAD_CERT` artifact. The current independent

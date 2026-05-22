@@ -72,6 +72,15 @@ target_link_libraries(source_origin_cpu_runner
     lb_source_campaign_tileop
 )
 
+add_executable(source_tileop_cpu_runner
+  apps/source_tileop_cpu_runner.cpp
+)
+target_link_libraries(source_tileop_cpu_runner
+  PRIVATE
+    lb_source_propagation
+    lb_source_campaign_tileop
+)
+
 enable_testing()
 
 add_executable(source_prop_tests tests/test_source_propagation.cpp)
@@ -124,3 +133,17 @@ set_tests_properties(source_origin_cpu_runner_dead_cert_smoke PROPERTIES
     "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"terminal_source_dead\":true.*\"source_path_length\":3.*\"cert_written\":true"
   FAIL_REGULAR_EXPRESSION
     "MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME source_tileop_cpu_runner_smoke
+  COMMAND source_tileop_cpu_runner
+    --r-start 248
+    --r-final 512
+    --band-width 128
+    --seed-a 0
+    --seed-b 251
+    --endpoint-a 0
+    --endpoint-b 251)
+set_tests_properties(source_tileop_cpu_runner_smoke PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_tileop_cpu_runner_v1\".*\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\".*\"source_mode\":\"CERTIFIED_SEED\".*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"source_reached\":true.*\"accepted\":true.*\"source_path_length\":[1-9][0-9]*"
+  FAIL_REGULAR_EXPRESSION
+    "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")

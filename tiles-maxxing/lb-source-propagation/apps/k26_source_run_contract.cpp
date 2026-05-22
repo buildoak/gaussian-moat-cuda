@@ -92,9 +92,9 @@ int main() {
       "commit, build, run profile, and artifact hashes"};
 
   constexpr const char* kBlockingGaps[] = {
-      "no campaign-scale source runner feeds the sidecar from CPU/CUDA TileOps",
+      "CPU TileOp-fed diagnostic runner exists, but no full-scale K26 source runner feeds the sidecar from campaign TileOps",
       "current production compositors compute ANY-SPAN/ANY-SHELL-MOAT, not SOURCE_ORIGIN_K26",
-      "sidecar inventory digest exists, but max norm, tie set, and endpoint-chain verifier are not accepted at 14.5B scale",
+      "sidecar inventory count/digest/max-norm/tie-set checks exist, but endpoint-chain and inventory handling are not accepted at 14.5B scale",
       "K26 non-square BZ evidence is preflight-only in this branch",
       "independent SOURCE_DEAD_CERT draft checker exists, but no full-scale K26 certificate artifact passes it"};
 

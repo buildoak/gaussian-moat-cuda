@@ -99,6 +99,16 @@ ctest --test-dir "$build_dir" --output-on-failure \
   --endpoint-b 3 \
   | tee "$out_dir/source_origin_cpu_runner_smoke.json"
 
+"$build_dir/source_tileop_cpu_runner" \
+  --r-start 248 \
+  --r-final 512 \
+  --band-width 128 \
+  --seed-a 0 \
+  --seed-b 251 \
+  --endpoint-a 0 \
+  --endpoint-b 251 \
+  | tee "$out_dir/source_tileop_cpu_runner_smoke.json"
+
 "$build_dir/k26_tsuchimura_preflight" \
   | tee "$out_dir/k26_tsuchimura_preflight.json"
 
@@ -107,7 +117,7 @@ ctest --test-dir "$build_dir" --output-on-failure \
 
 cat > "$out_dir/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, CPU TileOp producer smoke, small coordinate source runner, and K26 non-claim run contract only.
+Scope: sidecar build/test, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, and K26 non-claim run contract only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 
