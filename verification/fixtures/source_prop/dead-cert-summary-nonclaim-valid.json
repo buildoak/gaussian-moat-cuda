@@ -1,0 +1,32 @@
+{
+  "schema": "lb_source_dead_cert_draft_v1",
+  "certificate_id": "cert-summary-nonclaim-valid",
+  "profile_id": "profile-summary-nonclaim-valid",
+  "metadata": {
+    "source_mode": "ORIGIN_SOURCE",
+    "source_id": "omega",
+    "geometry_id": "SOURCE_ORIGIN_DIAGNOSTIC",
+    "commit_id": "abc123",
+    "build_id": "local-test",
+    "bz_status": "BZ_CLEAN_DIAGNOSTIC",
+    "artifact_hash": "sha256:test"
+  },
+  "proof_status": "SUMMARY_ONLY_NON_CLAIM",
+  "non_claim": "summary-only accumulator shape check; listed inventory is external",
+  "terminal_source_inventory_mode": "summary_only_non_claim",
+  "k_sq": 36,
+  "terminal_radius": 20,
+  "negative_guard_pass": true,
+  "endpoint": { "a": 7, "b": 2, "norm_sq": 53 },
+  "source_path": [
+    { "a": 5, "b": 2, "norm_sq": 29 },
+    { "a": 7, "b": 2, "norm_sq": 53 }
+  ],
+  "terminal_source_inventory_summary": {
+    "count": 14542615005,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "max_norm_sq": 53,
+    "max_norm_atom_ids": [30064771074]
+  }
+}

@@ -122,7 +122,7 @@ int main() {
   constexpr const char* kMissingRunnerFeatures[] = {
       "full K26 source runner has not executed the repaired variable-boundary schedule",
       "coordinate-to-port seam bridge remains diagnostic",
-      "terminal inventory is not yet represented by a scalable claim-grade accumulator",
+      "terminal inventory has only a summary-only non-claim verifier; claim-grade full-run provenance is still missing",
       "no K26 full-run artifact hash or non-pending build metadata exists"};
 
   std::cout

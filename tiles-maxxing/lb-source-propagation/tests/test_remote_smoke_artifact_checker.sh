@@ -30,7 +30,7 @@ write_ctest_log() {
 }
 
 write_ctest_log "$tmp/ctest.log" 21
-write_ctest_log "$tmp/verification-ctest.log" 43
+write_ctest_log "$tmp/verification-ctest.log" 46
 
 cat > "$tmp/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS

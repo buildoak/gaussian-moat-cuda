@@ -102,9 +102,13 @@ required evidence, and current blocking gaps. It must keep
   14.5B-member scale;
 - accepted K26 non-square BZ evidence bound to the repaired schedule;
 - an accepted full-scale `SOURCE_DEAD_CERT` artifact. The current independent
-  draft checker validates a listed positive source path, negative guard, and
-  inventory count/digest consistency, but the real K26 chain and BZ acceptance
-  are still missing.
+  draft checker has two deliberately separate modes: a listed-inventory mode
+  that recomputes the count/digest/max-norm/tie-set from the explicit terminal
+  inventory, and a `summary_only_non_claim` mode that only validates a
+  Tsuchimura-scale accumulator shape plus extrema witnesses and emits
+  `SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS`. The latter is the scalable
+  K26 contract shape, not a certificate acceptance; the real K26 chain,
+  accumulator provenance, and BZ acceptance are still missing.
 
 The exact command contract is:
 

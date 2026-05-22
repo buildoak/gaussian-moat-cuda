@@ -14,13 +14,41 @@
     "negative_guard_pass",
     "endpoint",
     "source_path",
-    "terminal_source_inventory_summary",
-    "terminal_source_inventory"
+    "terminal_source_inventory_summary"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "terminal_source_inventory_mode": {
+            "const": "summary_only_non_claim"
+          }
+        },
+        "required": ["terminal_source_inventory_mode"]
+      },
+      "then": {
+        "required": ["proof_status", "non_claim"],
+        "properties": {
+          "proof_status": { "const": "SUMMARY_ONLY_NON_CLAIM" }
+        },
+        "not": { "required": ["terminal_source_inventory"] }
+      },
+      "else": {
+        "required": ["terminal_source_inventory"]
+      }
+    }
   ],
   "properties": {
     "schema": { "const": "lb_source_dead_cert_draft_v1" },
     "certificate_id": { "type": "string", "minLength": 1 },
     "profile_id": { "type": "string", "minLength": 1 },
+    "proof_status": {
+      "enum": ["SUMMARY_ONLY_NON_CLAIM"]
+    },
+    "non_claim": { "type": "string", "minLength": 1 },
+    "terminal_source_inventory_mode": {
+      "enum": ["listed", "summary_only_non_claim"]
+    },
     "metadata": {
       "type": "object",
       "additionalProperties": false,

@@ -30,6 +30,10 @@ const nlohmann::json& require_field(const nlohmann::json& object,
   return *it;
 }
 
+bool has_field(const nlohmann::json& object, const char* field) {
+  return object.find(field) != object.end();
+}
+
 std::string require_string(const nlohmann::json& object, const char* field) {
   const nlohmann::json& value = require_field(object, field);
   if (!value.is_string()) {
@@ -431,6 +435,20 @@ std::string inventory_digest(const std::vector<std::int64_t>& ids) {
   return sha256_hex(payload.str());
 }
 
+void require_inventory_digest_shape(const nlohmann::json& summary) {
+  if (require_string(summary, "digest_algorithm") !=
+      "sha256:lb_source_inventory_v1") {
+    throw std::runtime_error("unsupported inventory digest algorithm");
+  }
+  const std::string digest_hex = require_string(summary, "digest_hex");
+  if (digest_hex.size() != 64 ||
+      !std::all_of(digest_hex.begin(), digest_hex.end(), [](unsigned char ch) {
+        return std::isdigit(ch) != 0 || (ch >= 'a' && ch <= 'f');
+      })) {
+    throw std::runtime_error("inventory digest is not lowercase sha256 hex");
+  }
+}
+
 std::uint64_t coordinate_atom_norm_sq(std::int64_t id) {
   if (id < 0) {
     throw std::runtime_error("terminal_source_inventory contains negative atom id");
@@ -464,7 +482,32 @@ std::vector<std::int64_t> max_norm_atom_ids(
   return ties;
 }
 
-void verify_source_dead_cert(const nlohmann::json& cert) {
+std::vector<std::int64_t> require_summary_ties(const nlohmann::json& summary) {
+  const nlohmann::json& raw_ties =
+      require_array(summary, "max_norm_atom_ids");
+  std::vector<std::int64_t> expected_ties;
+  expected_ties.reserve(raw_ties.size());
+  for (const nlohmann::json& item : raw_ties) {
+    if (!item.is_number_integer()) {
+      throw std::runtime_error("max_norm_atom_ids item is not integer");
+    }
+    expected_ties.push_back(item.get<std::int64_t>());
+  }
+  std::sort(expected_ties.begin(), expected_ties.end());
+  const auto duplicate =
+      std::adjacent_find(expected_ties.begin(), expected_ties.end());
+  if (duplicate != expected_ties.end()) {
+    throw std::runtime_error("max_norm_atom_ids contains duplicates");
+  }
+  return expected_ties;
+}
+
+enum class CertStatus {
+  kListedDraftPass,
+  kSummaryOnlyNonClaimPass,
+};
+
+CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   if (!cert.is_object()) {
     throw std::runtime_error("certificate must be object");
   }
@@ -510,27 +553,69 @@ void verify_source_dead_cert(const nlohmann::json& cert) {
     }
   }
 
+  const std::string inventory_mode =
+      has_field(cert, "terminal_source_inventory_mode")
+          ? require_string(cert, "terminal_source_inventory_mode")
+          : "listed";
+  if (inventory_mode != "listed" &&
+      inventory_mode != "summary_only_non_claim") {
+    throw std::runtime_error("unsupported terminal_source_inventory_mode");
+  }
+
+  const nlohmann::json& summary =
+      require_object(cert, "terminal_source_inventory_summary");
+  require_inventory_digest_shape(summary);
+
+  if (inventory_mode == "summary_only_non_claim") {
+    if (has_field(cert, "terminal_source_inventory")) {
+      throw std::runtime_error(
+          "summary_only_non_claim must not include listed inventory");
+    }
+    if (require_string(cert, "proof_status") != "SUMMARY_ONLY_NON_CLAIM") {
+      throw std::runtime_error(
+          "summary-only inventory requires SUMMARY_ONLY_NON_CLAIM proof_status");
+    }
+    const std::string non_claim = require_string(cert, "non_claim");
+    if (!sane_token(non_claim) || pending_like(non_claim)) {
+      throw std::runtime_error("non_claim explanation is malformed");
+    }
+    const std::uint64_t count = require_u64(summary, "count");
+    if (count == 0) {
+      throw std::runtime_error("summary-only inventory count must be nonzero");
+    }
+    const std::uint64_t max_norm_sq = require_u64(summary, "max_norm_sq");
+    if (static_cast<unsigned __int128>(max_norm_sq) >
+        static_cast<unsigned __int128>(terminal_radius) * terminal_radius) {
+      throw std::runtime_error(
+          "summary-only inventory max_norm_sq exceeds terminal radius");
+    }
+    const std::vector<std::int64_t> ties = require_summary_ties(summary);
+    if (ties.empty()) {
+      throw std::runtime_error(
+          "summary-only inventory max_norm_atom_ids must be nonempty");
+    }
+    if (count < ties.size()) {
+      throw std::runtime_error(
+          "summary-only inventory count is smaller than max-norm tie set");
+    }
+    for (const std::int64_t id : ties) {
+      if (coordinate_atom_norm_sq(id) != max_norm_sq) {
+        throw std::runtime_error(
+            "summary-only inventory max_norm_atom_ids norm mismatch");
+      }
+    }
+    return CertStatus::kSummaryOnlyNonClaimPass;
+  }
+
   const std::vector<std::int64_t> inventory = require_inventory(cert);
   if (inventory.empty()) {
     throw std::runtime_error("terminal_source_inventory must be nonempty");
   }
 
-  const nlohmann::json& summary =
-      require_object(cert, "terminal_source_inventory_summary");
   if (require_u64(summary, "count") != inventory.size()) {
     throw std::runtime_error("inventory summary count mismatch");
   }
-  if (require_string(summary, "digest_algorithm") !=
-      "sha256:lb_source_inventory_v1") {
-    throw std::runtime_error("unsupported inventory digest algorithm");
-  }
   const std::string digest_hex = require_string(summary, "digest_hex");
-  if (digest_hex.size() != 64 ||
-      !std::all_of(digest_hex.begin(), digest_hex.end(), [](unsigned char ch) {
-        return std::isdigit(ch) != 0 || (ch >= 'a' && ch <= 'f');
-      })) {
-    throw std::runtime_error("inventory digest is not lowercase sha256 hex");
-  }
   if (digest_hex != inventory_digest(inventory)) {
     throw std::runtime_error("inventory digest mismatch");
   }
@@ -541,20 +626,12 @@ void verify_source_dead_cert(const nlohmann::json& cert) {
   if (require_u64(summary, "max_norm_sq") != actual_max_norm_sq) {
     throw std::runtime_error("inventory max_norm_sq mismatch");
   }
-  const nlohmann::json& raw_ties =
-      require_array(summary, "max_norm_atom_ids");
-  std::vector<std::int64_t> expected_ties;
-  expected_ties.reserve(raw_ties.size());
-  for (const nlohmann::json& item : raw_ties) {
-    if (!item.is_number_integer()) {
-      throw std::runtime_error("max_norm_atom_ids item is not integer");
-    }
-    expected_ties.push_back(item.get<std::int64_t>());
-  }
-  std::sort(expected_ties.begin(), expected_ties.end());
+  const std::vector<std::int64_t> expected_ties =
+      require_summary_ties(summary);
   if (expected_ties != actual_ties) {
     throw std::runtime_error("inventory max_norm_atom_ids mismatch");
   }
+  return CertStatus::kListedDraftPass;
 }
 
 }  // namespace
@@ -571,8 +648,13 @@ int main(int argc, char** argv) {
       throw std::runtime_error("cannot open certificate file");
     }
     nlohmann::json cert = nlohmann::json::parse(in);
-    verify_source_dead_cert(cert);
-    std::cout << "{\"status\":\"SOURCE_DEAD_CERT_DRAFT_PASS\"}\n";
+    const CertStatus status = verify_source_dead_cert(cert);
+    if (status == CertStatus::kListedDraftPass) {
+      std::cout << "{\"status\":\"SOURCE_DEAD_CERT_DRAFT_PASS\"}\n";
+    } else {
+      std::cout
+          << "{\"status\":\"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS\"}\n";
+    }
     return 0;
   } catch (const std::exception& e) {
     std::cerr << "SOURCE_DEAD_CERT_DRAFT_REJECT: " << e.what() << "\n";
