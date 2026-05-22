@@ -129,7 +129,7 @@ ctest --test-dir "$verify_build_dir" --output-on-failure \
   | tee "$out_dir/source_tileop_cpu_runner_smoke.json"
 
 "$build_dir/source_origin_cpu_runner" \
-  --k-sq 36 \
+  --k-sq "$k_sq" \
   --r-final 248 \
   --band-width 128 \
   --endpoint-a 0 \

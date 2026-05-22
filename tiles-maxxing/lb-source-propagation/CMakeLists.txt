@@ -209,7 +209,7 @@ set_tests_properties(source_origin_cpu_runner_dead_cert_smoke PROPERTIES
     "MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_origin_prefix_manifest_smoke
   COMMAND source_origin_cpu_runner
-    --k-sq 36
+    --k-sq ${K_SQ}
     --r-final 248
     --band-width 128
     --endpoint-a 0

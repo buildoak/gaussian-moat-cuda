@@ -63,11 +63,6 @@ bool has_source_component(const lb_source::SeparatorState& state) {
 }  // namespace
 
 int main() {
-  if (campaign::k_sq_value != 36) {
-    std::cerr << "source_prop_cpu_tileop_smoke expects -DK_SQ=36\n";
-    return EXIT_FAILURE;
-  }
-
   const auto constants = campaign::CampaignConstants::from_radii(
       kRinner, kRouter, campaign::k_sq_value);
   const campaign::Grid grid =

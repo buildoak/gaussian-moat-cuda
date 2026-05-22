@@ -110,8 +110,10 @@ struct BridgeFixture {
 
 std::optional<BridgeFixture> first_bridgeable_real_tileop() {
   const campaign::CampaignConstants constants =
-      campaign::CampaignConstants::from_radii(248, 512, 36);
-  const campaign::Grid grid = campaign::Grid::build(248, 512, 36);
+      campaign::CampaignConstants::from_radii(248, 512,
+                                              campaign::k_sq_value);
+  const campaign::Grid grid =
+      campaign::Grid::build(248, 512, campaign::k_sq_value);
   const std::vector<campaign::TileCoord> coords = grid.enumerate_active_tiles();
 
   for (const campaign::TileCoord& tile_coord : coords) {
@@ -153,7 +155,7 @@ void test_port_graph_reaches_adjacent_tile() {
 
   const lb_source::TileOpPortGraphResult graph =
       lb_source::make_tileop_port_band({
-          .k_sq = 36,
+          .k_sq = campaign::k_sq_value,
           .outer_radius = 573,
           .coords = {coord(0, 0), coord(0, 1)},
           .tileops = {lower, upper},
@@ -179,7 +181,7 @@ void test_port_graph_rejects_port_count_mismatch() {
 
   const lb_source::TileOpPortGraphResult graph =
       lb_source::make_tileop_port_band({
-          .k_sq = 36,
+          .k_sq = campaign::k_sq_value,
           .outer_radius = 100,
           .coords = {coord(0, 0), coord(0, 1)},
           .tileops = {lower, upper},
@@ -194,7 +196,7 @@ void test_port_graph_overflow_forces_source_reject() {
 
   const lb_source::TileOpPortGraphResult graph =
       lb_source::make_tileop_port_band({
-          .k_sq = 36,
+          .k_sq = campaign::k_sq_value,
           .outer_radius = 100,
           .coords = {coord(0, 0)},
           .tileops = {overflow},
@@ -227,8 +229,10 @@ void test_coordinate_bridge_matches_real_tileop_ports() {
 
 void test_coordinate_bridge_rejects_missing_prime() {
   const campaign::CampaignConstants constants =
-      campaign::CampaignConstants::from_radii(248, 512, 36);
-  const campaign::Grid grid = campaign::Grid::build(248, 512, 36);
+      campaign::CampaignConstants::from_radii(248, 512,
+                                              campaign::k_sq_value);
+  const campaign::Grid grid =
+      campaign::Grid::build(248, 512, campaign::k_sq_value);
   const campaign::TileCoord tile_coord = grid.enumerate_active_tiles().front();
   const campaign::TileOp op =
       campaign::process_tile(tile_coord, constants, grid);
