@@ -231,6 +231,6 @@ add_test(NAME source_tileop_port_runner_manifest_smoke
 set_tests_properties(source_tileop_port_runner_manifest_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"dropped_coordinate_carry_atoms\":[0-9][0-9]*.*\"dropped_source_coordinate_carry_atoms\":[0-9][0-9]*.*\"bridged_port_carry_atoms\":[1-9][0-9]*.*\"bridge_components_before\":[1-9][0-9]*.*\"bridge_components_after\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"manifest_written\":false"
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"unbridged_coordinate_carry_atoms\":[0-9][0-9]*.*\"bridged_port_carry_atoms\":[1-9][0-9]*.*\"bridge_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"manifest_written\":false"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")

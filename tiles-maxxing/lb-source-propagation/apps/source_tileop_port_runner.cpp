@@ -48,13 +48,10 @@ struct PrefixWitness {
 };
 
 struct PortManifestBridgeResult {
-  lb_source::SeparatorState separator;
   std::uint64_t bridged_coordinate_carry_atoms = 0;
-  std::uint64_t dropped_coordinate_carry_atoms = 0;
-  std::uint64_t dropped_source_coordinate_carry_atoms = 0;
+  std::uint64_t unbridged_coordinate_carry_atoms = 0;
   std::uint64_t bridged_port_carry_atoms = 0;
-  std::uint64_t bridge_components_before = 0;
-  std::uint64_t bridge_components_after = 0;
+  std::uint64_t bridge_edges = 0;
 };
 
 std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b);
@@ -350,41 +347,6 @@ std::uint64_t source_carry_atoms(const lb_source::SeparatorState& state) {
   return count;
 }
 
-class ComponentDsu {
- public:
-  explicit ComponentDsu(std::size_t n) : parent_(n), rank_(n, 0) {
-    for (std::size_t i = 0; i < n; ++i) {
-      parent_[i] = i;
-    }
-  }
-
-  std::size_t find(std::size_t x) {
-    if (parent_[x] != x) {
-      parent_[x] = find(parent_[x]);
-    }
-    return parent_[x];
-  }
-
-  void unite(std::size_t a, std::size_t b) {
-    a = find(a);
-    b = find(b);
-    if (a == b) {
-      return;
-    }
-    if (rank_[a] < rank_[b]) {
-      std::swap(a, b);
-    }
-    parent_[b] = a;
-    if (rank_[a] == rank_[b]) {
-      ++rank_[a];
-    }
-  }
-
- private:
-  std::vector<std::size_t> parent_;
-  std::vector<std::uint8_t> rank_;
-};
-
 std::vector<campaign::TileOp> build_tileops(
     const std::vector<campaign::TileCoord>& coords,
     const campaign::CampaignConstants& constants,
@@ -407,7 +369,7 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     const campaign::CampaignConstants& constants,
     const std::vector<campaign::TileCoord>& coords,
     const std::vector<campaign::TileOp>& tileops,
-    const lb_source::BandInput& graph_band) {
+    lb_source::BandInput& graph_band) {
   PortManifestBridgeResult result;
 
   std::map<lb_source::AtomId, std::uint64_t> port_norm_by_id;
@@ -418,7 +380,6 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     }
   }
 
-  std::map<lb_source::AtomId, lb_source::CoordinateAtom> target_by_id;
   std::map<lb_source::AtomId, Point> carry_point_by_id;
   for (const lb_source::CarryAtom& atom : manifest.separator.carry_atoms) {
     const std::optional<lb_source::CoordinateAtom> decoded =
@@ -427,12 +388,9 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
       std::cerr << "manifest carry atom is not a stable coordinate atom\n";
       std::exit(EXIT_FAILURE);
     }
-    target_by_id.emplace(atom.id, *decoded);
     carry_point_by_id.emplace(
         atom.id, Point{decoded->a, decoded->b, decoded->norm_sq});
   }
-  result.bridge_components_before =
-      manifest.separator.component_partition.size();
 
   std::map<lb_source::AtomId, std::set<lb_source::AtomId>> ports_by_coord_id;
   for (std::size_t t = 0; t < coords.size(); ++t) {
@@ -468,86 +426,42 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     }
   }
 
-  for (const auto& [coord_id, decoded] : target_by_id) {
-    (void)decoded;
+  std::set<lb_source::AtomId> bridged_ports;
+  std::set<std::pair<lb_source::AtomId, lb_source::AtomId>> bridge_edges;
+  for (const auto& [coord_id, carry_point] : carry_point_by_id) {
+    (void)carry_point;
     const auto ports_it = ports_by_coord_id.find(coord_id);
     if (ports_it == ports_by_coord_id.end() || ports_it->second.empty()) {
-      ++result.dropped_coordinate_carry_atoms;
+      ++result.unbridged_coordinate_carry_atoms;
       continue;
     }
     ++result.bridged_coordinate_carry_atoms;
-  }
-
-  ComponentDsu dsu(manifest.separator.component_partition.size());
-  std::map<lb_source::AtomId, std::size_t> first_component_by_port;
-  std::vector<std::set<lb_source::AtomId>> component_ports(
-      manifest.separator.component_partition.size());
-  for (std::size_t c = 0; c < manifest.separator.component_partition.size();
-       ++c) {
-    for (const lb_source::AtomId coord_id :
-         manifest.separator.component_partition[c]) {
-      const auto ports_it = ports_by_coord_id.find(coord_id);
-      if (ports_it == ports_by_coord_id.end() || ports_it->second.empty()) {
-        if (manifest.separator.source_bit_per_component[c]) {
-          ++result.dropped_source_coordinate_carry_atoms;
-        }
-        continue;
-      }
-      for (const lb_source::AtomId port_id : ports_it->second) {
-        component_ports[c].insert(port_id);
-        const auto [first_it, inserted] =
-            first_component_by_port.emplace(port_id, c);
-        if (!inserted) {
-          dsu.unite(c, first_it->second);
-        }
-      }
-    }
-  }
-
-  struct Group {
-    std::set<lb_source::AtomId> ports;
-    std::set<lb_source::AtomId> inventory;
-    bool source = false;
-  };
-  std::map<std::size_t, Group> groups;
-  for (std::size_t c = 0; c < component_ports.size(); ++c) {
-    if (component_ports[c].empty()) {
-      continue;
-    }
-    Group& group = groups[dsu.find(c)];
-    group.ports.insert(component_ports[c].begin(), component_ports[c].end());
-    group.source = group.source || manifest.separator.source_bit_per_component[c];
-    const std::vector<lb_source::AtomId>& inventory =
-        manifest.separator.component_inventory.empty()
-            ? manifest.separator.component_partition[c]
-            : manifest.separator.component_inventory[c];
-    group.inventory.insert(inventory.begin(), inventory.end());
-    group.inventory.insert(component_ports[c].begin(), component_ports[c].end());
-  }
-
-  for (const auto& [root, group] : groups) {
-    (void)root;
-    std::vector<lb_source::AtomId> ports(group.ports.begin(),
-                                         group.ports.end());
-    std::vector<lb_source::AtomId> inventory(group.inventory.begin(),
-                                             group.inventory.end());
-    result.separator.component_partition.push_back(ports);
-    result.separator.source_bit_per_component.push_back(group.source);
-    result.separator.component_inventory.push_back(inventory);
-    for (const lb_source::AtomId port_id : ports) {
+    for (const lb_source::AtomId port_id : ports_it->second) {
       const auto norm_it = port_norm_by_id.find(port_id);
       if (norm_it == port_norm_by_id.end()) {
         std::cerr << "bridged port atom is missing from TileOp port graph\n";
         std::exit(EXIT_FAILURE);
       }
-      result.separator.carry_atoms.push_back({port_id, norm_it->second});
+      (void)norm_it;
+      bridged_ports.insert(port_id);
+      lb_source::AtomId lhs = coord_id;
+      lb_source::AtomId rhs = port_id;
+      if (rhs < lhs) {
+        std::swap(lhs, rhs);
+      }
+      bridge_edges.insert({lhs, rhs});
     }
   }
 
-  result.separator = lb_source::canonicalize_separator(result.separator);
-  result.bridged_port_carry_atoms = result.separator.carry_atoms.size();
-  result.bridge_components_after =
-      result.separator.component_partition.size();
+  graph_band.edges.insert(graph_band.edges.end(), bridge_edges.begin(),
+                          bridge_edges.end());
+  std::sort(graph_band.edges.begin(), graph_band.edges.end());
+  graph_band.edges.erase(
+      std::unique(graph_band.edges.begin(), graph_band.edges.end()),
+      graph_band.edges.end());
+
+  result.bridged_port_carry_atoms = bridged_ports.size();
+  result.bridge_edges = bridge_edges.size();
   return result;
 }
 
@@ -566,11 +480,9 @@ int main(int argc, char** argv) {
   std::uint64_t manifest_source_carry_atoms = 0;
   std::uint64_t prefix_witness_targets = 0;
   std::uint64_t bridged_coordinate_carry_atoms = 0;
-  std::uint64_t dropped_coordinate_carry_atoms = 0;
-  std::uint64_t dropped_source_coordinate_carry_atoms = 0;
+  std::uint64_t unbridged_coordinate_carry_atoms = 0;
   std::uint64_t bridged_port_carry_atoms = 0;
-  std::uint64_t bridge_components_before = 0;
-  std::uint64_t bridge_components_after = 0;
+  std::uint64_t bridge_edges = 0;
   if (config.manifest_in.has_value()) {
     coordinate_manifest = read_manifest_or_die(*config.manifest_in);
     if (coordinate_manifest->k_sq !=
@@ -680,29 +592,33 @@ int main(int argc, char** argv) {
       return EXIT_FAILURE;
     }
     if (coordinate_manifest.has_value() && bands_processed == 0) {
+      lb_source::BandInput bridged_band = graph.band;
       const PortManifestBridgeResult bridge =
           bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
-                                              coords, tileops, graph.band);
-      incoming = bridge.separator;
+                                              coords, tileops, bridged_band);
+      incoming = coordinate_manifest->separator;
+      last = lb_source::process_band(
+          bridged_band, incoming,
+          {.max_atoms = config.max_atoms,
+           .max_carry_atoms = config.max_atoms,
+           .max_components = config.max_atoms});
       bridged_coordinate_carry_atoms =
           bridge.bridged_coordinate_carry_atoms;
-      dropped_coordinate_carry_atoms =
-          bridge.dropped_coordinate_carry_atoms;
-      dropped_source_coordinate_carry_atoms =
-          bridge.dropped_source_coordinate_carry_atoms;
+      unbridged_coordinate_carry_atoms =
+          bridge.unbridged_coordinate_carry_atoms;
       bridged_port_carry_atoms = bridge.bridged_port_carry_atoms;
-      bridge_components_before = bridge.bridge_components_before;
-      bridge_components_after = bridge.bridge_components_after;
+      bridge_edges = bridge.bridge_edges;
+    } else {
+      last = lb_source::process_band(
+          graph.band, incoming,
+          {.max_atoms = config.max_atoms,
+           .max_carry_atoms = config.max_atoms,
+           .max_components = config.max_atoms});
     }
     port_atoms += graph.port_atoms;
     internal_edges += graph.internal_edges;
     seam_edges += graph.seam_edges;
 
-    last = lb_source::process_band(
-        graph.band, incoming,
-        {.max_atoms = config.max_atoms,
-         .max_carry_atoms = config.max_atoms,
-         .max_components = config.max_atoms});
     ++bands_processed;
     if (!last.accepted()) {
       break;
@@ -758,16 +674,11 @@ int main(int argc, char** argv) {
             << ",\"prefix_witness_targets\":" << prefix_witness_targets
             << ",\"bridged_coordinate_carry_atoms\":"
             << bridged_coordinate_carry_atoms
-            << ",\"dropped_coordinate_carry_atoms\":"
-            << dropped_coordinate_carry_atoms
-            << ",\"dropped_source_coordinate_carry_atoms\":"
-            << dropped_source_coordinate_carry_atoms
+            << ",\"unbridged_coordinate_carry_atoms\":"
+            << unbridged_coordinate_carry_atoms
             << ",\"bridged_port_carry_atoms\":"
             << bridged_port_carry_atoms
-            << ",\"bridge_components_before\":"
-            << bridge_components_before
-            << ",\"bridge_components_after\":"
-            << bridge_components_after
+            << ",\"bridge_edges\":" << bridge_edges
             << ",\"accepted\":" << (accepted ? "true" : "false")
             << ",\"reject\":\"" << lb_source::reject_reason_name(last.reject)
             << "\""

@@ -112,7 +112,7 @@ This payload does not grant new connectivity. It exists so a component that is
 neutral at seam `i` but later merges into the source can still contribute its
 retired vertices to a terminal certificate.
 
-## Coordinate-To-Port Projection
+## Coordinate-To-Port Seam Bridge
 
 The coordinate sidecar and the TileOp port graph use different stable atoms.
 Coordinate atoms identify Gaussian-prime coordinates. Port atoms identify
@@ -122,22 +122,28 @@ coordinate atoms into a TileOp-port band is therefore not a free relabeling.
 A coordinate carry atom below a radial seam may influence the first TileOp-port
 band only through a first-band prime within squared distance `K`. That
 first-band prime then bridges to every canonical port atom carrying its
-TileOp-visible local component. If no such port-visible continuation exists,
-the coordinate carry atom has been projected away from the port representation.
+TileOp-visible local component.
 
-This projection is diagnostic until accepted by an explicit seam lemma or
-verified zero-loss gate. The runner must report:
+The safe diagnostic handoff is hybrid: keep the original coordinate separator
+as `incoming`, add bridge edges from coordinate carry atoms to canonical port
+atoms in the first TileOp-port band, and let the normal source propagator decide
+which port atoms survive into the next carry window. This avoids turning the
+handoff into a lossy pre-projection of source state.
+
+This seam bridge is diagnostic until accepted by an explicit seam lemma or
+verifier gate. The runner must report:
 
 - coordinate carry atoms consumed from the manifest,
 - coordinate carry atoms that bridged to at least one TileOp port,
-- source coordinate carry atoms that were dropped,
+- coordinate carry atoms that had no first-band port bridge,
 - resulting canonical port carry atoms,
-- component counts before and after projection.
+- bridge edges inserted between coordinate atoms and port atoms.
 
-A lossy projection can be useful evidence for where source appears to die, but
-it is not by itself a `SOURCE_DEAD_CERT`. If source carry is dropped before the
-negative terminal guard, the certificate layer must either prove that the drop
-cannot affect future source reachability or stop as diagnostic/non-claim.
+A seam bridge can be useful evidence for where source appears to die, but it is
+not by itself a `SOURCE_DEAD_CERT`. If the first TileOp-port band reports
+source death, the certificate layer must still prove that unbridged coordinate
+carry atoms have no future continuation and that the port graph representation
+preserves every possible source attachment needed by the terminal guard.
 
 ## Lemma 1: Local TileOp Equivalence
 

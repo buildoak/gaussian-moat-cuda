@@ -34,12 +34,14 @@ verifier, the campaign should use the conservative value.
 6. Every source/origin proof row rejects overflow.
 7. Non-square `K=26` has external per-row BZ evidence, or the row is labeled
    diagnostic rather than accepted.
-8. Coordinate-to-port seam projection is accepted or explicitly reported as
-   lossy diagnostic evidence. The current K36 smoke projects `133` source
-   coordinate carry atoms into `106` bridgeable coordinate carry atoms and `7`
-   canonical port carry atoms, dropping `27` source coordinate carry atoms.
-   Until there is a theorem/verifier gate proving those drops irrelevant, this
-   cannot support a `SOURCE_DEAD_CERT`.
+8. Coordinate-to-port seam bridging is accepted or explicitly reported as
+   diagnostic evidence. The current K36 smoke keeps `133` source coordinate
+   carry atoms as the original incoming separator, inserts `374` bridge edges
+   from `106` bridgeable coordinate carry atoms to `7` canonical port atoms,
+   and leaves `27` coordinate carry atoms with no first-band port bridge. Until
+   there is a theorem/verifier gate proving that this hybrid handoff preserves
+   every future source attachment needed by the terminal guard, this cannot
+   support a `SOURCE_DEAD_CERT`.
 
 ## Certificate Gap To Close
 
@@ -71,14 +73,15 @@ required evidence, and current blocking gaps. It must keep
 - promotion of the TileOp port-graph primitive into the full band scheduler;
   transient TileOp group labels must remain internal only. The current
   `source_tileop_port_runner` can consume an origin-prefix manifest/witness and
-  project coordinate carry into canonical TileOp port atoms, but that projection
-  is still diagnostic because the smoke drops source coordinate carry atoms with
-  no port-visible continuation.
-- an accepted seam-projection rule for moving from coordinate carry atoms to
-  port atoms. The runner reports `bridged_coordinate_carry_atoms`,
-  `dropped_coordinate_carry_atoms`, `dropped_source_coordinate_carry_atoms`,
-  `bridged_port_carry_atoms`, and bridge component counts; K26 remains blocked
-  until those fields are either zero-loss or justified by an accepted lemma.
+  bridge coordinate carry into canonical TileOp port atoms. The handoff is
+  hybrid: the original coordinate separator remains incoming and bridge edges
+  connect it to first-band TileOp ports. It is still diagnostic because the
+  smoke reaches terminal source death after one port band.
+- an accepted seam-bridge rule for moving from coordinate carry atoms into the
+  TileOp-port graph. The runner reports `bridged_coordinate_carry_atoms`,
+  `unbridged_coordinate_carry_atoms`, `bridged_port_carry_atoms`, and
+  `bridge_edges`; K26 remains blocked until those fields are justified by an
+  accepted lemma and verifier gate.
 - accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
 - accepted K26 non-square BZ evidence;
@@ -93,8 +96,8 @@ Stop and report without claiming reproduction if:
 
 - source state depends on transient TileOp group labels or union-find roots;
 - any overflow appears in a source/origin row;
-- coordinate-to-port seam projection drops source carry atoms without an
-  accepted proof that the loss is irrelevant;
+- coordinate-to-port seam bridging leaves unbridged coordinate carry atoms or
+  first-band port death without an accepted proof that this is irrelevant;
 - BZ evidence is missing or mismatched for `K=26`;
 - terminal inventory cannot preserve retired source components;
 - remote runtime or memory threatens the agreed budget.
