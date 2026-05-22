@@ -163,4 +163,7 @@ Scope: sidecar build/test, independent verification CTest, CPU TileOp producer s
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 
+"$sidecar_dir/scripts/check_remote_smoke_artifacts.sh" "$out_dir" \
+  | tee "$out_dir/artifact-check.log"
+
 echo "remote sidecar smoke artifacts: $out_dir"

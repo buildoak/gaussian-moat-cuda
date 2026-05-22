@@ -155,11 +155,7 @@ PULL:
   rsync -avz -e "ssh -o StrictHostKeyChecking=accept-new -p \$PORT" root@\$HOST:/workspace/lb-source-remote-smoke/ ${pull_dir}/
 
 ACCEPTANCE_CHECK:
-  grep -q "100% tests passed" ${pull_dir}/ctest.log
-  test "\$(grep -c '^ *[0-9][0-9]*/14 Test' ${pull_dir}/ctest.log)" -eq 14
-  grep -q "100% tests passed" ${pull_dir}/verification-ctest.log
-  test "\$(grep -c '^ *[0-9][0-9]*/43 Test' ${pull_dir}/verification-ctest.log)" -eq 43
-  grep -q "deployed_local_head=${local_head}" ${pull_dir}/deployed_source.txt
+  tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh ${pull_dir} --expect-head ${local_head} --expect-branch ${local_branch}
 EOF
 
 if [[ "$execute" -eq 0 ]]; then

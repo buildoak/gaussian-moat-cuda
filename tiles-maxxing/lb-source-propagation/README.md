@@ -172,6 +172,16 @@ includes `source_origin_cpu_runner_smoke.json`, `k26_source_run_contract.json`,
 and `k26_execution_plan` output, which must remain non-claim artifacts until
 the blockers listed in the K26 contract are closed.
 
+The remote smoke finishes by running:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh \
+  /workspace/lb-source-remote-smoke
+```
+
+After pulling Vast artifacts, run the same checker with `--expect-head` and
+`--expect-branch` to bind the smoke to the deployed local source.
+
 The sqrt(26) readiness guard lives in
 `docs/k26-tsuchimura-readiness.md`.
 
