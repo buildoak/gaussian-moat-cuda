@@ -161,6 +161,8 @@ write_status() {
         "$out_dir/k26-source-dead-gap-check.log" | head -n 1
       sed -nE 's/.*"coordinate_path_obligation":"([^"]+)".*/source_dead_gap_coordinate_path_obligation=\1/p' \
         "$out_dir/k26-source-dead-gap-check.log" | head -n 1
+      sed -nE 's/.*"bz_schedule_obligation":"([^"]+)".*/source_dead_gap_bz_schedule_obligation=\1/p' \
+        "$out_dir/k26-source-dead-gap-check.log" | head -n 1
       sed -nE 's/.*"terminal_inventory_obligation":"([^"]+)".*/source_dead_gap_terminal_inventory_obligation=\1/p' \
         "$out_dir/k26-source-dead-gap-check.log" | head -n 1
       sed -nE 's/.*"claim_grade":(true|false).*/source_dead_gap_claim_grade=\1/p' \

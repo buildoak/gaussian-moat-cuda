@@ -443,6 +443,7 @@ int main(int argc, char** argv) {
     std::cout << "{\"status\":\"SOURCE_DEAD_GAP_NON_CLAIM_PASS\","
               << "\"bridge_safety\":\"accepted_non_claim\","
               << "\"coordinate_path_obligation\":\"blocked_coordinate_gaussian_prime_path\","
+              << "\"bz_schedule_obligation\":\"blocked_schedule_only_non_claim\","
               << "\"terminal_inventory_obligation\":\"blocked_claim_grade_terminal_inventory\","
               << "\"claim_grade\":false}\n";
     return 0;

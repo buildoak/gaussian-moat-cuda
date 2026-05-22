@@ -91,7 +91,7 @@ cat > "$fake_source_dead_gap_checker" <<'SH'
 set -euo pipefail
 if grep -q '"schema":"lb_source_k26_source_dead_gap_v1"' "$1" &&
     grep -q '"target_atom_path":\[1615075207963900,-25220051735553,1615075207964004\]' "$1"; then
-  echo '{"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS","bridge_safety":"accepted_non_claim","coordinate_path_obligation":"blocked_coordinate_gaussian_prime_path","terminal_inventory_obligation":"blocked_claim_grade_terminal_inventory","claim_grade":false}'
+  echo '{"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS","bridge_safety":"accepted_non_claim","coordinate_path_obligation":"blocked_coordinate_gaussian_prime_path","bz_schedule_obligation":"blocked_schedule_only_non_claim","terminal_inventory_obligation":"blocked_claim_grade_terminal_inventory","claim_grade":false}'
 else
   echo 'SOURCE_DEAD_GAP_REJECT: bad fixture' >&2
   exit 1
@@ -168,6 +168,8 @@ grep -q 'source_dead_gap_check_status=SOURCE_DEAD_GAP_NON_CLAIM_PASS' \
 grep -q 'source_dead_gap_bridge_safety=accepted_non_claim' \
   "$blocked_out/status.txt"
 grep -q 'source_dead_gap_coordinate_path_obligation=blocked_coordinate_gaussian_prime_path' \
+  "$blocked_out/status.txt"
+grep -q 'source_dead_gap_bz_schedule_obligation=blocked_schedule_only_non_claim' \
   "$blocked_out/status.txt"
 grep -q 'source_dead_gap_terminal_inventory_obligation=blocked_claim_grade_terminal_inventory' \
   "$blocked_out/status.txt"
@@ -262,6 +264,8 @@ checked_out="$tmp/checked"
   >/tmp/k26-harness-checked.out
 grep -q 'K26_FULL_RUN_BUNDLE_CHECKED' "$checked_out/status.txt"
 grep -q 'source_dead_gap_check_status=SOURCE_DEAD_GAP_NON_CLAIM_PASS' \
+  "$checked_out/status.txt"
+grep -q 'source_dead_gap_bz_schedule_obligation=blocked_schedule_only_non_claim' \
   "$checked_out/status.txt"
 grep -q 'K26_FULL_RUN_BUNDLE_DRAFT_PASS' \
   "$checked_out/k26-full-run-bundle-check.log"
