@@ -12,6 +12,9 @@ trap 'rm -rf "$tmp"' EXIT
 
 build_dir="$tmp/build"
 mkdir -p "$build_dir"
+cat > "$build_dir/CMakeCache.txt" <<'CACHE'
+K_SQ:STRING=26
+CACHE
 
 cat > "$build_dir/k26_source_run_commands" <<'SH'
 #!/usr/bin/env bash
@@ -107,6 +110,22 @@ if "$harness" \
 fi
 grep -q -- '--timeout-seconds must be a nonnegative integer' \
   /tmp/k26-harness-bad-timeout.err
+
+bad_cache_build="$tmp/bad-cache-build"
+cp -R "$build_dir" "$bad_cache_build"
+cat > "$bad_cache_build/CMakeCache.txt" <<'CACHE'
+K_SQ:STRING=36
+CACHE
+if "$harness" \
+    --build-dir "$bad_cache_build" \
+    --out-dir "$tmp/bad-cache-out" \
+    >/tmp/k26-harness-bad-cache.out \
+    2>/tmp/k26-harness-bad-cache.err; then
+  echo "harness accepted a non-K26 build cache" >&2
+  exit 1
+fi
+grep -q 'requires build configured with -DK_SQ=26; found K_SQ=36' \
+  /tmp/k26-harness-bad-cache.err
 
 timeout_build="$tmp/timeout-build"
 cp -R "$build_dir" "$timeout_build"

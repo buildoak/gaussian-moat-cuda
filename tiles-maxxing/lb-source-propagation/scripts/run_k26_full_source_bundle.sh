@@ -118,6 +118,27 @@ if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
+require_k26_cmake_cache() {
+  local cache="$build_dir/CMakeCache.txt"
+  local configured_k_sq
+  if [[ ! -f "$cache" ]]; then
+    return
+  fi
+  configured_k_sq="$(
+    sed -nE 's/^K_SQ:[^=]*=([0-9]+)$/\1/p' "$cache" | head -n 1
+  )"
+  if [[ -z "$configured_k_sq" ]]; then
+    echo "CMakeCache.txt exists but does not record K_SQ: $cache" >&2
+    exit 2
+  fi
+  if [[ "$configured_k_sq" != "26" ]]; then
+    echo "K26 full-run bundle requires build configured with -DK_SQ=26; found K_SQ=$configured_k_sq in $cache" >&2
+    exit 2
+  fi
+}
+
+require_k26_cmake_cache
+
 mkdir -p "$out_dir"
 
 status_file="$out_dir/status.txt"
