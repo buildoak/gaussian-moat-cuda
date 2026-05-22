@@ -54,6 +54,12 @@ struct PortManifestBridgeResult {
   std::uint64_t bridge_edges = 0;
 };
 
+struct RunnerInventorySummary {
+  lb_source::InventorySummary digest;
+  std::uint64_t max_norm_sq = 0;
+  std::vector<lb_source::AtomId> max_norm_atom_ids;
+};
+
 std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b);
 lb_source::AtomId checked_coordinate_atom_id(std::int64_t a, std::int64_t b);
 std::uint64_t dist_sq(const Point& lhs, const Point& rhs);
@@ -347,6 +353,67 @@ std::uint64_t source_carry_atoms(const lb_source::SeparatorState& state) {
   return count;
 }
 
+std::vector<lb_source::AtomId> source_inventory(
+    const lb_source::ProcessResult& result) {
+  if (result.terminal_source_dead) {
+    return result.terminal_source_inventory;
+  }
+  std::vector<lb_source::AtomId> ids;
+  for (std::size_t c = 0; c < result.outgoing.component_partition.size(); ++c) {
+    if (!result.outgoing.source_bit_per_component[c]) {
+      continue;
+    }
+    ids.insert(ids.end(), result.outgoing.component_inventory[c].begin(),
+               result.outgoing.component_inventory[c].end());
+  }
+  std::sort(ids.begin(), ids.end());
+  ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+  return ids;
+}
+
+RunnerInventorySummary summarize_runner_inventory(
+    const std::vector<lb_source::AtomId>& inventory,
+    const std::map<lb_source::AtomId, std::uint64_t>& norm_by_id) {
+  RunnerInventorySummary summary;
+  summary.digest = lb_source::summarize_inventory(inventory);
+
+  std::vector<lb_source::AtomId> canonical = inventory;
+  std::sort(canonical.begin(), canonical.end());
+  canonical.erase(std::unique(canonical.begin(), canonical.end()),
+                  canonical.end());
+  for (const lb_source::AtomId id : canonical) {
+    std::optional<std::uint64_t> norm;
+    if (const std::optional<lb_source::CoordinateAtom> atom =
+            lb_source::decode_coordinate_atom_id(id)) {
+      norm = atom->norm_sq;
+    } else if (const auto it = norm_by_id.find(id); it != norm_by_id.end()) {
+      norm = it->second;
+    }
+    if (!norm.has_value()) {
+      continue;
+    }
+    if (summary.max_norm_atom_ids.empty() || *norm > summary.max_norm_sq) {
+      summary.max_norm_sq = *norm;
+      summary.max_norm_atom_ids = {id};
+    } else if (*norm == summary.max_norm_sq) {
+      summary.max_norm_atom_ids.push_back(id);
+    }
+  }
+  return summary;
+}
+
+void append_atom_id_array(std::ostream& out,
+                          const std::vector<lb_source::AtomId>& ids) {
+  out << '[';
+  for (std::size_t i = 0; i < ids.size(); ++i) {
+    if (i != 0) {
+      out << ',';
+    }
+    out << ids[i];
+  }
+  out << ']';
+}
+
 std::vector<campaign::TileOp> build_tileops(
     const std::vector<campaign::TileCoord>& coords,
     const campaign::CampaignConstants& constants,
@@ -551,6 +618,7 @@ int main(int argc, char** argv) {
   std::uint64_t port_atoms = 0;
   std::uint64_t internal_edges = 0;
   std::uint64_t seam_edges = 0;
+  std::map<lb_source::AtomId, std::uint64_t> norm_by_id;
 
   while (previous_outer < config.r_final) {
     const std::uint64_t outer =
@@ -591,8 +659,15 @@ int main(int argc, char** argv) {
       std::cerr << "TileOp port graph rejected: " << graph.diagnostic << "\n";
       return EXIT_FAILURE;
     }
+    for (const lb_source::BandAtom& atom : graph.band.atoms) {
+      norm_by_id.emplace(atom.id, atom.norm_sq);
+    }
     if (coordinate_manifest.has_value() && bands_processed == 0) {
       lb_source::BandInput bridged_band = graph.band;
+      for (const lb_source::CarryAtom& atom :
+           coordinate_manifest->separator.carry_atoms) {
+        norm_by_id.emplace(atom.id, atom.norm_sq);
+      }
       const PortManifestBridgeResult bridge =
           bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
                                               coords, tileops, bridged_band);
@@ -653,6 +728,10 @@ int main(int argc, char** argv) {
   const bool accepted = last.accepted();
   const bool source_carry =
       accepted && !last.terminal_source_dead && has_source_carry(last.outgoing);
+  const std::vector<lb_source::AtomId> inventory =
+      accepted ? source_inventory(last) : std::vector<lb_source::AtomId>{};
+  const RunnerInventorySummary inventory_summary =
+      summarize_runner_inventory(inventory, norm_by_id);
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_port_runner_v1\","
@@ -688,6 +767,17 @@ int main(int argc, char** argv) {
             << (source_carry ? "true" : "false")
             << ",\"source_carry_atoms\":"
             << (source_carry ? source_carry_atoms(last.outgoing) : 0)
+            << ",\"source_inventory_count\":"
+            << inventory_summary.digest.count
+            << ",\"source_inventory_digest_algorithm\":\""
+            << inventory_summary.digest.digest_algorithm << "\""
+            << ",\"source_inventory_digest_hex\":\""
+            << inventory_summary.digest.digest_hex << "\""
+            << ",\"max_source_norm_sq\":"
+            << inventory_summary.max_norm_sq
+            << ",\"max_source_norm_atom_ids\":";
+  append_atom_id_array(std::cout, inventory_summary.max_norm_atom_ids);
+  std::cout
             << ",\"manifest_written\":"
             << (manifest_written ? "true" : "false")
             << ",\"non_claim\":\"TileOp-port scheduler diagnostic; not SOURCE_ORIGIN_K26 or SOURCE_DEAD_CERT\""
