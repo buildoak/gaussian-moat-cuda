@@ -49,6 +49,8 @@ foreach(source_prop_case
     composed-vs-big-equivalence
     false-weld
     k32-carry-width-minimum
+    non-source-partition-merge
+    one-band-identity
     source-only-carry-loss
     terminal-death-inventory)
   add_test(NAME source_prop_fixture_${source_prop_case}

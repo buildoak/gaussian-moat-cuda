@@ -9,8 +9,8 @@ Usage:
 
 Dry-run by default. Searches for a single RTX 4090 offer, enforces the price
 cap, and prints the exact create/deploy/smoke/pull commands. With --execute it
-creates the instance, deploys the repo, runs remote_sidecar_smoke.sh, and pulls
-the remote smoke artifacts.
+creates the instance only; deploy/smoke/pull remain explicit operator steps
+because SSH readiness and cleanup need human-visible instance metadata.
 
 Hard defaults from the LB source-propagation goal:
   --max-dph     0.37
@@ -73,6 +73,8 @@ fi
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
+local_head="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+local_branch="$(git branch --show-current 2>/dev/null || echo unknown)"
 
 shell_join() {
   local out=""
@@ -122,6 +124,7 @@ PY
 )"
 
 echo "QUALIFYING_OFFER id=${offer_id} dph=${offer_dph} budget_hours=${soft_hours}"
+echo "LOCAL_SOURCE branch=${local_branch} head=${local_head}"
 
 create_cmd=(vastai create instance "$offer_id"
   --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel
@@ -137,9 +140,12 @@ After instance is ready, set:
   HOST=<ssh_host>
   PORT=<ssh_port>
   SSH_CMD="ssh -o StrictHostKeyChecking=accept-new -p \$PORT root@\$HOST"
+  LOCAL_HEAD=${local_head}
+  LOCAL_BRANCH=${local_branch}
 
 DEPLOY:
   rsync -avz --delete --exclude '.git' --exclude 'build*/' --exclude '**/build*/' --exclude '**/artifacts/' --exclude '**/results/' --exclude '**/profiles/' --exclude '**/runs/' --exclude '**/tmp/' --exclude '**/*.bin' --exclude '**/*.log' -e "ssh -o StrictHostKeyChecking=accept-new -p \$PORT" ./ root@\$HOST:${remote_dir}/
+  printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" "\$LOCAL_HEAD" "\$LOCAL_BRANCH" | \$SSH_CMD "mkdir -p /workspace/lb-source-remote-smoke && cat > /workspace/lb-source-remote-smoke/deployed_source.txt"
 
 REMOTE_SMOKE:
   \$SSH_CMD "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh --repo ${remote_dir} --out-dir /workspace/lb-source-remote-smoke"
@@ -147,6 +153,11 @@ REMOTE_SMOKE:
 PULL:
   mkdir -p ${pull_dir}
   rsync -avz -e "ssh -o StrictHostKeyChecking=accept-new -p \$PORT" root@\$HOST:/workspace/lb-source-remote-smoke/ ${pull_dir}/
+
+ACCEPTANCE_CHECK:
+  grep -q "100% tests passed" ${pull_dir}/ctest.log
+  test "\$(grep -c '^ *[0-9][0-9]*/13 Test' ${pull_dir}/ctest.log)" -eq 13
+  grep -q "deployed_local_head=${local_head}" ${pull_dir}/deployed_source.txt
 EOF
 
 if [[ "$execute" -eq 0 ]]; then
@@ -158,6 +169,6 @@ fi
 
 cat <<'EOF'
 Instance creation requested. Wait for SSH readiness, then run the DEPLOY,
-REMOTE_SMOKE, and PULL commands printed above. This script intentionally does
-not destroy instances.
+REMOTE_SMOKE, PULL, and ACCEPTANCE_CHECK commands printed above. This script
+intentionally does not destroy instances.
 EOF

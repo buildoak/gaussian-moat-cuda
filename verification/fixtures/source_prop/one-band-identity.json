@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "case_id": "one-band-identity",
+  "k_sq": 9,
+  "carry_width": 3,
+  "source_atoms": ["s"],
+  "atoms": [
+    { "id": "s", "r": 7 },
+    { "id": "a", "r": 9 },
+    { "id": "t", "r": 12 }
+  ],
+  "edges": [
+    { "a": "s", "b": "a" },
+    { "a": "a", "b": "t" }
+  ],
+  "bands": [
+    { "id": "b0", "r_inner": 0, "r_outer": 12 }
+  ],
+  "guards": ["composed_equals_big"],
+  "overflow_counters": {
+    "component_label_overflow": 0,
+    "carry_atom_overflow": 0
+  },
+  "notes": "A single stitched band must equal the corresponding one-big-band state, including source bit and carry partition."
+}
