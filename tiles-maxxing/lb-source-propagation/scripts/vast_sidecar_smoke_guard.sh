@@ -11,21 +11,25 @@ Usage:
                               [--offer-poll-seconds N]
                               [--wait-ssh-seconds N] [--ssh-poll-seconds N]
                               [--stop-on-ssh-timeout]
+                              [--run-remote-smoke] [--destroy-on-exit]
 
 Dry-run by default. Searches for a single RTX 4090 offer, enforces the price
 cap, and prints the exact create/deploy/smoke/pull commands. With --execute it
-creates the instance only by default; deploy/smoke/pull remain explicit
-operator steps because cleanup needs human-visible instance metadata. Optional
-offer polling handles transient market races, and optional SSH readiness polling
-can stop a newly-created instance when SSH never opens.
+creates the instance only by default. Add --run-remote-smoke to make the script
+wait for SSH, deploy the current tree, run remote_sidecar_smoke.sh, pull
+artifacts, and run the local artifact acceptance checker. Add --destroy-on-exit
+to destroy the created instance after success or failure.
+
+Optional offer polling handles transient market races, and optional SSH
+readiness polling can stop or destroy a newly-created instance when SSH never
+opens.
 
 Hard defaults from the LB source-propagation goal:
   --max-dph     0.37
   --max-budget  1.50
   --k-sq        26
 
-This script never destroys an instance. Cleanup remains an explicit operator
-decision after artifacts are pulled.
+This script destroys an instance only when --destroy-on-exit is supplied.
 USAGE
 }
 
@@ -41,6 +45,9 @@ offer_poll_seconds="30"
 wait_ssh_seconds="0"
 ssh_poll_seconds="10"
 stop_on_ssh_timeout=0
+run_remote_smoke=0
+destroy_on_exit=0
+created_instance_id=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -90,6 +97,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --stop-on-ssh-timeout)
       stop_on_ssh_timeout=1
+      shift
+      ;;
+    --run-remote-smoke)
+      run_remote_smoke=1
+      shift
+      ;;
+    --destroy-on-exit)
+      destroy_on_exit=1
       shift
       ;;
     -h|--help)
@@ -145,6 +160,19 @@ if [[ "$offer_wait_seconds" != "0" && "$offer_poll_seconds" == "0" ]]; then
   echo "--offer-poll-seconds must be positive when offer polling is enabled" >&2
   exit 2
 fi
+if [[ "$run_remote_smoke" -eq 1 && "$wait_ssh_seconds" == "0" ]]; then
+  wait_ssh_seconds="600"
+fi
+
+cleanup_instance() {
+  local status="$?"
+  if [[ "$destroy_on_exit" -eq 1 && -n "$created_instance_id" ]]; then
+    echo "DESTROYING_INSTANCE_ON_EXIT id=${created_instance_id}" >&2
+    vastai destroy instance "$created_instance_id" -y >&2 || true
+  fi
+  return "$status"
+}
+trap cleanup_instance EXIT
 
 parse_created_instance_id() {
   CREATE_OUTPUT="$1" python3 <<'PY'
@@ -211,6 +239,65 @@ wait_for_ssh_ready() {
   return 5
 }
 
+require_ssh_endpoint() {
+  local instance_id="$1"
+  local state intended host port
+  read -r state intended host port < <(instance_ssh_fields "$instance_id" || true) || true
+  if [[ -z "${host:-}" || -z "${port:-}" ]]; then
+    echo "SSH endpoint unavailable for instance ${instance_id}" >&2
+    exit 5
+  fi
+  printf '%s %s\n' "$host" "$port"
+}
+
+run_remote_smoke_gate() {
+  local instance_id="$1"
+  local host port ssh_cmd rsync_ssh
+  read -r host port < <(require_ssh_endpoint "$instance_id")
+  ssh_cmd=(ssh -o StrictHostKeyChecking=accept-new -p "$port" "root@${host}")
+  rsync_ssh="ssh -o StrictHostKeyChecking=accept-new -p ${port}"
+
+  rm -rf "$pull_dir"
+  mkdir -p "$pull_dir"
+
+  echo "DEPLOYING_SOURCE id=${instance_id} host=${host} port=${port}"
+  rsync -avz --delete \
+    --exclude '.git' \
+    --exclude 'build*/' \
+    --exclude '**/build*/' \
+    --exclude '**/artifacts/' \
+    --exclude '**/results/' \
+    --exclude '**/profiles/' \
+    --exclude '**/runs/' \
+    --exclude '**/tmp/' \
+    --exclude '**/*.bin' \
+    --exclude '**/*.log' \
+    -e "$rsync_ssh" \
+    ./ "root@${host}:${remote_dir}/"
+
+  printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" \
+      "$local_head" "$local_branch" |
+    "${ssh_cmd[@]}" \
+      "mkdir -p /workspace/lb-source-remote-smoke && cat > /workspace/lb-source-remote-smoke/deployed_source.txt"
+
+  echo "RUNNING_REMOTE_SMOKE id=${instance_id}"
+  "${ssh_cmd[@]}" \
+    "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh --repo ${remote_dir} --k-sq ${k_sq} --out-dir /workspace/lb-source-remote-smoke"
+
+  echo "PULLING_REMOTE_SMOKE_ARTIFACTS id=${instance_id}"
+  rsync -avz -e "$rsync_ssh" \
+    "root@${host}:/workspace/lb-source-remote-smoke/" \
+    "${pull_dir}/"
+
+  echo "CHECKING_REMOTE_SMOKE_ARTIFACTS id=${instance_id}"
+  tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh \
+    "$pull_dir" \
+    --expect-head "$local_head" \
+    --expect-branch "$local_branch" \
+    --expect-k-sq "$k_sq"
+  echo "REMOTE_VAST_SMOKE_PASS id=${instance_id} pull_dir=${pull_dir}"
+}
+
 filter="gpu_name=RTX_4090 cuda_vers>=12.0 disk_space>=40 num_gpus=1 dph<=${max_dph} reliability>=0.95"
 
 echo "search_filter=$filter"
@@ -263,6 +350,11 @@ PY
 echo "QUALIFYING_OFFER id=${offer_id} dph=${offer_dph} budget_hours=${soft_hours}"
 echo "LOCAL_SOURCE branch=${local_branch} head=${local_head} k_sq=${k_sq}"
 
+one_shot_wait_ssh_seconds="$wait_ssh_seconds"
+if [[ "$one_shot_wait_ssh_seconds" == "0" ]]; then
+  one_shot_wait_ssh_seconds="600"
+fi
+
 create_cmd=(vastai create instance "$offer_id"
   --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel
   --disk 40 --ssh
@@ -293,6 +385,9 @@ PULL:
 
 ACCEPTANCE_CHECK:
   tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh ${pull_dir} --expect-head ${local_head} --expect-branch ${local_branch} --expect-k-sq ${k_sq}
+
+ONE_SHOT_REMOTE_SMOKE:
+  $(shell_join "$0" --execute --run-remote-smoke --destroy-on-exit --max-dph "$max_dph" --max-budget "$max_budget" --k-sq "$k_sq" --offer-wait-seconds "$offer_wait_seconds" --offer-poll-seconds "$offer_poll_seconds" --wait-ssh-seconds "$one_shot_wait_ssh_seconds" --ssh-poll-seconds "$ssh_poll_seconds")
 EOF
 
 if [[ "$execute" -eq 0 ]]; then
@@ -320,8 +415,13 @@ if [[ "$wait_ssh_seconds" != "0" ]]; then
   wait_for_ssh_ready "$created_instance_id"
 fi
 
+if [[ "$run_remote_smoke" -eq 1 ]]; then
+  run_remote_smoke_gate "$created_instance_id"
+  exit 0
+fi
+
 cat <<'EOF'
 Instance creation requested. Wait for SSH readiness, then run the DEPLOY,
 REMOTE_SMOKE, PULL, and ACCEPTANCE_CHECK commands printed above. This script
-intentionally does not destroy instances.
+destroys instances only when --destroy-on-exit is supplied.
 EOF

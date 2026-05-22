@@ -205,6 +205,29 @@ tiles-maxxing/lb-source-propagation/scripts/vast_sidecar_smoke_guard.sh \
   --stop-on-ssh-timeout
 ```
 
+To run the whole paid smoke gate as one bounded command, add the explicit
+remote-smoke and cleanup switches:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/vast_sidecar_smoke_guard.sh \
+  --execute \
+  --run-remote-smoke \
+  --destroy-on-exit \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26 \
+  --offer-wait-seconds 900 \
+  --offer-poll-seconds 30 \
+  --wait-ssh-seconds 600 \
+  --ssh-poll-seconds 10
+```
+
+This creates the instance only after the price cap passes, waits for SSH,
+deploys the current tree, runs `remote_sidecar_smoke.sh`, pulls artifacts into
+`tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull`, runs
+`check_remote_smoke_artifacts.sh --expect-head --expect-branch --expect-k-sq`,
+and destroys the created instance on exit.
+
 After a qualifying Vast 4090 is rented and the repo is copied to the host, run:
 
 ```bash
