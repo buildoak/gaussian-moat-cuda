@@ -267,16 +267,16 @@ require_ssh_endpoint() {
 
 run_remote_smoke_gate() {
   local instance_id="$1"
-  local host port ssh_cmd rsync_ssh
+  local host port ssh_cmd
   read -r host port < <(require_ssh_endpoint "$instance_id")
   ssh_cmd=(ssh -o StrictHostKeyChecking=accept-new -p "$port" "root@${host}")
-  rsync_ssh="ssh -o StrictHostKeyChecking=accept-new -p ${port}"
 
   rm -rf "$pull_dir"
   mkdir -p "$pull_dir"
 
   echo "DEPLOYING_SOURCE id=${instance_id} host=${host} port=${port}"
-  rsync -avz --delete \
+  "${ssh_cmd[@]}" "rm -rf ${remote_dir} && mkdir -p ${remote_dir}"
+  tar \
     --exclude '.git' \
     --exclude 'build*/' \
     --exclude '**/build*/' \
@@ -287,8 +287,8 @@ run_remote_smoke_gate() {
     --exclude '**/tmp/' \
     --exclude '**/*.bin' \
     --exclude '**/*.log' \
-    -e "$rsync_ssh" \
-    ./ "root@${host}:${remote_dir}/"
+    -czf - . |
+    "${ssh_cmd[@]}" "tar -xzf - -C ${remote_dir}"
 
   printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" \
       "$local_head" "$local_branch" |
@@ -300,9 +300,8 @@ run_remote_smoke_gate() {
     "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh --repo ${remote_dir} --k-sq ${k_sq} --out-dir /workspace/lb-source-remote-smoke"
 
   echo "PULLING_REMOTE_SMOKE_ARTIFACTS id=${instance_id}"
-  rsync -avz -e "$rsync_ssh" \
-    "root@${host}:/workspace/lb-source-remote-smoke/" \
-    "${pull_dir}/"
+  "${ssh_cmd[@]}" "cd /workspace/lb-source-remote-smoke && tar -czf - ." |
+    tar -xzf - -C "$pull_dir"
 
   echo "CHECKING_REMOTE_SMOKE_ARTIFACTS id=${instance_id}"
   tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh \
@@ -372,8 +371,7 @@ fi
 
 create_cmd=(vastai create instance "$offer_id"
   --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel
-  --disk 40 --ssh
-  --onstart-cmd 'apt-get update && apt-get install -y tmux cmake ninja-build rsync')
+  --disk 40 --ssh)
 
 cat <<EOF
 CREATE:
@@ -388,7 +386,8 @@ After instance is ready, set:
   LOCAL_BRANCH=${local_branch}
 
 DEPLOY:
-  rsync -avz --delete --exclude '.git' --exclude 'build*/' --exclude '**/build*/' --exclude '**/artifacts/' --exclude '**/results/' --exclude '**/profiles/' --exclude '**/runs/' --exclude '**/tmp/' --exclude '**/*.bin' --exclude '**/*.log' -e "ssh -o StrictHostKeyChecking=accept-new -p \$PORT" ./ root@\$HOST:${remote_dir}/
+  \$SSH_CMD "rm -rf ${remote_dir} && mkdir -p ${remote_dir}"
+  tar --exclude '.git' --exclude 'build*/' --exclude '**/build*/' --exclude '**/artifacts/' --exclude '**/results/' --exclude '**/profiles/' --exclude '**/runs/' --exclude '**/tmp/' --exclude '**/*.bin' --exclude '**/*.log' -czf - . | \$SSH_CMD "tar -xzf - -C ${remote_dir}"
   printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" "\$LOCAL_HEAD" "\$LOCAL_BRANCH" | \$SSH_CMD "mkdir -p /workspace/lb-source-remote-smoke && cat > /workspace/lb-source-remote-smoke/deployed_source.txt"
 
 REMOTE_SMOKE:
@@ -396,7 +395,7 @@ REMOTE_SMOKE:
 
 PULL:
   mkdir -p ${pull_dir}
-  rsync -avz -e "ssh -o StrictHostKeyChecking=accept-new -p \$PORT" root@\$HOST:/workspace/lb-source-remote-smoke/ ${pull_dir}/
+  \$SSH_CMD "cd /workspace/lb-source-remote-smoke && tar -czf - ." | tar -xzf - -C ${pull_dir}
 
 ACCEPTANCE_CHECK:
   tiles-maxxing/lb-source-propagation/scripts/check_remote_smoke_artifacts.sh ${pull_dir} --expect-head ${local_head} --expect-branch ${local_branch} --expect-k-sq ${k_sq}
