@@ -6,6 +6,7 @@ usage() {
 Usage:
   run_k26_full_source_bundle.sh --build-dir DIR --out-dir DIR
                                 [--max-atoms N]
+                                [--timeout-seconds N]
                                 [--cert-in PATH]
                                 [--source-dead-gap-checker PATH]
                                 [--source-dead-checker PATH]
@@ -35,6 +36,7 @@ USAGE
 build_dir=""
 out_dir=""
 max_atoms="50000000"
+timeout_seconds="0"
 cert_in=""
 source_dead_gap_checker=""
 source_dead_checker=""
@@ -51,6 +53,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --max-atoms)
       max_atoms="$2"
+      shift 2
+      ;;
+    --timeout-seconds)
+      timeout_seconds="$2"
       shift 2
       ;;
     --cert-in)
@@ -105,6 +111,10 @@ if [[ ! "$max_atoms" =~ ^[0-9]+$ || "$max_atoms" == "0" ]]; then
   echo "--max-atoms must be a positive integer" >&2
   exit 2
 fi
+if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
+  echo "--timeout-seconds must be a nonnegative integer" >&2
+  exit 2
+fi
 
 mkdir -p "$out_dir"
 
@@ -119,6 +129,7 @@ write_status() {
     echo "build_dir=$build_dir"
     echo "out_dir=$out_dir"
     echo "max_atoms=$max_atoms"
+    echo "timeout_seconds=$timeout_seconds"
     echo "non_claim=this is an executed bundle harness, not a source-dead acceptance"
   } > "$status_file"
 }
@@ -175,8 +186,41 @@ run_json() {
   local output="$2"
   shift 2
   local stderr_file="$output.stderr"
+  local status
   echo "RUN $label: $*" >> "$out_dir/run.log"
-  if ! "$@" > "$output" 2> "$stderr_file"; then
+  set +e
+  if [[ "$timeout_seconds" == "0" ]]; then
+    "$@" > "$output" 2> "$stderr_file"
+    status="$?"
+  else
+    python3 - "$timeout_seconds" "$output" "$stderr_file" "$@" <<'PY'
+import subprocess
+import sys
+
+timeout = int(sys.argv[1])
+stdout_path = sys.argv[2]
+stderr_path = sys.argv[3]
+cmd = sys.argv[4:]
+
+try:
+    with open(stdout_path, "wb") as stdout, open(stderr_path, "wb") as stderr:
+        completed = subprocess.run(
+            cmd, stdout=stdout, stderr=stderr, timeout=timeout
+        )
+except subprocess.TimeoutExpired:
+    raise SystemExit(124)
+
+raise SystemExit(completed.returncode)
+PY
+    status="$?"
+  fi
+  set -e
+  if [[ "$status" == "124" ]]; then
+    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_${label}_TIMEOUT"
+    echo "$label timed out after ${timeout_seconds}s" >&2
+    exit 124
+  fi
+  if [[ "$status" != "0" ]]; then
     write_status "K26_FULL_RUN_BUNDLE_BLOCKED_${label}_FAILED"
     cat "$stderr_file" >&2
     exit 1

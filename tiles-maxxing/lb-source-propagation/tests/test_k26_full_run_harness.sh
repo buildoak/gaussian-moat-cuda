@@ -91,6 +91,43 @@ fi
 SH
 chmod +x "$fake_source_dead_gap_checker"
 
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$tmp/bad-timeout" \
+    --timeout-seconds nope \
+    >/tmp/k26-harness-bad-timeout.out \
+    2>/tmp/k26-harness-bad-timeout.err; then
+  echo "harness accepted nonnumeric timeout" >&2
+  exit 1
+fi
+grep -q -- '--timeout-seconds must be a nonnegative integer' \
+  /tmp/k26-harness-bad-timeout.err
+
+timeout_build="$tmp/timeout-build"
+cp -R "$build_dir" "$timeout_build"
+cat > "$timeout_build/source_tileop_port_runner" <<'SH'
+#!/usr/bin/env bash
+sleep 2
+echo '{"schema":"should_not_finish"}'
+SH
+chmod +x "$timeout_build/source_tileop_port_runner"
+timeout_out="$tmp/timeout-out"
+if "$harness" \
+    --build-dir "$timeout_build" \
+    --out-dir "$timeout_out" \
+    --timeout-seconds 1 \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    >/tmp/k26-harness-timeout.out \
+    2>/tmp/k26-harness-timeout.err; then
+  echo "harness accepted a timed-out K26 continuation" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_TIMEOUT' \
+  "$timeout_out/status.txt"
+grep -q 'timeout_seconds=1' "$timeout_out/status.txt"
+grep -q 'K26_CONTINUATION timed out after 1s' \
+  /tmp/k26-harness-timeout.err
+
 blocked_out="$tmp/blocked"
 if "$harness" \
     --build-dir "$build_dir" \

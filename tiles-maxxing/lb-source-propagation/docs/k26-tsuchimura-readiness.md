@@ -98,7 +98,10 @@ of accepting the bundle.
 The executable harness for producing the bundle shape is:
 
 ```bash
-run_k26_full_source_bundle.sh --build-dir BUILD_DIR --out-dir OUT_DIR
+run_k26_full_source_bundle.sh \
+  --build-dir BUILD_DIR \
+  --out-dir OUT_DIR \
+  --timeout-seconds 1200
 ```
 
 It writes the command, BZ, profile, prefix, and continuation artifacts using
@@ -116,7 +119,9 @@ independent `source_dead_gap_check` before reporting the missing cert blocker.
 With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/continuation/gap artifacts before the checker runs.
 This keeps a paid sqrt(26) attempt reproducible without relaxing the
-`SOURCE_DEAD_CERT` logic. If the supplied cert is only a summary accumulator
+`SOURCE_DEAD_CERT` logic. `--timeout-seconds` should be set for paid runs so a
+slow prefix or continuation exits with an explicit timeout status before the
+runtime budget is exceeded. If the supplied cert is only a summary accumulator
 non-claim, the harness writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM` to
 `status.txt` and exits nonzero.

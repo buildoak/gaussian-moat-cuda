@@ -246,6 +246,7 @@ The paid/full-run harness is:
 tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
   --build-dir /tmp/gm-lbsp-remote-smoke \
   --out-dir /workspace/k26-full-source-bundle \
+  --timeout-seconds 1200 \
   --source-dead-gap-checker /path/to/source_dead_gap_check
 ```
 
@@ -262,6 +263,9 @@ checker before stopping on the missing cert. It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
 continuation, manifest, witness, gap, and any supplied cert artifacts by
 SHA-256.
+Use `--timeout-seconds` on paid runs so prefix or continuation work stops with
+a status-level timeout blocker instead of silently exceeding the runtime
+budget.
 If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
 the hash manifest, and runs the full bundle checker with the supplied
 `--source-dead-checker`.
