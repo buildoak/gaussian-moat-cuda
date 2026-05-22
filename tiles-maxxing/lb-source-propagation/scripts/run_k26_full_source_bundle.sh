@@ -21,6 +21,7 @@ Artifacts written under OUT_DIR:
   k26-continuation-result.json
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
+  k26-full-run-artifacts.sha256
   status.txt
 
 If --cert-in is supplied, it is copied to k26-source-dead-cert.json and the
@@ -101,6 +102,7 @@ fi
 mkdir -p "$out_dir"
 
 status_file="$out_dir/status.txt"
+artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
 write_status() {
   local status="$1"
   {
@@ -111,6 +113,34 @@ write_status() {
     echo "max_atoms=$max_atoms"
     echo "non_claim=this is an executed bundle harness, not a source-dead acceptance"
   } > "$status_file"
+}
+
+write_artifact_manifest() {
+  local names=(
+    k26_source_run_commands.json
+    k26_bz_schedule_check.json
+    k26_source_run_profile.json
+    k26-prefix-result.json
+    k26-continuation-result.json
+    k26-prefix-manifest.txt
+    k26-prefix-witness.txt
+    k26-source-dead-cert.json
+  )
+  : > "$artifact_manifest"
+  local name path digest
+  for name in "${names[@]}"; do
+    path="$out_dir/$name"
+    if [[ ! -f "$path" ]]; then
+      continue
+    fi
+    digest="$(shasum -a 256 "$path" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+    if [[ -z "$digest" ]]; then
+      write_status "K26_FULL_RUN_BUNDLE_BLOCKED_HASH_FAILED"
+      echo "could not hash artifact: $path" >&2
+      exit 1
+    fi
+    printf '%s  %s\n' "$digest" "$name" >> "$artifact_manifest"
+  done
 }
 
 run_json() {
@@ -172,6 +202,8 @@ run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
     --manifest-in "$out_dir/k26-prefix-manifest.txt" \
     --prefix-witness-in "$out_dir/k26-prefix-witness.txt"
 
+write_artifact_manifest
+
 if [[ -n "$cert_in" ]]; then
   if [[ ! -f "$cert_in" ]]; then
     write_status "K26_FULL_RUN_BUNDLE_BLOCKED_CERT_IN_MISSING"
@@ -179,6 +211,7 @@ if [[ -n "$cert_in" ]]; then
     exit 2
   fi
   cp "$cert_in" "$out_dir/k26-source-dead-cert.json"
+  write_artifact_manifest
 fi
 
 if [[ ! -f "$out_dir/k26-source-dead-cert.json" ]]; then

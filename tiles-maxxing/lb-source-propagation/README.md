@@ -228,9 +228,12 @@ coordinate prefix and strict-bridge TileOp-port continuation. It does not
 manufacture a source-dead certificate. If no `k26-source-dead-cert.json` is
 available, it writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt` after
-the prefix and continuation artifacts are produced. If a cert is supplied with
-`--cert-in`, it copies it into the bundle and runs the full bundle checker with
-the supplied `--source-dead-checker`.
+the prefix and continuation artifacts are produced. It also writes
+`k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
+continuation, manifest, witness, and any supplied cert artifacts by SHA-256.
+If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
+the hash manifest, and runs the full bundle checker with the supplied
+`--source-dead-checker`.
 
 The exact non-claim command contract for the eventual K26 run is emitted by:
 

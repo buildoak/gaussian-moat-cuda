@@ -23,6 +23,25 @@ fi
 SH
 chmod +x "$fake_source_dead_checker"
 
+write_manifest() {
+  local dir="$1"
+  : > "$dir/k26-full-run-artifacts.sha256"
+  local name digest
+  for name in \
+      k26_source_run_commands.json \
+      k26_bz_schedule_check.json \
+      k26_source_run_profile.json \
+      k26-prefix-result.json \
+      k26-continuation-result.json \
+      k26-prefix-manifest.txt \
+      k26-prefix-witness.txt \
+      k26-source-dead-cert.json; do
+    digest="$(shasum -a 256 "$dir/$name" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+    printf '%s  %s\n' "$digest" "$name" \
+      >> "$dir/k26-full-run-artifacts.sha256"
+  done
+}
+
 write_bundle() {
   local dir="$1"
   mkdir -p "$dir"
@@ -44,6 +63,9 @@ JSON
   cat > "$dir/k26-source-dead-cert.json" <<'JSON'
 {"schema":"lb_source_dead_cert_draft_v1","k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615070786916]}}
 JSON
+  echo 'manifest' > "$dir/k26-prefix-manifest.txt"
+  echo 'witness' > "$dir/k26-prefix-witness.txt"
+  write_manifest "$dir"
 }
 
 good="$tmp/good"
@@ -58,10 +80,18 @@ perl -0pi -e 's/7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95
   "$bad_digest/k26_source_run_profile.json"
 if "$checker" "$bad_digest" --source-dead-checker "$fake_source_dead_checker" \
     > "$tmp/bad-digest.log" 2>&1; then
+  echo "checker accepted stale artifact hash after profile mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26_source_run_profile.json' \
+  "$tmp/bad-digest.log"
+write_manifest "$bad_digest"
+if "$checker" "$bad_digest" --source-dead-checker "$fake_source_dead_checker" \
+    > "$tmp/bad-digest-rehashed.log" 2>&1; then
   echo "checker accepted mismatched BZ digest" >&2
   exit 1
 fi
-grep -q 'K26 BZ digest profile binding' "$tmp/bad-digest.log"
+grep -q 'K26 BZ digest profile binding' "$tmp/bad-digest-rehashed.log"
 
 bad_bridge="$tmp/bad-bridge"
 write_bundle "$bad_bridge"
@@ -69,10 +99,18 @@ perl -0pi -e 's/"unbridged_coordinate_carry_atoms":0/"unbridged_coordinate_carry
   "$bad_bridge/k26-continuation-result.json"
 if "$checker" "$bad_bridge" --source-dead-checker "$fake_source_dead_checker" \
     > "$tmp/bad-bridge.log" 2>&1; then
+  echo "checker accepted stale artifact hash after continuation mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26-continuation-result.json' \
+  "$tmp/bad-bridge.log"
+write_manifest "$bad_bridge"
+if "$checker" "$bad_bridge" --source-dead-checker "$fake_source_dead_checker" \
+    > "$tmp/bad-bridge-rehashed.log" 2>&1; then
   echo "checker accepted unbridged coordinate carry" >&2
   exit 1
 fi
-grep -q 'K26 continuation full bridge' "$tmp/bad-bridge.log"
+grep -q 'K26 continuation full bridge' "$tmp/bad-bridge-rehashed.log"
 
 missing="$tmp/missing"
 write_bundle "$missing"

@@ -72,8 +72,11 @@ check_k26_full_run_bundle.sh OUT_DIR --source-dead-checker source_dead_cert_chec
 ```
 
 It expects `k26-prefix-result.json`, `k26-continuation-result.json`, the K26
-command/profile/BZ evidence JSON, and `k26-source-dead-cert.json`. It rejects
-the bundle if the BZ digest is not identical across artifacts, if the
+command/profile/BZ evidence JSON, prefix manifest/witness, the
+`k26-full-run-artifacts.sha256` hash manifest, and
+`k26-source-dead-cert.json`. It rejects the bundle if any required artifact
+hash does not match the manifest, if the BZ digest is not identical across
+artifacts, if the
 continuation did not run with `seam_bridge_policy=require_full_bridge`, if any
 source coordinate carry atom remained unbridged, if TileOp overflow occurred,
 if terminal source death was not reached at `R_final=1015645`, if the terminal
@@ -88,9 +91,12 @@ run_k26_full_source_bundle.sh --build-dir BUILD_DIR --out-dir OUT_DIR
 
 It writes the command, BZ, profile, prefix, and continuation artifacts using
 the strict `--require-full-bridge` continuation schedule. It is deliberately
-certificate-gated: without a supplied `k26-source-dead-cert.json` it stops with
-`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. This keeps a paid
-sqrt(26) attempt reproducible without relaxing the `SOURCE_DEAD_CERT` logic.
+certificate-gated: without a supplied `k26-source-dead-cert.json` it still
+writes a partial `k26-full-run-artifacts.sha256` manifest and stops with
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. With a supplied cert,
+the manifest binds the cert with the command/profile/BZ/prefix/continuation
+artifacts before the checker runs. This keeps a paid sqrt(26) attempt
+reproducible without relaxing the `SOURCE_DEAD_CERT` logic.
 
 ## Executable Contract
 

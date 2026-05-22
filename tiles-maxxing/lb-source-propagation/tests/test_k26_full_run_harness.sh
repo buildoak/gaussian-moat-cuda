@@ -86,6 +86,14 @@ grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING' \
   "$blocked_out/status.txt"
 test -f "$blocked_out/k26-prefix-result.json"
 test -f "$blocked_out/k26-continuation-result.json"
+test -f "$blocked_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-continuation-result.json' \
+  "$blocked_out/k26-full-run-artifacts.sha256"
+if grep -q 'k26-source-dead-cert.json' \
+    "$blocked_out/k26-full-run-artifacts.sha256"; then
+  echo "blocked partial manifest unexpectedly included missing cert" >&2
+  exit 1
+fi
 
 cert="$tmp/k26-source-dead-cert.json"
 cat > "$cert" <<'JSON'
@@ -113,5 +121,7 @@ checked_out="$tmp/checked"
 grep -q 'K26_FULL_RUN_BUNDLE_CHECKED' "$checked_out/status.txt"
 grep -q 'K26_FULL_RUN_BUNDLE_SUMMARY_ONLY_NON_CLAIM_PASS' \
   "$checked_out/k26-full-run-bundle-check.log"
+grep -q 'k26-source-dead-cert.json' \
+  "$checked_out/k26-full-run-artifacts.sha256"
 
 echo "k26 full-run harness self-test PASS"

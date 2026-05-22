@@ -17,7 +17,10 @@ Required artifact names:
   k26_source_run_profile.json
   k26-prefix-result.json
   k26-continuation-result.json
+  k26-prefix-manifest.txt
+  k26-prefix-witness.txt
   k26-source-dead-cert.json
+  k26-full-run-artifacts.sha256
 USAGE
 }
 
@@ -112,11 +115,39 @@ bz="$out_dir/k26_bz_schedule_check.json"
 profile="$out_dir/k26_source_run_profile.json"
 prefix="$out_dir/k26-prefix-result.json"
 continuation="$out_dir/k26-continuation-result.json"
+prefix_manifest="$out_dir/k26-prefix-manifest.txt"
+prefix_witness="$out_dir/k26-prefix-witness.txt"
 cert="$out_dir/k26-source-dead-cert.json"
+artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
 
-for artifact in "$commands" "$bz" "$profile" "$prefix" "$continuation" "$cert"; do
+for artifact in "$commands" "$bz" "$profile" "$prefix" "$continuation" \
+    "$prefix_manifest" "$prefix_witness" "$cert" "$artifact_manifest"; do
   require_file "$artifact"
 done
+
+require_manifest_hash() {
+  local path="$1"
+  local name="$2"
+  local digest
+  digest="$(shasum -a 256 "$path" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+  if [[ -z "$digest" ]]; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: could not hash artifact: $path" >&2
+    exit 1
+  fi
+  if ! grep -Fxq "${digest}  ${name}" "$artifact_manifest"; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: artifact hash mismatch for ${name}" >&2
+    exit 1
+  fi
+}
+
+require_manifest_hash "$commands" k26_source_run_commands.json
+require_manifest_hash "$bz" k26_bz_schedule_check.json
+require_manifest_hash "$profile" k26_source_run_profile.json
+require_manifest_hash "$prefix" k26-prefix-result.json
+require_manifest_hash "$continuation" k26-continuation-result.json
+require_manifest_hash "$prefix_manifest" k26-prefix-manifest.txt
+require_manifest_hash "$prefix_witness" k26-prefix-witness.txt
+require_manifest_hash "$cert" k26-source-dead-cert.json
 
 require_grep '"schema":"lb_source_k26_run_commands_v1"' "$commands" \
   "K26 command schema"
