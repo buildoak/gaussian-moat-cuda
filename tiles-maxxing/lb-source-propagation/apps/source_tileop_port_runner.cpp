@@ -1013,7 +1013,8 @@ int main(int argc, char** argv) {
               << ",\"port_atoms\":" << target_port_atoms
               << ",\"bridge_edges\":" << target_bridge_edges
               << ",\"source_reached\":"
-              << (target_source_reached ? "true" : "false");
+              << (target_source_reached ? "true" : "false")
+              << ",\"path_provenance\":\"component_reachability_only\"";
   }
   std::cout << "}"
             << ",\"accepted\":" << (accepted ? "true" : "false")

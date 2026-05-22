@@ -251,7 +251,10 @@ execute the full sqrt(26) comparison, and must not be treated as a
 `--require-full-bridge --target-a 376039 --target-b 943460`; if any source
 coordinate carry atom lacks a first-band TileOp-port bridge, the run must stop,
 and the canonical endpoint must be seen and source-reached in the continuation
-artifact before the full bundle checker can pass.
+artifact before the full bundle checker can pass. The TileOp-port target field
+currently reports `path_provenance=component_reachability_only`: that is
+component membership in the diagnostic port graph, not a coordinate source-path
+witness suitable for a `SOURCE_DEAD_CERT`.
 
 `k26_source_run_contract` emits the execution contract for the Tsuchimura
 comparison target. It is intentionally a non-claim artifact:

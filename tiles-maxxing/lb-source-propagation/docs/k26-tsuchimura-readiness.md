@@ -162,10 +162,13 @@ continuation command includes `--require-full-bridge` and
 `--target-a 376039 --target-b 943460`, so unbridged source coordinate carry
 atoms are a hard stop and the canonical endpoint must be bridged into a
 TileOp-port component and reported as source-reached in the continuation
-artifact. This command is not part of the local smoke gate. A Mac Mini probe of
-the row-0 prefix was still CPU-bound after eight minutes with no completed
-artifact, so row-0 prefix execution should be treated as paid-run work under
-the Vast budget cap unless a smaller diagnostic radius is being tested.
+artifact. The target field currently reports
+`path_provenance=component_reachability_only`, which is not yet a coordinate
+source-path witness suitable for a `SOURCE_DEAD_CERT`. This command is not part
+of the local smoke gate. A Mac Mini probe of the row-0 prefix was still
+CPU-bound after eight minutes with no completed artifact, so row-0 prefix
+execution should be treated as paid-run work under the Vast budget cap unless a
+smaller diagnostic radius is being tested.
 
 ## Stop Conditions
 
