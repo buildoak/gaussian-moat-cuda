@@ -157,6 +157,8 @@ PULL:
 ACCEPTANCE_CHECK:
   grep -q "100% tests passed" ${pull_dir}/ctest.log
   test "\$(grep -c '^ *[0-9][0-9]*/13 Test' ${pull_dir}/ctest.log)" -eq 13
+  grep -q "100% tests passed" ${pull_dir}/verification-ctest.log
+  test "\$(grep -c '^ *[0-9][0-9]*/43 Test' ${pull_dir}/verification-ctest.log)" -eq 43
   grep -q "deployed_local_head=${local_head}" ${pull_dir}/deployed_source.txt
 EOF
 

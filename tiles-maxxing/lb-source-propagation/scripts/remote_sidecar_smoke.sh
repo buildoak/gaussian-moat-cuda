@@ -4,22 +4,25 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  remote_sidecar_smoke.sh [--repo DIR] [--build-dir DIR] [--k-sq N] [--out-dir DIR]
+  remote_sidecar_smoke.sh [--repo DIR] [--build-dir DIR] [--verify-build-dir DIR]
+                          [--k-sq N] [--out-dir DIR]
 
 Build and run the LB source-propagation sidecar smoke gate on a remote host.
 This script performs no Vast API actions and starts no long campaign. It is
 intended to run after the repo has been copied to a rented host.
 
 Defaults:
-  --repo      current working directory
-  --build-dir /tmp/gm-lbsp-remote-smoke
-  --k-sq      36
-  --out-dir   <repo>/tiles-maxxing/lb-source-propagation/artifacts/remote-smoke
+  --repo             current working directory
+  --build-dir        /tmp/gm-lbsp-remote-smoke
+  --verify-build-dir /tmp/gm-lbsp-remote-verify
+  --k-sq             36
+  --out-dir          <repo>/tiles-maxxing/lb-source-propagation/artifacts/remote-smoke
 USAGE
 }
 
 repo_dir="$(pwd)"
 build_dir="/tmp/gm-lbsp-remote-smoke"
+verify_build_dir="/tmp/gm-lbsp-remote-verify"
 k_sq="36"
 out_dir=""
 
@@ -31,6 +34,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --build-dir)
       build_dir="$2"
+      shift 2
+      ;;
+    --verify-build-dir)
+      verify_build_dir="$2"
       shift 2
       ;;
     --k-sq)
@@ -62,6 +69,11 @@ if [[ ! -f "$sidecar_dir/CMakeLists.txt" ]]; then
   echo "sidecar CMakeLists.txt not found at $sidecar_dir" >&2
   exit 2
 fi
+verification_dir="$repo_dir/verification"
+if [[ ! -f "$verification_dir/CMakeLists.txt" ]]; then
+  echo "verification CMakeLists.txt not found at $verification_dir" >&2
+  exit 2
+fi
 
 mkdir -p "$out_dir"
 
@@ -87,6 +99,13 @@ cmake --build "$build_dir" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)" \
   | tee "$out_dir/cmake-build.log"
 ctest --test-dir "$build_dir" --output-on-failure \
   | tee "$out_dir/ctest.log"
+
+cmake -S "$verification_dir" -B "$verify_build_dir" \
+  | tee "$out_dir/verification-cmake-configure.log"
+cmake --build "$verify_build_dir" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)" \
+  | tee "$out_dir/verification-cmake-build.log"
+ctest --test-dir "$verify_build_dir" --output-on-failure \
+  | tee "$out_dir/verification-ctest.log"
 
 "$build_dir/source_prop_cpu_tileop_smoke" \
   | tee "$out_dir/source_prop_cpu_tileop_smoke.log"
@@ -137,7 +156,7 @@ ctest --test-dir "$build_dir" --output-on-failure \
 
 cat > "$out_dir/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, and K26 non-claim run contract only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, and K26 non-claim run contract only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 
