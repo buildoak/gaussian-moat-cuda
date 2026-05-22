@@ -48,6 +48,19 @@ This is intentionally a smoke path. `TileOp` group labels are not persisted as
 source carry atoms because they are tile-local; Phase 2 should promote stable
 coordinate or canonical-port atoms before running campaign-scale source claims.
 
+## Small Source Runner
+
+`source_origin_cpu_runner` is a small-radius diagnostic runner. It enumerates
+canonical-octant Gaussian-prime coordinates directly, seeds `Omega` by the
+origin rule `norm_sq <= K`, uses stable coordinate atom ids, stitches radial
+bands through `lb_source::process_band`, and emits
+`lb_source_origin_cpu_runner_v1` JSON.
+
+This closes the first executable gap between the abstract sidecar protocol and
+a source/origin run, but it is still a non-claim surface. It is not TileOp/CUDA
+fed at campaign scale, it does not process side-boundary separator state, and it
+does not emit an accepted `SOURCE_DEAD_CERT`.
+
 ## Local Gate
 
 From the repo root:
@@ -79,8 +92,9 @@ tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh \
 
 This only builds/tests the sidecar and runs the CPU TileOp source smoke. It
 does not start K32, does not run a long campaign, and does not claim a moat
-result. The smoke artifact set includes `k26_source_run_contract.json`, which
-must remain a non-claim contract until the blockers it lists are closed.
+result. The smoke artifact set includes `source_origin_cpu_runner_smoke.json`
+and `k26_source_run_contract.json`, which must remain non-claim artifacts until
+the blockers listed in the K26 contract are closed.
 
 The sqrt(26) readiness guard lives in
 `docs/k26-tsuchimura-readiness.md`.
