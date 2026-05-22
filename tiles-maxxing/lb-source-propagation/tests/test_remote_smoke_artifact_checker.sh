@@ -29,7 +29,7 @@ write_ctest_log() {
   } > "$path"
 }
 
-write_ctest_log "$tmp/ctest.log" 20
+write_ctest_log "$tmp/ctest.log" 21
 write_ctest_log "$tmp/verification-ctest.log" 43
 
 cat > "$tmp/status.txt" <<'STATUS'
@@ -74,7 +74,7 @@ cat > "$tmp/k26_source_run_contract.json" <<'JSON'
 JSON
 
 cat > "$tmp/k26_execution_plan.json" <<'JSON'
-{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 20/20"],"non_claim":"execution plan only; no source/origin run executed"}
+{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 21/21"],"non_claim":"execution plan only; no source/origin run executed"}
 JSON
 
 cat > "$tmp/k26_bz_schedule_check.json" <<'JSON'

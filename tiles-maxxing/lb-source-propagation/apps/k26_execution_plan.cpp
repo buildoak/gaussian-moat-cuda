@@ -144,9 +144,9 @@ int main() {
   }
 
   constexpr const char* kPreRunGates[] = {
-      "local sidecar ctest 20/20",
+      "local sidecar ctest 21/21",
       "local independent verification ctest 43/43",
-      "remote 4090 smoke with sidecar ctest 20/20 and verification ctest 43/43",
+      "remote 4090 smoke with sidecar ctest 21/21 and verification ctest 43/43",
       "accepted K26 repaired BZ schedule evidence for every source/origin proof row",
       "accepted coordinate-to-port seam bridge theorem or diagnostic label",
       "accepted terminal inventory count/digest/max-norm handling at 14.5B scale"};

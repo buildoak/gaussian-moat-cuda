@@ -30,6 +30,7 @@ struct Config {
   std::uint64_t band_width = 128;
   std::size_t max_atoms = 1000000;
   bool seed_inner_flags = false;
+  bool require_full_bridge = false;
   std::vector<std::uint64_t> schedule_radii;
   std::optional<std::string> manifest_in;
   std::optional<std::string> prefix_witness_in;
@@ -122,6 +123,9 @@ void usage(const char* prog) {
       << "                        (default 1000000)\n"
       << "  --seed-inner-flags    seed first band from TileOp inner flags\n"
       << "                        (geo-I diagnostic only)\n"
+      << "  --require-full-bridge\n"
+      << "                        reject manifest handoff if any source coordinate\n"
+      << "                        carry atom has no first-band TileOp port bridge\n"
       << "  --manifest-in PATH    read an origin-prefix coordinate carry\n"
       << "                        manifest at --r-start and bridge it to\n"
       << "                        canonical TileOp port atoms\n"
@@ -187,6 +191,8 @@ bool parse_args(int argc, char** argv, Config& config) {
       config.max_atoms = static_cast<std::size_t>(parsed);
     } else if (arg == "--seed-inner-flags") {
       config.seed_inner_flags = true;
+    } else if (arg == "--require-full-bridge") {
+      config.require_full_bridge = true;
     } else if (take_value("--manifest-in", value)) {
       if (value.empty()) {
         std::cerr << "--manifest-in must not be empty\n";
@@ -753,6 +759,14 @@ int main(int argc, char** argv) {
       const PortManifestBridgeResult bridge =
           bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
                                               coords, tileops, bridged_band);
+      if (config.require_full_bridge &&
+          bridge.unbridged_coordinate_carry_atoms != 0) {
+        std::cerr
+            << "strict seam bridge requires zero unbridged coordinate carry "
+               "atoms, got "
+            << bridge.unbridged_coordinate_carry_atoms << "\n";
+        return EXIT_FAILURE;
+      }
       incoming = coordinate_manifest->separator;
       last = lb_source::process_band(
           bridged_band, incoming,
@@ -819,6 +833,10 @@ int main(int argc, char** argv) {
             << "\"claim_label\":\"SOURCE_TILEOP_PORT_DIAGNOSTIC\","
             << "\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\","
             << "\"source_mode\":\"" << source_mode << "\","
+            << "\"seam_bridge_policy\":\""
+            << (config.require_full_bridge ? "require_full_bridge"
+                                           : "diagnostic_allow_unbridged")
+            << "\","
             << "\"k_sq\":" << campaign::k_sq_value
             << ",\"r_start\":" << config.r_start
             << ",\"r_final\":" << config.r_final

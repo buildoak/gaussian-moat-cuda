@@ -92,7 +92,12 @@ required evidence, and current blocking gaps. It must keep
   TileOp-port graph. The runner reports `bridged_coordinate_carry_atoms`,
   `unbridged_coordinate_carry_atoms`, `bridged_port_carry_atoms`, and
   `bridge_edges`; K26 remains blocked until those fields are justified by an
-  accepted lemma and verifier gate.
+  accepted lemma and verifier gate. The `--require-full-bridge` runner mode is
+  the strict executable guard: it rejects a manifest handoff whenever any source
+  coordinate carry atom has no first-band TileOp-port bridge. K26 remains
+  diagnostic until it either satisfies that strict guard or an accepted
+  verifier/theorem explains why the unbridged carry atoms cannot affect the
+  source/death certificate.
 - accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
 - accepted K26 non-square BZ evidence bound to the repaired schedule;

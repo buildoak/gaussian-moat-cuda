@@ -111,6 +111,11 @@ distance `sqrt(K)` of each coordinate carry atom. Coordinate carry atoms with
 no first-band port bridge are reported in the JSON. This is still diagnostic:
 the seam bridge is explicit evidence for the next engineering gate, not an
 accepted source/death certificate.
+The runner also has `--require-full-bridge`, which rejects a manifest handoff
+when any source coordinate carry atom lacks a first-band TileOp-port bridge.
+That strict mode is a guardrail for future claim-grade execution; the current
+K26 plan remains diagnostic until the seam bridge either satisfies this strict
+gate or has an accepted verifier/theorem for the unbridged carry atoms.
 
 ## Small Source Runner
 
