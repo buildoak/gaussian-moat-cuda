@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -31,6 +32,7 @@ struct Config {
   std::int64_t endpoint_a = 0;
   std::int64_t endpoint_b = 251;
   std::size_t max_atoms = 65535;
+  std::optional<std::string> manifest_in;
 };
 
 struct Point {
@@ -86,7 +88,9 @@ void usage(const char* prog) {
       << "  --endpoint-a A        endpoint real coordinate (default 0)\n"
       << "  --endpoint-b B        endpoint imaginary coordinate (default 251)\n"
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
-      << "                        (default 65535)\n";
+      << "                        (default 65535)\n"
+      << "  --manifest-in PATH    read an incoming origin-prefix carry manifest\n"
+      << "                        at --r-start instead of seeding one atom\n";
 }
 
 bool parse_args(int argc, char** argv, Config& config) {
@@ -158,6 +162,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.max_atoms = static_cast<std::size_t>(parsed);
+    } else if (take_value("--manifest-in", value)) {
+      if (value.empty()) {
+        std::cerr << "--manifest-in must not be empty\n";
+        return false;
+      }
+      config.manifest_in = value;
     } else {
       std::cerr << "unknown argument: " << arg << "\n";
       return false;
@@ -185,6 +195,21 @@ bool parse_args(int argc, char** argv, Config& config) {
     return false;
   }
   return true;
+}
+
+lb_source::CarryManifest read_manifest_or_die(const std::string& path) {
+  std::ifstream in(path);
+  if (!in) {
+    std::cerr << "cannot open --manifest-in path: " << path << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  lb_source::CarryManifestReadResult decoded =
+      lb_source::read_carry_manifest(in);
+  if (!decoded.accepted()) {
+    std::cerr << "invalid --manifest-in: " << decoded.diagnostic << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return decoded.manifest;
 }
 
 std::uint64_t square_u64(std::uint64_t value) {
@@ -421,6 +446,37 @@ int main(int argc, char** argv) {
   std::map<lb_source::AtomId, std::vector<lb_source::AtomId>> adjacency;
   std::vector<lb_source::AtomId> source_seed_ids;
   std::optional<lb_source::SeparatorState> incoming;
+  std::string source_mode = "CERTIFIED_SEED";
+  std::uint64_t manifest_source_carry_atoms = 0;
+  if (config.manifest_in.has_value()) {
+    const lb_source::CarryManifest manifest =
+        read_manifest_or_die(*config.manifest_in);
+    if (manifest.k_sq != static_cast<std::uint64_t>(campaign::k_sq_value)) {
+      std::cerr << "manifest k_sq does not match compiled K_SQ\n";
+      return EXIT_FAILURE;
+    }
+    if (manifest.outer_radius != config.r_start) {
+      std::cerr << "manifest outer_radius must equal --r-start\n";
+      return EXIT_FAILURE;
+    }
+    if (manifest.carry_width != lb_source::ceil_sqrt(manifest.k_sq)) {
+      std::cerr << "manifest carry_width mismatch\n";
+      return EXIT_FAILURE;
+    }
+    incoming = manifest.separator;
+    source_mode = "ORIGIN_PREFIX_MANIFEST";
+    manifest_source_carry_atoms = manifest.separator.carry_atoms.size();
+    for (std::size_t c = 0; c < manifest.separator.component_partition.size();
+         ++c) {
+      if (!manifest.separator.source_bit_per_component[c]) {
+        continue;
+      }
+      for (const lb_source::AtomId id :
+           manifest.separator.component_partition[c]) {
+        source_seed_ids.push_back(id);
+      }
+    }
+  }
   lb_source::ProcessResult last;
   std::uint64_t previous_outer = config.r_start;
   std::uint64_t bands_processed = 0;
@@ -456,7 +512,8 @@ int main(int argc, char** argv) {
 
     for (const Point& point : new_points) {
       const lb_source::AtomId id = checked_atom_id(point.a, point.b);
-      const bool is_certified_seed = id == seed_id;
+      const bool is_certified_seed = !config.manifest_in.has_value() &&
+                                     id == seed_id;
       band.atoms.push_back({id, point.norm_sq, is_certified_seed});
       point_by_id.emplace(id, point);
       if (is_certified_seed) {
@@ -527,7 +584,7 @@ int main(int argc, char** argv) {
             << "\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\","
             << "\"domain\":\"cpu-tileop-fed-canonical-octant\","
             << "\"k_sq\":" << campaign::k_sq_value
-            << ",\"source_mode\":\"CERTIFIED_SEED\""
+            << ",\"source_mode\":\"" << source_mode << "\""
             << ",\"seed\":{\"a\":" << config.seed_a
             << ",\"b\":" << config.seed_b
             << ",\"norm_sq\":" << seed_norm << "}"
@@ -536,6 +593,8 @@ int main(int argc, char** argv) {
             << ",\"band_width\":" << config.band_width
             << ",\"carry_width\":"
             << lb_source::ceil_sqrt(campaign::k_sq_value)
+            << ",\"manifest_source_carry_atoms\":"
+            << manifest_source_carry_atoms
             << ",\"bands_processed\":" << bands_processed
             << ",\"campaign_tiles_processed\":" << campaign_tiles_processed
             << ",\"tileop_overflows\":" << tileop_overflows

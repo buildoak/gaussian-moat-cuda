@@ -28,6 +28,7 @@ struct Config {
   std::int64_t endpoint_b = 3;
   std::size_t max_atoms = 65535;
   std::optional<std::string> cert_out;
+  std::optional<std::string> manifest_out;
 };
 
 struct Point {
@@ -82,7 +83,9 @@ void usage(const char* prog) {
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
       << "                        (default 65535)\n"
       << "  --cert-out PATH       write lb_source_dead_cert_draft_v1 when the\n"
-      << "                        endpoint is reached and source dies\n";
+      << "                        endpoint is reached and source dies\n"
+      << "  --manifest-out PATH   write carry manifest when source survives into\n"
+      << "                        the final carry window\n";
 }
 
 bool parse_args(int argc, char** argv, Config& config) {
@@ -150,6 +153,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.cert_out = value;
+    } else if (take_value("--manifest-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--manifest-out must not be empty\n";
+        return false;
+      }
+      config.manifest_out = value;
     } else {
       std::cerr << "unknown argument: " << arg << "\n";
       return false;
@@ -510,6 +519,24 @@ int main(int argc, char** argv) {
           ? source_path_to_endpoint(source_seed_ids, endpoint_id, point_by_id,
                                     adjacency)
           : std::vector<lb_source::AtomId>{};
+  bool manifest_written = false;
+  if (config.manifest_out.has_value()) {
+    if (!last.accepted() || last.terminal_source_dead ||
+        !has_source_carry(last.outgoing)) {
+      std::cerr << "--manifest-out requires accepted live source carry\n";
+      return EXIT_FAILURE;
+    }
+    std::ofstream manifest(*config.manifest_out);
+    if (!manifest) {
+      std::cerr << "cannot open --manifest-out path: "
+                << *config.manifest_out << "\n";
+      return EXIT_FAILURE;
+    }
+    lb_source::write_carry_manifest(
+        manifest, lb_source::make_carry_manifest(config.k_sq, config.r_final,
+                                                 last));
+    manifest_written = true;
+  }
   bool cert_written = false;
   if (config.cert_out.has_value()) {
     if (!last.accepted() || !last.terminal_source_dead ||
@@ -582,6 +609,8 @@ int main(int argc, char** argv) {
             << ",\"source_path\":";
   append_source_path_json(std::cout, source_path, point_by_id);
   std::cout << ",\"cert_written\":" << (cert_written ? "true" : "false")
+            << ",\"manifest_written\":"
+            << (manifest_written ? "true" : "false")
             << ",\"non_claim\":\"small coordinate-fed sidecar runner; not a TileOp/CUDA SOURCE_DEAD_CERT\""
             << "}\n";
 

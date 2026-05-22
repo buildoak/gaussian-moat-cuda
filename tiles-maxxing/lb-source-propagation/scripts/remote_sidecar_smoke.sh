@@ -109,6 +109,24 @@ ctest --test-dir "$build_dir" --output-on-failure \
   --endpoint-b 251 \
   | tee "$out_dir/source_tileop_cpu_runner_smoke.json"
 
+"$build_dir/source_origin_cpu_runner" \
+  --k-sq 36 \
+  --r-final 248 \
+  --band-width 128 \
+  --endpoint-a 0 \
+  --endpoint-b 251 \
+  --manifest-out "$out_dir/source_origin_prefix_manifest.txt" \
+  | tee "$out_dir/source_origin_prefix_manifest_smoke.json"
+
+"$build_dir/source_tileop_cpu_runner" \
+  --r-start 248 \
+  --r-final 512 \
+  --band-width 128 \
+  --endpoint-a 0 \
+  --endpoint-b 251 \
+  --manifest-in "$out_dir/source_origin_prefix_manifest.txt" \
+  | tee "$out_dir/source_tileop_cpu_runner_manifest_smoke.json"
+
 "$build_dir/k26_tsuchimura_preflight" \
   | tee "$out_dir/k26_tsuchimura_preflight.json"
 
