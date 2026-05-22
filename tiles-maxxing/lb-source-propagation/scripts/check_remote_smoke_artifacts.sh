@@ -117,7 +117,7 @@ if [[ ! -d "$out_dir" ]]; then
 fi
 
 require_ctest_log "$out_dir/ctest.log" 24
-require_ctest_log "$out_dir/verification-ctest.log" 58
+require_ctest_log "$out_dir/verification-ctest.log" 64
 
 for artifact in \
   environment.txt \
@@ -260,12 +260,12 @@ require_grep '"executable_now":false' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands non-executable"
 require_grep '"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1"' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands BZ digest algorithm"
-require_grep '"seam_bridge_policy":"require_full_bridge"' \
-  "$out_dir/k26_source_run_commands.json" "K26 run commands strict seam bridge"
-require_grep '"blocked_if_unbridged_coordinate_carry_atoms":true' \
-  "$out_dir/k26_source_run_commands.json" "K26 run commands unbridged block"
-require_grep '--require-full-bridge' \
-  "$out_dir/k26_source_run_commands.json" "K26 run commands strict bridge flag"
+require_grep '"seam_bridge_policy":"diagnostic_allow_unbridged"' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands diagnostic seam bridge"
+require_grep '"blocked_if_unbridged_coordinate_carry_atoms":false' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands allow classified unbridged carry"
+require_grep '"claim_grade_requires_source_unbridged_unsafe_candidate_atoms":0' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands unsafe bridge stop condition"
 require_grep '--target-a 376039 --target-b 943460' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands target bridge flags"
 
