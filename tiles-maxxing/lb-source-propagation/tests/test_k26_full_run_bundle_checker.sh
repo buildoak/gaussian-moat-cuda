@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "usage: test_k26_full_run_bundle_checker.sh CHECKER" >&2
+  exit 2
+fi
+
+checker="$1"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+fake_source_dead_checker="$tmp/fake-source-dead-checker"
+cat > "$fake_source_dead_checker" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+if grep -q '"schema":"lb_source_dead_cert_draft_v1"' "$1"; then
+  echo '{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}'
+else
+  echo 'SOURCE_DEAD_CERT_DRAFT_REJECT: bad fixture' >&2
+  exit 1
+fi
+SH
+chmod +x "$fake_source_dead_checker"
+
+write_bundle() {
+  local dir="$1"
+  mkdir -p "$dir"
+  cat > "$dir/k26_source_run_commands.json" <<'JSON'
+{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"continuation":{"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"require_full_bridge","blocked_if_unbridged_coordinate_carry_atoms":true,"command":"source_tileop_port_runner --require-full-bridge"}}
+JSON
+  cat > "$dir/k26_bz_schedule_check.json" <<'JSON'
+{"schema":"lb_source_k26_bz_schedule_check_v1","proof_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","repaired_summary":{"bad_norm_count":0,"bz_clean":true}}
+JSON
+  cat > "$dir/k26_source_run_profile.json" <<'JSON'
+{"schema":"lb_source_k26_run_profile_v1","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","schedule":{"bz_evidence":{"accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"}}}
+JSON
+  cat > "$dir/k26-prefix-result.json" <<'JSON'
+{"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"manifest_written":true,"prefix_witness_written":true}
+JSON
+  cat > "$dir/k26-continuation-result.json" <<'JSON'
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"require_full_bridge","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","max_source_norm_sq":1031520000000}
+JSON
+  cat > "$dir/k26-source-dead-cert.json" <<'JSON'
+{"schema":"lb_source_dead_cert_draft_v1","k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615070786916]}}
+JSON
+}
+
+good="$tmp/good"
+write_bundle "$good"
+"$checker" "$good" --source-dead-checker "$fake_source_dead_checker" \
+  > "$tmp/good.log"
+grep -q 'K26_FULL_RUN_BUNDLE_SUMMARY_ONLY_NON_CLAIM_PASS' "$tmp/good.log"
+
+bad_digest="$tmp/bad-digest"
+write_bundle "$bad_digest"
+perl -0pi -e 's/7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95/0000000000000000000000000000000000000000000000000000000000000000/' \
+  "$bad_digest/k26_source_run_profile.json"
+if "$checker" "$bad_digest" --source-dead-checker "$fake_source_dead_checker" \
+    > "$tmp/bad-digest.log" 2>&1; then
+  echo "checker accepted mismatched BZ digest" >&2
+  exit 1
+fi
+grep -q 'K26 BZ digest profile binding' "$tmp/bad-digest.log"
+
+bad_bridge="$tmp/bad-bridge"
+write_bundle "$bad_bridge"
+perl -0pi -e 's/"unbridged_coordinate_carry_atoms":0/"unbridged_coordinate_carry_atoms":1/' \
+  "$bad_bridge/k26-continuation-result.json"
+if "$checker" "$bad_bridge" --source-dead-checker "$fake_source_dead_checker" \
+    > "$tmp/bad-bridge.log" 2>&1; then
+  echo "checker accepted unbridged coordinate carry" >&2
+  exit 1
+fi
+grep -q 'K26 continuation full bridge' "$tmp/bad-bridge.log"
+
+missing="$tmp/missing"
+write_bundle "$missing"
+rm "$missing/k26-source-dead-cert.json"
+if "$checker" "$missing" --source-dead-checker "$fake_source_dead_checker" \
+    > "$tmp/missing.log" 2>&1; then
+  echo "checker accepted missing source-dead cert" >&2
+  exit 1
+fi
+grep -q 'missing required artifact' "$tmp/missing.log"
+
+echo "k26 full-run bundle checker self-test PASS"

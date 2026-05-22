@@ -195,6 +195,21 @@ After pulling Vast artifacts, run the same checker with `--expect-head` and
 The sqrt(26) readiness guard lives in
 `docs/k26-tsuchimura-readiness.md`.
 
+The full-run bundle gate is:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/check_k26_full_run_bundle.sh \
+  /path/to/k26-full-run-artifacts \
+  --source-dead-checker /path/to/source_dead_cert_check
+```
+
+It is intentionally stricter than the remote smoke checker. It expects the
+K26 prefix result, strict-bridge continuation result, BZ schedule evidence,
+run profile, run command contract, and `k26-source-dead-cert.json`; it rejects
+digest mismatches, unbridged coordinate carry, overflow, wrong component size,
+missing source-dead draft, or a source-dead draft not accepted by the
+independent checker.
+
 The exact non-claim command contract for the eventual K26 run is emitted by:
 
 ```bash

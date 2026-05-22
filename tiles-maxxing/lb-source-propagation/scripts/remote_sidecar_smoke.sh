@@ -168,7 +168,7 @@ ctest --test-dir "$verify_build_dir" --output-on-failure \
 
 cat > "$out_dir/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule diagnostic, K26 run profile draft, and K26 run command contract only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule evidence, K26 run profile draft, and K26 run command contract only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 

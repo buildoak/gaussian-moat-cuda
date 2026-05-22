@@ -65,6 +65,21 @@ verifier, the campaign should use the conservative value.
 - stable artifact hashes for carry manifests and source profile drafts;
 - commit/build identity and BZ evidence in the profile metadata.
 
+The bundle-level acceptance gate is:
+
+```bash
+check_k26_full_run_bundle.sh OUT_DIR --source-dead-checker source_dead_cert_check
+```
+
+It expects `k26-prefix-result.json`, `k26-continuation-result.json`, the K26
+command/profile/BZ evidence JSON, and `k26-source-dead-cert.json`. It rejects
+the bundle if the BZ digest is not identical across artifacts, if the
+continuation did not run with `seam_bridge_policy=require_full_bridge`, if any
+source coordinate carry atom remained unbridged, if TileOp overflow occurred,
+if terminal source death was not reached at `R_final=1015645`, if the terminal
+inventory count is not `14,542,615,005`, or if the independent
+`source_dead_cert_check` does not accept the source-dead draft.
+
 ## Executable Contract
 
 The local executable contract is:
