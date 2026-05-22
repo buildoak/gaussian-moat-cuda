@@ -16,7 +16,7 @@
   },
   "target_path_provenance": "mixed_coordinate_port_atom_chain_non_claim",
   "target_atom_path_length": 3,
-  "target_atom_path": [1615075207963900, -9223372036854775800, 1615075207964004],
+  "target_atom_path": [1615075207963900, -25220051735553, 1615075207964004],
   "terminal_source_inventory_summary": {
     "count": 14542615005,
     "digest_algorithm": "sha256:lb_source_inventory_v1",

@@ -113,6 +113,14 @@ std::uint64_t coordinate_atom_norm_sq(std::int64_t id) {
   return static_cast<std::uint64_t>(norm);
 }
 
+bool valid_port_atom_id(std::int64_t id) {
+  if (id >= 0 || id == std::numeric_limits<std::int64_t>::min()) {
+    return false;
+  }
+  const std::uint64_t raw = static_cast<std::uint64_t>(-1 - id);
+  return (raw >> 58) == 0;
+}
+
 void require_point(const nlohmann::json& object, const char* field,
                    std::uint64_t expected_a, std::uint64_t expected_b) {
   const nlohmann::json& point = require_object(object, field);
@@ -191,8 +199,23 @@ void verify_gap(const nlohmann::json& gap) {
   if (atom_path.back() != kEndpointAtomId) {
     throw std::runtime_error("target atom path does not end at K26 endpoint atom");
   }
-  if (std::none_of(atom_path.begin(), atom_path.end(),
-                   [](std::int64_t id) { return id < 0; })) {
+  std::size_t coordinate_atoms = 0;
+  std::size_t port_atoms = 0;
+  for (const std::int64_t id : atom_path) {
+    if (id >= 0) {
+      (void)coordinate_atom_norm_sq(id);
+      ++coordinate_atoms;
+      continue;
+    }
+    if (!valid_port_atom_id(id)) {
+      throw std::runtime_error("target atom path contains invalid TileOp port atom id");
+    }
+    ++port_atoms;
+  }
+  if (coordinate_atoms < 2) {
+    throw std::runtime_error("target atom path needs coordinate source and endpoint atoms");
+  }
+  if (port_atoms == 0) {
     throw std::runtime_error("target atom path has no TileOp port atom");
   }
 
