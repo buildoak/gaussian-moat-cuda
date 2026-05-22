@@ -395,6 +395,8 @@ void verify_gap(const nlohmann::json& gap) {
   const nlohmann::json& missing =
       require_array(gap, "missing_for_source_dead_cert");
   bool has_coordinate_path_gap = false;
+  bool has_terminal_inventory_gap = false;
+  bool has_bz_schedule_gap = false;
   bool has_verifier_gap = false;
   for (const nlohmann::json& item : missing) {
     if (!item.is_string() || !sane_text(item.get<std::string>())) {
@@ -405,12 +407,21 @@ void verify_gap(const nlohmann::json& gap) {
         std::string::npos) {
       has_coordinate_path_gap = true;
     }
+    if (text.find("terminal inventory") != std::string::npos) {
+      has_terminal_inventory_gap = true;
+    }
+    if (text.find("BZ schedule") != std::string::npos) {
+      has_bz_schedule_gap = true;
+    }
     if (text.find("verifier") != std::string::npos) {
       has_verifier_gap = true;
     }
   }
-  if (!has_coordinate_path_gap || !has_verifier_gap) {
-    throw std::runtime_error("missing gap list omits coordinate path or verifier gap");
+  if (!has_coordinate_path_gap || !has_terminal_inventory_gap ||
+      !has_bz_schedule_gap || !has_verifier_gap) {
+    throw std::runtime_error(
+        "missing gap list omits coordinate path, terminal inventory, BZ "
+        "schedule, or verifier gap");
   }
 }
 

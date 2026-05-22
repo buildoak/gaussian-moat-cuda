@@ -208,7 +208,33 @@
     "missing_for_source_dead_cert": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": { "type": "string", "minLength": 1 },
+      "allOf": [
+        {
+          "contains": {
+            "type": "string",
+            "pattern": "coordinate Gaussian-prime source_path"
+          }
+        },
+        {
+          "contains": {
+            "type": "string",
+            "pattern": "terminal inventory"
+          }
+        },
+        {
+          "contains": {
+            "type": "string",
+            "pattern": "BZ schedule"
+          }
+        },
+        {
+          "contains": {
+            "type": "string",
+            "pattern": "verifier"
+          }
+        }
+      ]
     }
   },
   "$defs": {
