@@ -9,6 +9,8 @@ if(NOT DEFINED K_SQ)
   set(K_SQ 36 CACHE STRING "Squared step bound for campaign TileOp smoke")
 endif()
 
+find_package(OpenMP QUIET)
+
 add_library(lb_source_propagation STATIC
   src/source_propagation.cpp
 )
@@ -31,6 +33,9 @@ add_library(lb_source_campaign_tileop STATIC
   ../cpp-campaign-v2/src/union_find.cpp
 )
 target_compile_options(lb_source_campaign_tileop PRIVATE -Wall -Wextra -Werror)
+if(NOT OpenMP_CXX_FOUND)
+  target_compile_options(lb_source_campaign_tileop PRIVATE -Wno-unknown-pragmas)
+endif()
 target_compile_definitions(lb_source_campaign_tileop PUBLIC K_SQ=${K_SQ})
 target_include_directories(lb_source_campaign_tileop
   PUBLIC
@@ -38,6 +43,9 @@ target_include_directories(lb_source_campaign_tileop
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
 )
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(lb_source_campaign_tileop PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 add_executable(source_prop_smoke apps/source_prop_smoke.cpp)
 target_link_libraries(source_prop_smoke PRIVATE lb_source_propagation)
