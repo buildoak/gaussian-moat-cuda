@@ -85,8 +85,11 @@ source coordinate carry atom remained unbridged, if TileOp overflow occurred,
 if terminal source death was not reached at `R_final=1015645`, if the terminal
 inventory count is not `14,542,615,005`, if the cert's terminal inventory
 summary does not match the executed continuation count/digest/max-norm/tie-set,
-or if the independent `source_dead_cert_check` does not accept the source-dead
-draft.
+or if the independent `source_dead_cert_check` does not accept a listed
+source-dead draft. A `summary_only_non_claim` cert remains useful diagnostic
+shape evidence, but the bundle checker reports
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM` instead
+of accepting the bundle.
 
 The executable harness for producing the bundle shape is:
 
@@ -109,7 +112,10 @@ independent `source_dead_gap_check` before reporting the missing cert blocker.
 With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/continuation/gap artifacts before the checker runs.
 This keeps a paid sqrt(26) attempt reproducible without relaxing the
-`SOURCE_DEAD_CERT` logic.
+`SOURCE_DEAD_CERT` logic. If the supplied cert is only a summary accumulator
+non-claim, the harness writes
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM` to
+`status.txt` and exits nonzero.
 
 ## Executable Contract
 

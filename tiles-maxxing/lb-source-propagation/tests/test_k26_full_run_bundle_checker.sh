@@ -15,7 +15,11 @@ cat > "$fake_source_dead_checker" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 if grep -q '"schema":"lb_source_dead_cert_draft_v1"' "$1"; then
-  echo '{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}'
+  if grep -q '"proof_status":"SUMMARY_ONLY_NON_CLAIM"' "$1"; then
+    echo '{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}'
+  else
+    echo '{"status":"SOURCE_DEAD_CERT_DRAFT_PASS"}'
+  fi
 else
   echo 'SOURCE_DEAD_CERT_DRAFT_REJECT: bad fixture' >&2
   exit 1
@@ -100,7 +104,22 @@ grep -q 'missing required --source-dead-gap-checker' \
   --source-dead-checker "$fake_source_dead_checker" \
   --source-dead-gap-checker "$fake_source_dead_gap_checker" \
   > "$tmp/good.log"
-grep -q 'K26_FULL_RUN_BUNDLE_SUMMARY_ONLY_NON_CLAIM_PASS' "$tmp/good.log"
+grep -q 'K26_FULL_RUN_BUNDLE_DRAFT_PASS' "$tmp/good.log"
+
+summary_nonclaim="$tmp/summary-nonclaim"
+write_bundle "$summary_nonclaim"
+perl -0pi -e 's/"metadata":/"proof_status":"SUMMARY_ONLY_NON_CLAIM","non_claim":"summary-only diagnostic inventory, not a SOURCE_DEAD_CERT","metadata":/' \
+  "$summary_nonclaim/k26-source-dead-cert.json"
+write_manifest "$summary_nonclaim"
+if "$checker" "$summary_nonclaim" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/summary-nonclaim.log" 2>&1; then
+  echo "checker accepted summary-only non-claim cert as completed K26 bundle" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM' \
+  "$tmp/summary-nonclaim.log"
 
 bad_gap="$tmp/bad-gap"
 write_bundle "$bad_gap"

@@ -136,8 +136,10 @@ JSON
 fake_source_dead_checker="$tmp/fake-source-dead-checker"
 cat > "$fake_source_dead_checker" <<'SH'
 #!/usr/bin/env bash
-if grep -q '"terminal_source_inventory_summary":{"count":14542615005' "$1"; then
+if grep -q '"proof_status":"SUMMARY_ONLY_NON_CLAIM"' "$1"; then
   echo '{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}'
+elif grep -q '"terminal_source_inventory_summary":{"count":14542615005' "$1"; then
+  echo '{"status":"SOURCE_DEAD_CERT_DRAFT_PASS"}'
 else
   exit 1
 fi
@@ -167,7 +169,7 @@ checked_out="$tmp/checked"
   --source-dead-checker "$fake_source_dead_checker" \
   >/tmp/k26-harness-checked.out
 grep -q 'K26_FULL_RUN_BUNDLE_CHECKED' "$checked_out/status.txt"
-grep -q 'K26_FULL_RUN_BUNDLE_SUMMARY_ONLY_NON_CLAIM_PASS' \
+grep -q 'K26_FULL_RUN_BUNDLE_DRAFT_PASS' \
   "$checked_out/k26-full-run-bundle-check.log"
 grep -q 'k26-source-dead-cert.json' \
   "$checked_out/k26-full-run-artifacts.sha256"
@@ -175,5 +177,26 @@ grep -q 'k26-source-dead-gap.json' \
   "$checked_out/k26-full-run-artifacts.sha256"
 grep -q 'SOURCE_DEAD_GAP_NON_CLAIM_PASS' \
   "$checked_out/k26-source-dead-gap-check.log"
+
+summary_cert="$tmp/k26-source-dead-cert-summary-nonclaim.json"
+cp "$cert" "$summary_cert"
+perl -0pi -e 's/"metadata":/"proof_status":"SUMMARY_ONLY_NON_CLAIM","non_claim":"summary-only diagnostic inventory, not a SOURCE_DEAD_CERT","metadata":/' \
+  "$summary_cert"
+summary_out="$tmp/summary-checked"
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$summary_out" \
+    --cert-in "$summary_cert" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    >/tmp/k26-harness-summary.out \
+    2>/tmp/k26-harness-summary.err; then
+  echo "harness accepted a summary-only non-claim cert as checked K26 bundle" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM' \
+  "$summary_out/status.txt"
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM' \
+  "$summary_out/k26-full-run-bundle-check.log"
 
 echo "k26 full-run harness self-test PASS"

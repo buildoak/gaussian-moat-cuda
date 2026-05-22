@@ -322,6 +322,19 @@ bundle_checker_args=(
   --source-dead-checker "$source_dead_checker"
   --source-dead-gap-checker "$source_dead_gap_checker"
 )
+set +e
 "$bundle_checker" "${bundle_checker_args[@]}" \
-  | tee "$out_dir/k26-full-run-bundle-check.log"
+  > "$out_dir/k26-full-run-bundle-check.log" 2>&1
+bundle_checker_status=$?
+set -e
+cat "$out_dir/k26-full-run-bundle-check.log"
+if [[ "$bundle_checker_status" -ne 0 ]]; then
+  if grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM' \
+      "$out_dir/k26-full-run-bundle-check.log"; then
+    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM"
+    exit 3
+  fi
+  write_status "K26_FULL_RUN_BUNDLE_BLOCKED_BUNDLE_CHECK_REJECTED"
+  exit "$bundle_checker_status"
+fi
 write_status "K26_FULL_RUN_BUNDLE_CHECKED"
