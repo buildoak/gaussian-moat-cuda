@@ -107,7 +107,8 @@ run_k26_full_source_bundle.sh \
 It writes the command, BZ, profile, prefix, and continuation artifacts using
 the strict `--require-full-bridge` continuation schedule. It is deliberately
 certificate-gated: without a supplied `k26-source-dead-cert.json` it still
-writes `k26-prefix-progress.jsonl`, `k26-source-dead-gap.json`, a partial
+writes `k26-prefix-progress.jsonl`, `k26-continuation-progress.jsonl`,
+`k26-source-dead-gap.json`, a partial
 `k26-full-run-artifacts.sha256` manifest, and stops with
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. The gap artifact binds
 the continuation artifact and records the exact missing layer: a coordinate
@@ -121,7 +122,10 @@ independent `source_dead_gap_check` before reporting the missing cert blocker.
 The prefix-progress JSONL rows are operational telemetry only: they expose
 band radii, generated atom counts, edge counts, source carry/death state, and
 phase timings so a paid run can be stopped with evidence instead of guesswork.
-They do not relax the `SOURCE_DEAD_CERT` gate.
+The continuation-progress JSONL rows do the same for TileOp-port continuation
+bands, including tile counts, port graph counts, overflow totals, seam bridge
+counts, source carry/death state, and timings. Neither progress artifact
+relaxes the `SOURCE_DEAD_CERT` gate.
 With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/progress/continuation/gap artifacts before the
 checker runs.

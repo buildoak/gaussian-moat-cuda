@@ -261,6 +261,10 @@ the prefix and continuation artifacts are produced. It also writes
 `k26-prefix-progress.jsonl`, one JSON row per processed coordinate-prefix band,
 with atom/edge counts, source carry/death state, and timing fields. This is
 paid-run observability, not claim evidence. The harness also writes
+`k26-continuation-progress.jsonl`, one JSON row per processed TileOp-port band,
+with tile counts, port atom/edge counts, overflow totals, seam bridge counts,
+source carry/death state, and timing fields. This is also observability only.
+The harness also writes
 `k26-source-dead-gap.json`, binding the continuation artifact and naming the
 missing coordinate Gaussian-prime source-path layer. The gap artifact also
 binds the repaired K26 BZ schedule digest as schedule-only, non-claim evidence.
@@ -268,8 +272,8 @@ When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
 checker before stopping on the missing cert. It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
-prefix-progress, continuation, manifest, witness, gap, and any supplied cert
-artifacts by SHA-256.
+prefix-progress, continuation, continuation-progress, manifest, witness, gap,
+and any supplied cert artifacts by SHA-256.
 Use `--timeout-seconds` on paid runs so prefix or continuation work stops with
 a status-level timeout blocker instead of silently exceeding the runtime
 budget.

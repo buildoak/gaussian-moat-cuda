@@ -2,6 +2,7 @@
 #include "lb_source/tileop_port_graph.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
@@ -36,6 +37,7 @@ struct Config {
   std::optional<std::string> manifest_in;
   std::optional<std::string> prefix_witness_in;
   std::optional<std::string> manifest_out;
+  std::optional<std::string> progress_out;
   std::optional<std::uint64_t> target_a;
   std::optional<std::uint64_t> target_b;
 };
@@ -144,7 +146,8 @@ void usage(const char* prog) {
       << "  --target-a A --target-b B\n"
       << "                        add a canonical coordinate target atom and\n"
       << "                        bridge it to its TileOp port component when seen\n"
-      << "  --manifest-out PATH   write final carry manifest when source survives\n";
+      << "  --manifest-out PATH   write final carry manifest when source survives\n"
+      << "  --progress-out PATH   write one JSONL progress row per processed band\n";
 }
 
 bool parse_args(int argc, char** argv, Config& config) {
@@ -241,6 +244,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.manifest_out = value;
+    } else if (take_value("--progress-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--progress-out must not be empty\n";
+        return false;
+      }
+      config.progress_out = value;
     } else {
       std::cerr << "unknown argument: " << arg << "\n";
       return false;
@@ -461,6 +470,13 @@ std::uint64_t dist_sq(const Point& lhs, const Point& rhs) {
   const __int128 da = static_cast<__int128>(lhs.a) - rhs.a;
   const __int128 db = static_cast<__int128>(lhs.b) - rhs.b;
   return static_cast<std::uint64_t>(da * da + db * db);
+}
+
+std::uint64_t elapsed_ms(std::chrono::steady_clock::time_point begin,
+                         std::chrono::steady_clock::time_point end) {
+  return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
+          .count());
 }
 
 bool has_source_carry(const lb_source::SeparatorState& state) {
@@ -933,9 +949,19 @@ int main(int argc, char** argv) {
   std::uint64_t internal_edges = 0;
   std::uint64_t seam_edges = 0;
   std::map<lb_source::AtomId, std::uint64_t> norm_by_id;
+  std::ofstream progress;
+  if (config.progress_out.has_value()) {
+    progress.open(*config.progress_out);
+    if (!progress) {
+      std::cerr << "cannot open --progress-out path: " << *config.progress_out
+                << "\n";
+      return EXIT_FAILURE;
+    }
+  }
 
   for (std::size_t segment = 0; segment + 1 < schedule_radii.size();
        ++segment) {
+    const auto band_begin = std::chrono::steady_clock::now();
     const std::uint64_t previous_outer = schedule_radii[segment];
     const std::uint64_t outer = schedule_radii[segment + 1];
     campaign::CampaignConstants constants;
@@ -954,12 +980,15 @@ int main(int argc, char** argv) {
       std::cerr << "grid invariant failed: " << invariant_error << "\n";
       return EXIT_FAILURE;
     }
+    const auto grid_done = std::chrono::steady_clock::now();
 
     const std::vector<campaign::TileCoord> coords =
         grid.enumerate_active_tiles();
     campaign_tiles_processed += coords.size();
+    const auto enumerate_done = std::chrono::steady_clock::now();
     std::vector<campaign::TileOp> tileops =
         build_tileops(coords, constants, grid, tileop_overflows);
+    const auto tileop_done = std::chrono::steady_clock::now();
 
     const lb_source::TileOpPortGraphResult graph =
         lb_source::make_tileop_port_band({
@@ -974,21 +1003,30 @@ int main(int argc, char** argv) {
       std::cerr << "TileOp port graph rejected: " << graph.diagnostic << "\n";
       return EXIT_FAILURE;
     }
+    const auto graph_done = std::chrono::steady_clock::now();
     for (const lb_source::BandAtom& atom : graph.band.atoms) {
       norm_by_id.emplace(atom.id, atom.norm_sq);
     }
     lb_source::BandInput band = graph.band;
+    bool segment_target_seen = false;
+    std::uint64_t segment_target_port_atoms = 0;
+    std::uint64_t segment_target_bridge_edges = 0;
     if (target.has_value() && !target_seen) {
       const TargetBridgeResult target_bridge =
           bridge_target_coordinate_to_ports(*target, constants, coords, tileops,
                                             band);
       if (target_bridge.seen) {
+        segment_target_seen = true;
+        segment_target_port_atoms = target_bridge.port_atoms;
+        segment_target_bridge_edges = target_bridge.bridge_edges;
         target_seen = true;
         target_port_atoms = target_bridge.port_atoms;
         target_bridge_edges = target_bridge.bridge_edges;
         norm_by_id.emplace(*target_id, target->norm_sq);
       }
     }
+    const auto target_bridge_done = std::chrono::steady_clock::now();
+    PortManifestBridgeResult segment_bridge;
     if (coordinate_manifest.has_value() && bands_processed == 0) {
       lb_source::BandInput bridged_band = band;
       for (const lb_source::CarryAtom& atom :
@@ -1000,6 +1038,7 @@ int main(int argc, char** argv) {
       const PortManifestBridgeResult bridge =
           bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
                                               coords, tileops, bridged_band);
+      segment_bridge = bridge;
       if (config.require_full_bridge &&
           bridge.unbridged_coordinate_carry_atoms != 0) {
         std::cerr
@@ -1036,11 +1075,69 @@ int main(int argc, char** argv) {
         }
       }
     }
+    const auto process_done = std::chrono::steady_clock::now();
     port_atoms += graph.port_atoms;
     internal_edges += graph.internal_edges;
     seam_edges += graph.seam_edges;
 
     ++bands_processed;
+    if (progress) {
+      const bool segment_accepted = last.accepted();
+      const bool segment_source_carry =
+          segment_accepted && !last.terminal_source_dead &&
+          has_source_carry(last.outgoing);
+      progress << "{\"schema\":\"lb_source_tileop_port_progress_v1\""
+               << ",\"band_index\":" << (bands_processed - 1)
+               << ",\"r_start\":" << previous_outer
+               << ",\"r_outer\":" << outer
+               << ",\"tiles\":" << coords.size()
+               << ",\"port_atoms\":" << graph.port_atoms
+               << ",\"internal_edges\":" << graph.internal_edges
+               << ",\"seam_edges\":" << graph.seam_edges
+               << ",\"tileop_overflows_total\":" << tileop_overflows
+               << ",\"accepted\":" << (segment_accepted ? "true" : "false")
+               << ",\"reject\":\""
+               << lb_source::reject_reason_name(last.reject) << "\""
+               << ",\"terminal_source_dead\":"
+               << (segment_accepted && last.terminal_source_dead ? "true"
+                                                                 : "false")
+               << ",\"has_source_carry\":"
+               << (segment_source_carry ? "true" : "false")
+               << ",\"source_carry_atoms\":"
+               << (segment_source_carry ? source_carry_atoms(last.outgoing)
+                                        : 0)
+               << ",\"outgoing_carry_atoms\":"
+               << (segment_accepted ? last.outgoing.carry_atoms.size() : 0)
+               << ",\"outgoing_components\":"
+               << (segment_accepted
+                       ? last.outgoing.component_partition.size()
+                       : 0)
+               << ",\"bridged_coordinate_carry_atoms\":"
+               << segment_bridge.bridged_coordinate_carry_atoms
+               << ",\"unbridged_coordinate_carry_atoms\":"
+               << segment_bridge.unbridged_coordinate_carry_atoms
+               << ",\"bridged_port_carry_atoms\":"
+               << segment_bridge.bridged_port_carry_atoms
+               << ",\"bridge_edges\":" << segment_bridge.bridge_edges
+               << ",\"target_seen\":"
+               << (segment_target_seen ? "true" : "false")
+               << ",\"target_port_atoms\":" << segment_target_port_atoms
+               << ",\"target_bridge_edges\":"
+               << segment_target_bridge_edges
+               << ",\"grid_ms\":" << elapsed_ms(band_begin, grid_done)
+               << ",\"enumerate_ms\":"
+               << elapsed_ms(grid_done, enumerate_done)
+               << ",\"tileop_ms\":"
+               << elapsed_ms(enumerate_done, tileop_done)
+               << ",\"graph_ms\":" << elapsed_ms(tileop_done, graph_done)
+               << ",\"target_bridge_ms\":"
+               << elapsed_ms(graph_done, target_bridge_done)
+               << ",\"process_ms\":"
+               << elapsed_ms(target_bridge_done, process_done)
+               << ",\"total_ms\":"
+               << elapsed_ms(band_begin, process_done) << "}\n";
+      progress.flush();
+    }
     if (!last.accepted()) {
       break;
     }

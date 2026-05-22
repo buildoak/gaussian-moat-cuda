@@ -17,7 +17,9 @@ Required artifact names:
   k26_bz_schedule_check.json
   k26_source_run_profile.json
   k26-prefix-result.json
+  k26-prefix-progress.jsonl
   k26-continuation-result.json
+  k26-continuation-progress.jsonl
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
   k26-source-dead-gap.json
@@ -165,15 +167,18 @@ commands="$out_dir/k26_source_run_commands.json"
 bz="$out_dir/k26_bz_schedule_check.json"
 profile="$out_dir/k26_source_run_profile.json"
 prefix="$out_dir/k26-prefix-result.json"
+prefix_progress="$out_dir/k26-prefix-progress.jsonl"
 continuation="$out_dir/k26-continuation-result.json"
+continuation_progress="$out_dir/k26-continuation-progress.jsonl"
 prefix_manifest="$out_dir/k26-prefix-manifest.txt"
 prefix_witness="$out_dir/k26-prefix-witness.txt"
 gap="$out_dir/k26-source-dead-gap.json"
 cert="$out_dir/k26-source-dead-cert.json"
 artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
 
-for artifact in "$commands" "$bz" "$profile" "$prefix" "$continuation" \
-    "$prefix_manifest" "$prefix_witness" "$gap" "$cert" "$artifact_manifest"; do
+for artifact in "$commands" "$bz" "$profile" "$prefix" "$prefix_progress" \
+    "$continuation" "$continuation_progress" "$prefix_manifest" \
+    "$prefix_witness" "$gap" "$cert" "$artifact_manifest"; do
   require_file "$artifact"
 done
 
@@ -196,7 +201,9 @@ require_manifest_hash "$commands" k26_source_run_commands.json
 require_manifest_hash "$bz" k26_bz_schedule_check.json
 require_manifest_hash "$profile" k26_source_run_profile.json
 require_manifest_hash "$prefix" k26-prefix-result.json
+require_manifest_hash "$prefix_progress" k26-prefix-progress.jsonl
 require_manifest_hash "$continuation" k26-continuation-result.json
+require_manifest_hash "$continuation_progress" k26-continuation-progress.jsonl
 require_manifest_hash "$prefix_manifest" k26-prefix-manifest.txt
 require_manifest_hash "$prefix_witness" k26-prefix-witness.txt
 require_manifest_hash "$gap" k26-source-dead-gap.json

@@ -22,6 +22,7 @@ Artifacts written under OUT_DIR:
   k26-prefix-result.json
   k26-prefix-progress.jsonl
   k26-continuation-result.json
+  k26-continuation-progress.jsonl
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
   k26-source-dead-gap.json
@@ -161,6 +162,7 @@ write_artifact_manifest() {
     k26-prefix-result.json
     k26-prefix-progress.jsonl
     k26-continuation-result.json
+    k26-continuation-progress.jsonl
     k26-prefix-manifest.txt
     k26-prefix-witness.txt
     k26-source-dead-gap.json
@@ -337,7 +339,8 @@ run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
     --target-a 376039 \
     --target-b 943460 \
     --manifest-in "$out_dir/k26-prefix-manifest.txt" \
-    --prefix-witness-in "$out_dir/k26-prefix-witness.txt"
+    --prefix-witness-in "$out_dir/k26-prefix-witness.txt" \
+    --progress-out "$out_dir/k26-continuation-progress.jsonl"
 
 write_source_dead_gap
 check_source_dead_gap

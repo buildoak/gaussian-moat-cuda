@@ -49,7 +49,9 @@ write_manifest() {
       k26_bz_schedule_check.json \
       k26_source_run_profile.json \
       k26-prefix-result.json \
+      k26-prefix-progress.jsonl \
       k26-continuation-result.json \
+      k26-continuation-progress.jsonl \
       k26-prefix-manifest.txt \
       k26-prefix-witness.txt \
       k26-source-dead-gap.json \
@@ -75,9 +77,15 @@ JSON
   cat > "$dir/k26-prefix-result.json" <<'JSON'
 {"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"manifest_written":true,"prefix_witness_written":true}
 JSON
+  cat > "$dir/k26-prefix-progress.jsonl" <<'JSONL'
+{"schema":"lb_source_origin_progress_v1","band_index":0,"r_start":0,"r_outer":8192,"accepted":true}
+JSONL
   cat > "$dir/k26-continuation-result.json" <<'JSON'
 {"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"require_full_bridge","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true,"path_provenance":"mixed_coordinate_port_atom_chain_non_claim","atom_path_length":3,"atom_path":[1615075207963900,-25220051735553,1615075207964004]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615075207964004]}
 JSON
+  cat > "$dir/k26-continuation-progress.jsonl" <<'JSONL'
+{"schema":"lb_source_tileop_port_progress_v1","band_index":0,"r_start":8192,"r_outer":122879,"accepted":true}
+JSONL
   local continuation_digest
   continuation_digest="$(shasum -a 256 "$dir/k26-continuation-result.json" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
   cat > "$dir/k26-source-dead-cert.json" <<JSON
