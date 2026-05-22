@@ -19,6 +19,7 @@
     "target_path_provenance",
     "target_atom_path_length",
     "target_atom_path",
+    "coordinate_path_obligation",
     "terminal_source_inventory_summary",
     "missing_for_source_dead_cert"
   ],
@@ -121,6 +122,36 @@
       "type": "array",
       "minItems": 1,
       "items": { "type": "integer" }
+    },
+    "coordinate_path_obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_provenance",
+        "observed_provenance",
+        "observed_coordinate_atom_count",
+        "observed_port_atom_count",
+        "per_port_coordinate_expansion",
+        "claim_grade_path_accepted"
+      ],
+      "properties": {
+        "required_provenance": {
+          "const": "coordinate_gaussian_prime_path"
+        },
+        "observed_provenance": {
+          "const": "mixed_coordinate_port_atom_chain_non_claim"
+        },
+        "observed_coordinate_atom_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_port_atom_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "per_port_coordinate_expansion": { "const": "missing" },
+        "claim_grade_path_accepted": { "const": false }
+      }
     },
     "terminal_source_inventory_summary": {
       "type": "object",

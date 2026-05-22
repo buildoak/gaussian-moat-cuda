@@ -46,6 +46,14 @@
     "source_unbridged_unsafe_candidate_atoms": 0,
     "source_bridge_rejected_candidate_atoms": 72
   },
+  "coordinate_path_obligation": {
+    "required_provenance": "coordinate_gaussian_prime_path",
+    "observed_provenance": "mixed_coordinate_port_atom_chain_non_claim",
+    "observed_coordinate_atom_count": 2,
+    "observed_port_atom_count": 1,
+    "per_port_coordinate_expansion": "missing",
+    "claim_grade_path_accepted": false
+  },
   "terminal_source_inventory_summary": {
     "count": 14542615005,
     "digest_algorithm": "sha256:lb_source_inventory_v1",

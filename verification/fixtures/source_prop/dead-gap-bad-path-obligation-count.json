@@ -43,13 +43,13 @@
     "source_unbridged_without_next_band_candidates": 1154,
     "source_unbridged_with_next_band_candidates": 57,
     "source_unbridged_dead_end_candidate_atoms": 57,
-    "source_unbridged_unsafe_candidate_atoms": 1,
+    "source_unbridged_unsafe_candidate_atoms": 0,
     "source_bridge_rejected_candidate_atoms": 72
   },
   "coordinate_path_obligation": {
     "required_provenance": "coordinate_gaussian_prime_path",
     "observed_provenance": "mixed_coordinate_port_atom_chain_non_claim",
-    "observed_coordinate_atom_count": 2,
+    "observed_coordinate_atom_count": 3,
     "observed_port_atom_count": 1,
     "per_port_coordinate_expansion": "missing",
     "claim_grade_path_accepted": false

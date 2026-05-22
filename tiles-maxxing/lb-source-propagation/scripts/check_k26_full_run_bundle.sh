@@ -117,6 +117,24 @@ json_array_value() {
   sed -nE "s/.*\"${field}\":(\[[0-9, -]*\]).*/\\1/p" "$path" | head -n 1
 }
 
+atom_path_kind_counts() {
+  local atom_path="$1"
+  local body token coordinate_count=0 port_count=0
+  body="${atom_path#[}"
+  body="${body%]}"
+  IFS=',' read -r -a tokens <<< "$body"
+  for token in "${tokens[@]}"; do
+    token="${token//[[:space:]]/}"
+    [[ -z "$token" ]] && continue
+    if [[ "$token" == -* ]]; then
+      port_count=$((port_count + 1))
+    else
+      coordinate_count=$((coordinate_count + 1))
+    fi
+  done
+  printf '%s %s\n' "$coordinate_count" "$port_count"
+}
+
 require_json_string_value() {
   local path="$1"
   local field="$2"
@@ -379,6 +397,8 @@ require_grep '"bridge_safety":.*"source_unbridged_unsafe_candidate_atoms":0' "$g
   "K26 source-dead gap unsafe bridge stop condition"
 require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' "$gap" \
   "K26 source-dead gap target path provenance"
+require_grep '"coordinate_path_obligation":.*"required_provenance":"coordinate_gaussian_prime_path".*"observed_provenance":"mixed_coordinate_port_atom_chain_non_claim".*"per_port_coordinate_expansion":"missing".*"claim_grade_path_accepted":false' "$gap" \
+  "K26 source-dead gap coordinate path obligation"
 require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
   "K26 source-dead gap missing coordinate source path"
 
@@ -426,6 +446,18 @@ require_equal "$continuation_atom_path_length" "$gap_atom_path_length" \
   "K26 gap atom path length binding"
 require_equal "$continuation_atom_path" "$gap_atom_path" \
   "K26 gap atom path binding"
+gap_observed_provenance="$(require_json_string_value "$gap" observed_provenance)"
+require_equal "$gap_path_provenance" "$gap_observed_provenance" \
+  "K26 gap coordinate path observed provenance binding"
+atom_path_counts="$(atom_path_kind_counts "$gap_atom_path")"
+gap_coordinate_atom_count="$(
+  require_json_number_value "$gap" observed_coordinate_atom_count
+)"
+gap_port_atom_count="$(require_json_number_value "$gap" observed_port_atom_count)"
+require_equal "${atom_path_counts%% *}" "$gap_coordinate_atom_count" \
+  "K26 gap coordinate path coordinate atom count"
+require_equal "${atom_path_counts##* }" "$gap_port_atom_count" \
+  "K26 gap coordinate path port atom count"
 continuation_inventory_count="$(
   require_json_number_value "$continuation" source_inventory_count
 )"

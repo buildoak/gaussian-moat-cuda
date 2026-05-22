@@ -302,6 +302,34 @@ void verify_gap(const nlohmann::json& gap) {
     throw std::runtime_error("target atom path does not enter endpoint through the K26 endpoint tile");
   }
 
+  const nlohmann::json& path_obligation =
+      require_object(gap, "coordinate_path_obligation");
+  if (require_string(path_obligation, "required_provenance") !=
+      "coordinate_gaussian_prime_path") {
+    throw std::runtime_error("coordinate path obligation has wrong required provenance");
+  }
+  if (require_string(path_obligation, "observed_provenance") !=
+      "mixed_coordinate_port_atom_chain_non_claim") {
+    throw std::runtime_error("coordinate path obligation has wrong observed provenance");
+  }
+  if (require_u64(path_obligation, "observed_coordinate_atom_count") !=
+      coordinate_atoms) {
+    throw std::runtime_error("coordinate path obligation coordinate count mismatch");
+  }
+  if (require_u64(path_obligation, "observed_port_atom_count") != port_atoms) {
+    throw std::runtime_error("coordinate path obligation port count mismatch");
+  }
+  if (port_atoms == 0) {
+    throw std::runtime_error("coordinate path obligation needs a port expansion gap");
+  }
+  if (require_string(path_obligation, "per_port_coordinate_expansion") !=
+      "missing") {
+    throw std::runtime_error("coordinate path obligation must report missing port expansion");
+  }
+  if (require_bool(path_obligation, "claim_grade_path_accepted")) {
+    throw std::runtime_error("coordinate path obligation must not accept mixed atom chain as claim-grade");
+  }
+
   const nlohmann::json& summary =
       require_object(gap, "terminal_source_inventory_summary");
   if (require_u64(summary, "count") != kExpectedComponentSize) {
