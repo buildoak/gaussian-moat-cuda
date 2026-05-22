@@ -36,6 +36,16 @@
     -25220051735553,
     1615075207964004
   ],
+  "bridge_safety": {
+    "seam_bridge_policy": "diagnostic_allow_unbridged",
+    "source_bridged_coordinate_carry_atoms": 1369,
+    "source_unbridged_coordinate_carry_atoms": 1211,
+    "source_unbridged_without_next_band_candidates": 1154,
+    "source_unbridged_with_next_band_candidates": 57,
+    "source_unbridged_dead_end_candidate_atoms": 57,
+    "source_unbridged_unsafe_candidate_atoms": 0,
+    "source_bridge_rejected_candidate_atoms": 72
+  },
   "terminal_source_inventory_summary": {
     "count": 14542615005,
     "digest_algorithm": "sha256:lb_source_inventory_v1",

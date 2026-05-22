@@ -268,6 +268,9 @@ write_source_dead_gap() {
   local path_provenance atom_path atom_path_length inventory_count
   local inventory_digest max_norm max_ties bz_status bz_digest_algorithm
   local bz_digest_hex
+  local seam_bridge_policy source_bridged source_unbridged
+  local source_unbridged_without source_unbridged_with source_dead_end
+  local source_unsafe source_bridge_rejected
   path_provenance="$(json_string_value "$continuation" path_provenance)"
   atom_path="$(json_array_value "$continuation" atom_path)"
   atom_path_length="$(json_number_value "$continuation" atom_path_length)"
@@ -275,6 +278,14 @@ write_source_dead_gap() {
   inventory_digest="$(json_string_value "$continuation" source_inventory_digest_hex)"
   max_norm="$(json_number_value "$continuation" max_source_norm_sq)"
   max_ties="$(json_array_value "$continuation" max_source_norm_atom_ids)"
+  seam_bridge_policy="$(json_string_value "$continuation" seam_bridge_policy)"
+  source_bridged="$(json_number_value "$continuation" source_bridged_coordinate_carry_atoms)"
+  source_unbridged="$(json_number_value "$continuation" source_unbridged_coordinate_carry_atoms)"
+  source_unbridged_without="$(json_number_value "$continuation" source_unbridged_without_next_band_candidates)"
+  source_unbridged_with="$(json_number_value "$continuation" source_unbridged_with_next_band_candidates)"
+  source_dead_end="$(json_number_value "$continuation" source_unbridged_dead_end_candidate_atoms)"
+  source_unsafe="$(json_number_value "$continuation" source_unbridged_unsafe_candidate_atoms)"
+  source_bridge_rejected="$(json_number_value "$continuation" source_bridge_rejected_candidate_atoms)"
   bz_status="$(json_string_value "$out_dir/k26_bz_schedule_check.json" proof_status)"
   bz_digest_algorithm="$(json_string_value "$out_dir/k26_bz_schedule_check.json" schedule_digest_algorithm)"
   bz_digest_hex="$(json_string_value "$out_dir/k26_bz_schedule_check.json" schedule_digest_hex)"
@@ -285,12 +296,20 @@ write_source_dead_gap() {
   require_extracted "$inventory_digest" "INVENTORY_DIGEST"
   require_extracted "$max_norm" "MAX_SOURCE_NORM"
   require_extracted "$max_ties" "MAX_SOURCE_NORM_TIES"
+  require_extracted "$seam_bridge_policy" "SEAM_BRIDGE_POLICY"
+  require_extracted "$source_bridged" "SOURCE_BRIDGED_CARRY"
+  require_extracted "$source_unbridged" "SOURCE_UNBRIDGED_CARRY"
+  require_extracted "$source_unbridged_without" "SOURCE_UNBRIDGED_WITHOUT_CANDIDATES"
+  require_extracted "$source_unbridged_with" "SOURCE_UNBRIDGED_WITH_CANDIDATES"
+  require_extracted "$source_dead_end" "SOURCE_UNBRIDGED_DEAD_END"
+  require_extracted "$source_unsafe" "SOURCE_UNBRIDGED_UNSAFE"
+  require_extracted "$source_bridge_rejected" "SOURCE_BRIDGE_REJECTED"
   require_extracted "$bz_status" "BZ_STATUS"
   require_extracted "$bz_digest_algorithm" "BZ_DIGEST_ALGORITHM"
   require_extracted "$bz_digest_hex" "BZ_DIGEST_HEX"
 
   cat > "$source_dead_gap" <<JSON
-{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"},"bz_evidence":{"status":"$bz_status","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"$bz_digest_algorithm","schedule_digest_hex":"$bz_digest_hex"},"target_path_provenance":"$path_provenance","target_atom_path_length":$atom_path_length,"target_atom_path":$atom_path,"terminal_source_inventory_summary":{"count":$inventory_count,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"$inventory_digest","max_norm_sq":$max_norm,"max_norm_atom_ids":$max_ties},"missing_for_source_dead_cert":["coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","per-port representative coordinate path expansion for TileOp atom-chain edges","claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"]}
+{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"},"bz_evidence":{"status":"$bz_status","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"$bz_digest_algorithm","schedule_digest_hex":"$bz_digest_hex"},"bridge_safety":{"seam_bridge_policy":"$seam_bridge_policy","source_bridged_coordinate_carry_atoms":$source_bridged,"source_unbridged_coordinate_carry_atoms":$source_unbridged,"source_unbridged_without_next_band_candidates":$source_unbridged_without,"source_unbridged_with_next_band_candidates":$source_unbridged_with,"source_unbridged_dead_end_candidate_atoms":$source_dead_end,"source_unbridged_unsafe_candidate_atoms":$source_unsafe,"source_bridge_rejected_candidate_atoms":$source_bridge_rejected},"target_path_provenance":"$path_provenance","target_atom_path_length":$atom_path_length,"target_atom_path":$atom_path,"terminal_source_inventory_summary":{"count":$inventory_count,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"$inventory_digest","max_norm_sq":$max_norm,"max_norm_atom_ids":$max_ties},"missing_for_source_dead_cert":["coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","per-port representative coordinate path expansion for TileOp atom-chain edges","claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"]}
 JSON
 }
 

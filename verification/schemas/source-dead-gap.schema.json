@@ -15,6 +15,7 @@
     "target",
     "continuation_artifact",
     "bz_evidence",
+    "bridge_safety",
     "target_path_provenance",
     "target_atom_path_length",
     "target_atom_path",
@@ -67,6 +68,48 @@
         "schedule_digest_hex": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "bridge_safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seam_bridge_policy",
+        "source_bridged_coordinate_carry_atoms",
+        "source_unbridged_coordinate_carry_atoms",
+        "source_unbridged_without_next_band_candidates",
+        "source_unbridged_with_next_band_candidates",
+        "source_unbridged_dead_end_candidate_atoms",
+        "source_unbridged_unsafe_candidate_atoms",
+        "source_bridge_rejected_candidate_atoms"
+      ],
+      "properties": {
+        "seam_bridge_policy": { "const": "diagnostic_allow_unbridged" },
+        "source_bridged_coordinate_carry_atoms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_unbridged_coordinate_carry_atoms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_unbridged_without_next_band_candidates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_unbridged_with_next_band_candidates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_unbridged_dead_end_candidate_atoms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_unbridged_unsafe_candidate_atoms": { "const": 0 },
+        "source_bridge_rejected_candidate_atoms": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

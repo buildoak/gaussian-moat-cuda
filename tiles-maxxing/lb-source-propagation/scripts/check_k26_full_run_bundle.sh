@@ -373,6 +373,10 @@ require_grep '"bz_evidence":.*"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE".*"
   "K26 source-dead gap BZ evidence flags"
 require_grep '"bz_evidence":.*"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1".*"schedule_digest_hex":"[0-9a-f]{64}"' "$gap" \
   "K26 source-dead gap BZ digest"
+require_grep '"bridge_safety":.*"seam_bridge_policy":"diagnostic_allow_unbridged"' "$gap" \
+  "K26 source-dead gap bridge policy"
+require_grep '"bridge_safety":.*"source_unbridged_unsafe_candidate_atoms":0' "$gap" \
+  "K26 source-dead gap unsafe bridge stop condition"
 require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' "$gap" \
   "K26 source-dead gap target path provenance"
 require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
@@ -387,6 +391,25 @@ require_equal "$actual_continuation_digest" "$gap_continuation_digest" \
 gap_bz_digest="$(require_json_string_value "$gap" schedule_digest_hex)"
 require_equal "$bz_digest" "$gap_bz_digest" \
   "K26 gap BZ digest binding"
+continuation_bridge_policy="$(
+  require_json_string_value "$continuation" seam_bridge_policy
+)"
+gap_bridge_policy="$(require_json_string_value "$gap" seam_bridge_policy)"
+require_equal "$continuation_bridge_policy" "$gap_bridge_policy" \
+  "K26 gap bridge policy binding"
+for bridge_field in \
+    source_bridged_coordinate_carry_atoms \
+    source_unbridged_coordinate_carry_atoms \
+    source_unbridged_without_next_band_candidates \
+    source_unbridged_with_next_band_candidates \
+    source_unbridged_dead_end_candidate_atoms \
+    source_unbridged_unsafe_candidate_atoms \
+    source_bridge_rejected_candidate_atoms; do
+  continuation_bridge_value="$(require_json_number_value "$continuation" "$bridge_field")"
+  gap_bridge_value="$(require_json_number_value "$gap" "$bridge_field")"
+  require_equal "$continuation_bridge_value" "$gap_bridge_value" \
+    "K26 gap bridge ${bridge_field} binding"
+done
 continuation_path_provenance="$(
   require_json_string_value "$continuation" path_provenance
 )"

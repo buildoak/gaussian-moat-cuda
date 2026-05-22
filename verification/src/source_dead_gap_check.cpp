@@ -233,6 +233,34 @@ void verify_gap(const nlohmann::json& gap) {
     throw std::runtime_error("BZ schedule digest is not sha256 hex");
   }
 
+  const nlohmann::json& bridge_safety =
+      require_object(gap, "bridge_safety");
+  if (require_string(bridge_safety, "seam_bridge_policy") !=
+      "diagnostic_allow_unbridged") {
+    throw std::runtime_error("bridge safety policy is not diagnostic_allow_unbridged");
+  }
+  const std::uint64_t source_unbridged =
+      require_u64(bridge_safety, "source_unbridged_coordinate_carry_atoms");
+  const std::uint64_t source_without_candidates =
+      require_u64(bridge_safety, "source_unbridged_without_next_band_candidates");
+  const std::uint64_t source_with_candidates =
+      require_u64(bridge_safety, "source_unbridged_with_next_band_candidates");
+  const std::uint64_t source_dead_end =
+      require_u64(bridge_safety, "source_unbridged_dead_end_candidate_atoms");
+  const std::uint64_t source_unsafe =
+      require_u64(bridge_safety, "source_unbridged_unsafe_candidate_atoms");
+  (void)require_u64(bridge_safety, "source_bridged_coordinate_carry_atoms");
+  (void)require_u64(bridge_safety, "source_bridge_rejected_candidate_atoms");
+  if (source_unbridged != source_without_candidates + source_with_candidates) {
+    throw std::runtime_error("bridge safety source unbridged counts do not add up");
+  }
+  if (source_with_candidates != source_dead_end + source_unsafe) {
+    throw std::runtime_error("bridge safety source candidate counts do not add up");
+  }
+  if (source_unsafe != 0) {
+    throw std::runtime_error("bridge safety has unsafe source unbridged candidates");
+  }
+
   if (require_string(gap, "target_path_provenance") !=
       "mixed_coordinate_port_atom_chain_non_claim") {
     throw std::runtime_error("target path provenance is not the mixed non-claim chain");

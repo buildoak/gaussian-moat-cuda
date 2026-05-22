@@ -1,14 +1,22 @@
 {
   "schema": "lb_source_k26_source_dead_gap_v1",
   "claim_label": "SOURCE_ORIGIN_K26",
-  "proof_status": "SOURCE_DEAD_CERT_PASS",
+  "proof_status": "DIAGNOSTIC_NON_CLAIM",
   "blocker": "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING",
   "non_claim": "executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT",
   "k_sq": 26,
   "terminal_radius": 1015645,
   "target": {
-    "tsuchimura_endpoint": {"a": 943460, "b": 376039, "norm_sq": 1031522101121},
-    "canonical_octant_endpoint": {"a": 376039, "b": 943460, "norm_sq": 1031522101121}
+    "tsuchimura_endpoint": {
+      "a": 943460,
+      "b": 376039,
+      "norm_sq": 1031522101121
+    },
+    "canonical_octant_endpoint": {
+      "a": 376039,
+      "b": 943460,
+      "norm_sq": 1031522101121
+    }
   },
   "continuation_artifact": {
     "name": "k26-continuation-result.json",
@@ -23,7 +31,11 @@
   },
   "target_path_provenance": "mixed_coordinate_port_atom_chain_non_claim",
   "target_atom_path_length": 3,
-  "target_atom_path": [1615075207963900, -25220051735553, 1615075207964004],
+  "target_atom_path": [
+    1615075207963900,
+    -25220051735553,
+    1615075207964004
+  ],
   "bridge_safety": {
     "seam_bridge_policy": "diagnostic_allow_unbridged",
     "source_bridged_coordinate_carry_atoms": 1369,
@@ -31,7 +43,7 @@
     "source_unbridged_without_next_band_candidates": 1154,
     "source_unbridged_with_next_band_candidates": 57,
     "source_unbridged_dead_end_candidate_atoms": 57,
-    "source_unbridged_unsafe_candidate_atoms": 0,
+    "source_unbridged_unsafe_candidate_atoms": 1,
     "source_bridge_rejected_candidate_atoms": 72
   },
   "terminal_source_inventory_summary": {
@@ -43,6 +55,7 @@
   },
   "missing_for_source_dead_cert": [
     "coordinate Gaussian-prime source_path from origin prefix to canonical endpoint",
+    "per-port representative coordinate path expansion for TileOp atom-chain edges",
     "claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"
   ]
 }
