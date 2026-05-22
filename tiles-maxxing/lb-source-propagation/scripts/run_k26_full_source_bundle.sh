@@ -133,6 +133,18 @@ write_status() {
     echo "max_atoms=$max_atoms"
     echo "timeout_seconds=$timeout_seconds"
     echo "non_claim=this is an executed bundle harness, not a source-dead acceptance"
+    if [[ -f "$out_dir/k26-source-dead-gap-check.log" ]]; then
+      sed -nE 's/.*"status":"([^"]+)".*/source_dead_gap_check_status=\1/p' \
+        "$out_dir/k26-source-dead-gap-check.log" | head -n 1
+      sed -nE 's/.*"bridge_safety":"([^"]+)".*/source_dead_gap_bridge_safety=\1/p' \
+        "$out_dir/k26-source-dead-gap-check.log" | head -n 1
+      sed -nE 's/.*"coordinate_path_obligation":"([^"]+)".*/source_dead_gap_coordinate_path_obligation=\1/p' \
+        "$out_dir/k26-source-dead-gap-check.log" | head -n 1
+      sed -nE 's/.*"terminal_inventory_obligation":"([^"]+)".*/source_dead_gap_terminal_inventory_obligation=\1/p' \
+        "$out_dir/k26-source-dead-gap-check.log" | head -n 1
+      sed -nE 's/.*"claim_grade":(true|false).*/source_dead_gap_claim_grade=\1/p' \
+        "$out_dir/k26-source-dead-gap-check.log" | head -n 1
+    fi
   } > "$status_file"
 }
 

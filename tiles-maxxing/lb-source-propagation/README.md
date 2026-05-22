@@ -285,7 +285,9 @@ promoted to claim-grade terminal inventory provenance. The gap artifact also
 binds the repaired K26 BZ schedule digest as schedule-only, non-claim evidence.
 When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
-checker before stopping on the missing cert. It also writes
+checker before stopping on the missing cert, and mirrors the checker status
+fields into `status.txt` so remote logs show whether bridge safety passed and
+which certificate obligations remain blocked. It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
 prefix-progress, continuation, continuation-progress, manifest, witness, gap,
 and any supplied cert artifacts by SHA-256.
