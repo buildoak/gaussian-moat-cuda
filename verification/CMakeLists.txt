@@ -22,6 +22,7 @@ foreach(tool
     bz_exact_check
     boundary_semantics_test
     exact_global_uf
+    source_dead_cert_check
     source_prop_oracle
     tile_sample_check
     span_cert_check)
@@ -61,6 +62,19 @@ foreach(bad_source_prop_case
     COMMAND source_prop_oracle
       ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/${bad_source_prop_case}.json)
   set_tests_properties(source_prop_fixture_${bad_source_prop_case} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+add_test(NAME source_dead_cert_fixture_valid
+  COMMAND source_dead_cert_check
+    ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-cert-valid.json)
+foreach(bad_source_dead_cert
+    dead-cert-bad-digest
+    dead-cert-bad-negative-guard
+    dead-cert-bad-pending-metadata)
+  add_test(NAME source_dead_cert_fixture_${bad_source_dead_cert}_reject
+    COMMAND source_dead_cert_check
+      ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/${bad_source_dead_cert}.json)
+  set_tests_properties(source_dead_cert_fixture_${bad_source_dead_cert}_reject
+    PROPERTIES WILL_FAIL TRUE)
 endforeach()
 if(Python3_Interpreter_FOUND)
   add_test(NAME stats_normalize_sweep_rows_py

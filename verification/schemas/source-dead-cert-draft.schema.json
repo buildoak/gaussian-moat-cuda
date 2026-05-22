@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gaussian-moat.local/schemas/source-dead-cert-draft.schema.json",
+  "title": "LB source dead certificate draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "certificate_id",
+    "profile_id",
+    "metadata",
+    "k_sq",
+    "terminal_radius",
+    "negative_guard_pass",
+    "terminal_source_inventory_summary",
+    "terminal_source_inventory"
+  ],
+  "properties": {
+    "schema": { "const": "lb_source_dead_cert_draft_v1" },
+    "certificate_id": { "type": "string", "minLength": 1 },
+    "profile_id": { "type": "string", "minLength": 1 },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_mode",
+        "source_id",
+        "geometry_id",
+        "commit_id",
+        "build_id",
+        "bz_status",
+        "artifact_hash"
+      ],
+      "properties": {
+        "source_mode": {
+          "enum": ["ORIGIN_SOURCE", "WIRED_SOURCE", "CERTIFIED_SEED"]
+        },
+        "source_id": { "type": "string", "minLength": 1 },
+        "geometry_id": { "type": "string", "minLength": 1 },
+        "commit_id": { "type": "string", "minLength": 1 },
+        "build_id": { "type": "string", "minLength": 1 },
+        "bz_status": { "type": "string", "minLength": 1 },
+        "artifact_hash": { "type": "string", "minLength": 1 }
+      }
+    },
+    "k_sq": { "type": "integer", "minimum": 1 },
+    "terminal_radius": { "type": "integer", "minimum": 1 },
+    "negative_guard_pass": { "type": "boolean" },
+    "terminal_source_inventory_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "digest_algorithm", "digest_hex"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "digest_algorithm": {
+          "const": "sha256:lb_source_inventory_v1"
+        },
+        "digest_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "terminal_source_inventory": {
+      "type": "array",
+      "items": { "type": "integer" }
+    }
+  }
+}

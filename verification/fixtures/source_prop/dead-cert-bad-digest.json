@@ -1,0 +1,23 @@
+{
+  "schema": "lb_source_dead_cert_draft_v1",
+  "certificate_id": "cert-bad-digest",
+  "profile_id": "profile-valid",
+  "metadata": {
+    "source_mode": "ORIGIN_SOURCE",
+    "source_id": "omega",
+    "geometry_id": "SOURCE_ORIGIN_DIAGNOSTIC",
+    "commit_id": "abc123",
+    "build_id": "local-test",
+    "bz_status": "BZ_CLEAN_DIAGNOSTIC",
+    "artifact_hash": "sha256:test"
+  },
+  "k_sq": 26,
+  "terminal_radius": 20,
+  "negative_guard_pass": true,
+  "terminal_source_inventory_summary": {
+    "count": 2,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "terminal_source_inventory": [1, 2]
+}
