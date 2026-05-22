@@ -118,11 +118,13 @@ evidence for the next engineering gate, not an accepted source/death
 certificate.
 The runner also has `--require-full-bridge`, which rejects a manifest handoff
 when any coordinate carry atom lacks a first-band TileOp-port bridge. That
-strict mode is a conservative guardrail for future claim-grade execution. The
-sharper certificate condition is
-`source_unbridged_with_next_band_candidates == 0`: source-connected carry atoms
-may be unbridged only when no legal next-band candidate exists. K26 remains
-diagnostic while this counter is nonzero.
+strict mode is a conservative diagnostic guardrail, not the K26 run contract.
+The sharper certificate condition is
+`source_unbridged_unsafe_candidate_atoms == 0`: source-connected carry atoms
+may be unbridged only when no legal next-band candidate exists or when every
+candidate is a dead-end TileOp component with no encoded face ports. K26 still
+remains diagnostic until the corresponding terminal inventory and coordinate
+path layers are certificate-grade.
 With `--target-a/--target-b`, the runner also inserts a canonical coordinate
 target atom when the target prime is seen in a TileOp band, bridges it to its
 visible TileOp-port component, and reports whether that coordinate target is in
@@ -300,10 +302,9 @@ output is a run contract only; it uses the canonical-octant representative
 `376039 + 943460i` for Tsuchimura's endpoint `943460 + 376039i`, does not
 execute the full sqrt(26) comparison, and must not be treated as a
 `SOURCE_DEAD_CERT`. The emitted continuation command includes
-`--require-full-bridge --target-a 376039 --target-b 943460`; under the current
-conservative executable guard, any unbridged coordinate carry atom stops the
-run. The claim-grade bridge condition is sharper:
-`source_unbridged_with_next_band_candidates` must be zero, and the canonical
+`--target-a 376039 --target-b 943460` and allows dead-end unbridged carry
+diagnostics. The claim-grade bridge condition is:
+`source_unbridged_unsafe_candidate_atoms` must be zero, and the canonical
 endpoint must be seen and source-reached in the continuation artifact before
 the full bundle checker can pass. The TileOp-port target field
 now reports `path_provenance=mixed_coordinate_port_atom_chain_non_claim` plus a

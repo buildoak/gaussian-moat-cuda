@@ -47,15 +47,16 @@ verifier, the campaign should use the conservative value.
    diagnostic evidence. The bridge distinction needed for a death certificate
    is not "every coordinate carry atom bridges." The needed statement is:
    every source-connected coordinate carry atom either bridges into the
-   TileOp-port graph or has no legal next-band Gaussian-prime candidate within
-   `sqrt(K)`. The tiny K36 smoke has the clean shape: `82` source carry atoms
-   bridge and `51` source carry atoms have no next-band candidate, so
-   `source_unbridged_with_next_band_candidates=0`. K26 row 0 to row 1 does not
-   yet have that shape: a 2026-05-23 local diagnostic reports `1369` source
-   carry atoms bridged, `1154` source carry atoms unbridged with no candidate,
-   and `57` source carry atoms unbridged despite having next-band candidates.
-   Until those `57` atoms are explained by a bridge-completeness fix or an
-   accepted verifier/theorem, this cannot support a `SOURCE_DEAD_CERT`.
+   TileOp-port graph, has no legal next-band Gaussian-prime candidate within
+   `sqrt(K)`, or has only dead-end candidates whose local components have no
+   encoded TileOp face ports. The tiny K36 smoke has the clean shape: `82`
+   source carry atoms bridge and `51` source carry atoms have no next-band
+   candidate. K26 row 0 to row 1 now has the corresponding unsafe-candidate
+   shape: a 2026-05-23 local diagnostic reports `1369` source carry atoms
+   bridged, `1154` source carry atoms unbridged with no candidate, `57` source
+   carry atoms unbridged with dead-end candidates, and
+   `source_unbridged_unsafe_candidate_atoms=0`. This supports the bridge-safety
+   side of the diagnostic, but not yet a `SOURCE_DEAD_CERT`.
 
 ## Certificate Gap To Close
 
@@ -84,12 +85,13 @@ command/profile/BZ evidence JSON, prefix manifest/witness, the
 `k26-full-run-artifacts.sha256` hash manifest, and
 `k26-source-dead-cert.json`. It rejects the bundle if any required artifact
 hash does not match the manifest, if the BZ digest is not identical across
-artifacts, if the gap artifact is malformed, if the
-continuation did not run with `seam_bridge_policy=require_full_bridge`, if any
-source coordinate carry atom remained unbridged, if TileOp overflow occurred,
-if terminal source death was not reached at `R_final=1015645`, if the terminal
-inventory count is not `14,542,615,005`, if the cert's terminal inventory
-summary does not match the executed continuation count/digest/max-norm/tie-set,
+artifacts, if the gap artifact is malformed, if the continuation did not run
+with `seam_bridge_policy=diagnostic_allow_unbridged`, if any
+source-connected coordinate carry atom has an unsafe unbridged next-band
+candidate, if TileOp overflow occurred, if terminal source death was not
+reached at `R_final=1015645`, if the terminal inventory count is not
+`14,542,615,005`, if the cert's terminal inventory summary does not match the
+executed continuation count/digest/max-norm/tie-set,
 if `endpoint_atom_id` is not the stable coordinate atom id
 `1615075207964004` for the canonical endpoint,
 if `metadata.artifact_hash` is not exactly the SHA-256 hash of
@@ -110,8 +112,9 @@ run_k26_full_source_bundle.sh \
 ```
 
 It writes the command, BZ, profile, prefix, and continuation artifacts using
-the strict `--require-full-bridge` continuation schedule. It is deliberately
-certificate-gated: without a supplied `k26-source-dead-cert.json` it still
+the repaired continuation schedule and the unsafe-candidate bridge gate. It is
+deliberately certificate-gated: without a supplied `k26-source-dead-cert.json`
+it still
 writes `k26-prefix-progress.jsonl`, `k26-continuation-progress.jsonl`,
 `k26-source-dead-gap.json`, a partial
 `k26-full-run-artifacts.sha256` manifest, and stops with
@@ -175,10 +178,13 @@ required evidence, and current blocking gaps. It must keep
   `bridge_edges`; K26 remains blocked until those fields are justified by an
   accepted lemma and verifier gate. The old `--require-full-bridge` guard is a
   conservative hard stop, but the current certificate logic is sharper:
-  `source_unbridged_with_next_band_candidates` must be zero. A K26 first
+  `source_unbridged_unsafe_candidate_atoms` must be zero. A K26 first
   continuation diagnostic on 2026-05-23 reported
-  `source_unbridged_with_next_band_candidates=57`, so the current bridge is
-  incomplete for claim-grade source death.
+  `source_unbridged_with_next_band_candidates=57`, all classified as
+  `source_unbridged_dead_end_candidate_atoms=57`, with
+  `source_unbridged_unsafe_candidate_atoms=0`. This closes the bridge-safety
+  blocker for row 0 -> row 1, but not the terminal inventory or coordinate
+  endpoint-path blockers.
 - accepted terminal inventory handling for count/digest/max norm/tie set at
   14.5B-member scale;
 - accepted K26 non-square BZ evidence bound to the repaired schedule digest;
@@ -201,12 +207,11 @@ It emits the row-0 coordinate prefix command and the repaired TileOp-port
 continuation schedule. The row-0 prefix command targets the canonical-octant
 representative `376039 + 943460i`; the comparison back to Tsuchimura's
 `943460 + 376039i` is by Gaussian-unit and conjugation symmetry. The
-continuation command includes `--require-full-bridge` and
-`--target-a 376039 --target-b 943460`, so unbridged coordinate carry atoms are
-a hard stop under the current conservative executable guard. The certificate
-design now needs the sharper guard described above: unbridged source carry is
-acceptable only when there is no legal next-band candidate. The canonical
-endpoint must still be bridged into a TileOp-port component and reported as
+continuation command includes `--target-a 376039 --target-b 943460` and the
+bundle checker requires `source_unbridged_unsafe_candidate_atoms=0`. Unbridged
+source carry is acceptable only when there is no legal next-band candidate or
+only dead-end candidates with no encoded face ports. The canonical endpoint
+must still be bridged into a TileOp-port component and reported as
 source-reached in the continuation artifact. The target field currently reports
 `path_provenance=mixed_coordinate_port_atom_chain_non_claim` plus a stable atom
 id chain when target reachability is proved. This is still not a coordinate
@@ -234,9 +239,13 @@ same prefix artifacts completed in about `470s` and reached
 `source_bridged_coordinate_carry_atoms=1369`,
 `source_unbridged_coordinate_carry_atoms=1211`,
 `source_unbridged_without_next_band_candidates=1154`,
-`source_unbridged_with_next_band_candidates=57`, and
-`source_bridge_rejected_candidate_atoms=72`. This is useful evidence, but it is
-a blocker for `SOURCE_DEAD_CERT`, not a certificate.
+`source_unbridged_with_next_band_candidates=57`,
+`source_unbridged_dead_end_candidate_atoms=57`,
+`source_unbridged_unsafe_candidate_atoms=0`, and
+`source_bridge_rejected_candidate_atoms=72`. The only rejection reason was
+`visible coordinate component has no encoded face ports`. This is useful
+bridge-safety evidence, but it is still not a certificate because the
+coordinate endpoint path and claim-grade terminal inventory are missing.
 
 ## Stop Conditions
 

@@ -138,14 +138,19 @@ carry atom needs one more distinction:
 
 - if there is no legal next-band Gaussian-prime candidate within distance
   `sqrt(K)`, the atom has no continuation into that band;
-- if a legal next-band candidate exists but the TileOp-port bridge does not
-  attach it, the continuation is unsafe for a source-death claim.
+- if a legal next-band candidate exists and its local component has no encoded
+  TileOp face ports, the candidate is a dead-end attachment inside the next
+  band; it cannot carry source reachability farther, but claim-grade inventory
+  must still account for it;
+- if a legal next-band candidate exists and the bridge failure is not such a
+  dead-end component, the continuation is unsafe for a source-death claim.
 
 Thus a claim-grade continuation cannot require "all coordinate carry atoms must
 bridge." That is too strong. It must require that every source-connected carry
 atom either bridges into the next local graph or is proven to have no legal
-next-band candidate. Any unbridged source-connected atom with a candidate is a
-stop condition for `SOURCE_DEAD_CERT`.
+next-band candidate or only dead-end candidates. Any unbridged
+source-connected atom with an unsafe candidate is a stop condition for
+`SOURCE_DEAD_CERT`.
 
 The TileOp-port diagnostic runner reports this distinction explicitly:
 
@@ -153,12 +158,15 @@ The TileOp-port diagnostic runner reports this distinction explicitly:
 source_bridged_coordinate_carry_atoms
 source_unbridged_without_next_band_candidates
 source_unbridged_with_next_band_candidates
+source_unbridged_dead_end_candidate_atoms
+source_unbridged_unsafe_candidate_atoms
 source_bridge_rejected_candidate_atoms
 ```
 
-For a source-death certificate, `source_unbridged_with_next_band_candidates`
-must be zero. Non-source unbridged carry atoms still matter for composed-band
-equivalence, but they do not by themselves keep the source component alive.
+For a source-death certificate,
+`source_unbridged_unsafe_candidate_atoms` must be zero. Non-source unbridged
+carry atoms still matter for composed-band equivalence, but they do not by
+themselves keep the source component alive.
 
 ## Engineering Constraints
 

@@ -60,13 +60,19 @@ struct PortManifestBridgeResult {
   std::uint64_t unbridged_coordinate_carry_atoms = 0;
   std::uint64_t unbridged_without_next_band_candidates = 0;
   std::uint64_t unbridged_with_next_band_candidates = 0;
+  std::uint64_t unbridged_dead_end_candidate_atoms = 0;
+  std::uint64_t unbridged_unsafe_candidate_atoms = 0;
   std::uint64_t bridge_rejected_candidate_atoms = 0;
   std::uint64_t source_coordinate_carry_atoms_with_next_band_candidates = 0;
   std::uint64_t source_bridged_coordinate_carry_atoms = 0;
   std::uint64_t source_unbridged_coordinate_carry_atoms = 0;
   std::uint64_t source_unbridged_without_next_band_candidates = 0;
   std::uint64_t source_unbridged_with_next_band_candidates = 0;
+  std::uint64_t source_unbridged_dead_end_candidate_atoms = 0;
+  std::uint64_t source_unbridged_unsafe_candidate_atoms = 0;
   std::uint64_t source_bridge_rejected_candidate_atoms = 0;
+  std::map<std::string, std::uint64_t> bridge_reject_reasons;
+  std::map<std::string, std::uint64_t> source_bridge_reject_reasons;
   std::uint64_t bridged_port_carry_atoms = 0;
   std::uint64_t bridge_edges = 0;
 };
@@ -658,6 +664,70 @@ void append_atom_id_array(std::ostream& out,
   out << ']';
 }
 
+void append_json_string(std::ostream& out, std::string_view value) {
+  out << '"';
+  for (const unsigned char ch : value) {
+    switch (ch) {
+      case '"':
+        out << "\\\"";
+        break;
+      case '\\':
+        out << "\\\\";
+        break;
+      case '\b':
+        out << "\\b";
+        break;
+      case '\f':
+        out << "\\f";
+        break;
+      case '\n':
+        out << "\\n";
+        break;
+      case '\r':
+        out << "\\r";
+        break;
+      case '\t':
+        out << "\\t";
+        break;
+      default:
+        if (ch < 0x20) {
+          out << "\\u";
+          const char* digits = "0123456789abcdef";
+          out << '0' << '0' << digits[(ch >> 4) & 0xf]
+              << digits[ch & 0xf];
+        } else {
+          out << static_cast<char>(ch);
+        }
+        break;
+    }
+  }
+  out << '"';
+}
+
+void append_count_object(
+    std::ostream& out,
+    const std::map<std::string, std::uint64_t>& counts) {
+  out << '{';
+  bool first = true;
+  for (const auto& [key, count] : counts) {
+    if (!first) {
+      out << ',';
+    }
+    first = false;
+    append_json_string(out, key);
+    out << ':' << count;
+  }
+  out << '}';
+}
+
+bool all_rejected_candidates_are_dead_end(
+    const std::set<std::string>& reasons) {
+  return !reasons.empty() &&
+         reasons.size() == 1 &&
+         reasons.find("visible coordinate component has no encoded face ports") !=
+             reasons.end();
+}
+
 void insert_adjacency_edge(
     std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>& adjacency,
     lb_source::AtomId lhs, lb_source::AtomId rhs) {
@@ -810,6 +880,10 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
   std::map<lb_source::AtomId, std::set<lb_source::AtomId>> ports_by_coord_id;
   std::set<lb_source::AtomId> candidate_coord_ids;
   std::set<lb_source::AtomId> bridge_rejected_coord_ids;
+  std::map<std::string, std::set<lb_source::AtomId>>
+      rejected_coord_ids_by_reason;
+  std::map<lb_source::AtomId, std::set<std::string>>
+      rejected_reasons_by_coord_id;
   for (std::size_t t = 0; t < coords.size(); ++t) {
     const std::vector<campaign::Prime> primes =
         campaign::sieve_tile(coords[t], constants);
@@ -838,6 +912,13 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
       if (!bridge.accepted()) {
         bridge_rejected_coord_ids.insert(adjacent_carry_ids.begin(),
                                          adjacent_carry_ids.end());
+        std::set<lb_source::AtomId>& rejected_for_reason =
+            rejected_coord_ids_by_reason[bridge.diagnostic];
+        rejected_for_reason.insert(adjacent_carry_ids.begin(),
+                                   adjacent_carry_ids.end());
+        for (const lb_source::AtomId coord_id : adjacent_carry_ids) {
+          rejected_reasons_by_coord_id[coord_id].insert(bridge.diagnostic);
+        }
         continue;
       }
       for (const lb_source::AtomId coord_id : adjacent_carry_ids) {
@@ -883,6 +964,18 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
   result.coordinate_carry_atoms_with_next_band_candidates =
       candidate_coord_ids.size();
   result.bridge_rejected_candidate_atoms = bridge_rejected_coord_ids.size();
+  for (const auto& [reason, ids] : rejected_coord_ids_by_reason) {
+    result.bridge_reject_reasons[reason] = ids.size();
+    std::uint64_t source_count = 0;
+    for (const lb_source::AtomId id : ids) {
+      if (source_carry_ids.find(id) != source_carry_ids.end()) {
+        ++source_count;
+      }
+    }
+    if (source_count != 0) {
+      result.source_bridge_reject_reasons[reason] = source_count;
+    }
+  }
   for (const lb_source::AtomId id : candidate_coord_ids) {
     if (source_carry_ids.find(id) != source_carry_ids.end()) {
       ++result.source_coordinate_carry_atoms_with_next_band_candidates;
@@ -903,8 +996,22 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     }
     if (candidate_coord_ids.find(coord_id) != candidate_coord_ids.end()) {
       ++result.unbridged_with_next_band_candidates;
+      const auto reasons_it = rejected_reasons_by_coord_id.find(coord_id);
+      const bool dead_end_candidate =
+          reasons_it != rejected_reasons_by_coord_id.end() &&
+          all_rejected_candidates_are_dead_end(reasons_it->second);
+      if (dead_end_candidate) {
+        ++result.unbridged_dead_end_candidate_atoms;
+      } else {
+        ++result.unbridged_unsafe_candidate_atoms;
+      }
       if (source_carry_ids.find(coord_id) != source_carry_ids.end()) {
         ++result.source_unbridged_with_next_band_candidates;
+        if (dead_end_candidate) {
+          ++result.source_unbridged_dead_end_candidate_atoms;
+        } else {
+          ++result.source_unbridged_unsafe_candidate_atoms;
+        }
       }
     } else {
       ++result.unbridged_without_next_band_candidates;
@@ -1028,13 +1135,19 @@ int main(int argc, char** argv) {
   std::uint64_t unbridged_coordinate_carry_atoms = 0;
   std::uint64_t unbridged_without_next_band_candidates = 0;
   std::uint64_t unbridged_with_next_band_candidates = 0;
+  std::uint64_t unbridged_dead_end_candidate_atoms = 0;
+  std::uint64_t unbridged_unsafe_candidate_atoms = 0;
   std::uint64_t bridge_rejected_candidate_atoms = 0;
   std::uint64_t source_coordinate_carry_atoms_with_next_band_candidates = 0;
   std::uint64_t source_bridged_coordinate_carry_atoms = 0;
   std::uint64_t source_unbridged_coordinate_carry_atoms = 0;
   std::uint64_t source_unbridged_without_next_band_candidates = 0;
   std::uint64_t source_unbridged_with_next_band_candidates = 0;
+  std::uint64_t source_unbridged_dead_end_candidate_atoms = 0;
+  std::uint64_t source_unbridged_unsafe_candidate_atoms = 0;
   std::uint64_t source_bridge_rejected_candidate_atoms = 0;
+  std::map<std::string, std::uint64_t> bridge_reject_reasons;
+  std::map<std::string, std::uint64_t> source_bridge_reject_reasons;
   std::uint64_t bridged_port_carry_atoms = 0;
   std::uint64_t bridge_edges = 0;
   bool target_seen = false;
@@ -1231,6 +1344,10 @@ int main(int argc, char** argv) {
           bridge.unbridged_without_next_band_candidates;
       unbridged_with_next_band_candidates =
           bridge.unbridged_with_next_band_candidates;
+      unbridged_dead_end_candidate_atoms =
+          bridge.unbridged_dead_end_candidate_atoms;
+      unbridged_unsafe_candidate_atoms =
+          bridge.unbridged_unsafe_candidate_atoms;
       bridge_rejected_candidate_atoms =
           bridge.bridge_rejected_candidate_atoms;
       source_coordinate_carry_atoms_with_next_band_candidates =
@@ -1243,8 +1360,14 @@ int main(int argc, char** argv) {
           bridge.source_unbridged_without_next_band_candidates;
       source_unbridged_with_next_band_candidates =
           bridge.source_unbridged_with_next_band_candidates;
+      source_unbridged_dead_end_candidate_atoms =
+          bridge.source_unbridged_dead_end_candidate_atoms;
+      source_unbridged_unsafe_candidate_atoms =
+          bridge.source_unbridged_unsafe_candidate_atoms;
       source_bridge_rejected_candidate_atoms =
           bridge.source_bridge_rejected_candidate_atoms;
+      bridge_reject_reasons = bridge.bridge_reject_reasons;
+      source_bridge_reject_reasons = bridge.source_bridge_reject_reasons;
       bridged_port_carry_atoms = bridge.bridged_port_carry_atoms;
       bridge_edges = bridge.bridge_edges;
     } else {
@@ -1310,6 +1433,10 @@ int main(int argc, char** argv) {
                << segment_bridge.unbridged_without_next_band_candidates
                << ",\"unbridged_with_next_band_candidates\":"
                << segment_bridge.unbridged_with_next_band_candidates
+               << ",\"unbridged_dead_end_candidate_atoms\":"
+               << segment_bridge.unbridged_dead_end_candidate_atoms
+               << ",\"unbridged_unsafe_candidate_atoms\":"
+               << segment_bridge.unbridged_unsafe_candidate_atoms
                << ",\"bridge_rejected_candidate_atoms\":"
                << segment_bridge.bridge_rejected_candidate_atoms
                << ",\"source_coordinate_carry_atoms_with_next_band_candidates\":"
@@ -1324,9 +1451,18 @@ int main(int argc, char** argv) {
                       .source_unbridged_without_next_band_candidates
                << ",\"source_unbridged_with_next_band_candidates\":"
                << segment_bridge.source_unbridged_with_next_band_candidates
+               << ",\"source_unbridged_dead_end_candidate_atoms\":"
+               << segment_bridge.source_unbridged_dead_end_candidate_atoms
+               << ",\"source_unbridged_unsafe_candidate_atoms\":"
+               << segment_bridge.source_unbridged_unsafe_candidate_atoms
                << ",\"source_bridge_rejected_candidate_atoms\":"
                << segment_bridge.source_bridge_rejected_candidate_atoms
-               << ",\"bridged_port_carry_atoms\":"
+               << ",\"bridge_reject_reasons\":";
+      append_count_object(progress, segment_bridge.bridge_reject_reasons);
+      progress << ",\"source_bridge_reject_reasons\":";
+      append_count_object(progress,
+                          segment_bridge.source_bridge_reject_reasons);
+      progress << ",\"bridged_port_carry_atoms\":"
                << segment_bridge.bridged_port_carry_atoms
                << ",\"bridge_edges\":" << segment_bridge.bridge_edges
                << ",\"target_seen\":"
@@ -1438,6 +1574,10 @@ int main(int argc, char** argv) {
             << unbridged_without_next_band_candidates
             << ",\"unbridged_with_next_band_candidates\":"
             << unbridged_with_next_band_candidates
+            << ",\"unbridged_dead_end_candidate_atoms\":"
+            << unbridged_dead_end_candidate_atoms
+            << ",\"unbridged_unsafe_candidate_atoms\":"
+            << unbridged_unsafe_candidate_atoms
             << ",\"bridge_rejected_candidate_atoms\":"
             << bridge_rejected_candidate_atoms
             << ",\"source_coordinate_carry_atoms_with_next_band_candidates\":"
@@ -1450,9 +1590,17 @@ int main(int argc, char** argv) {
             << source_unbridged_without_next_band_candidates
             << ",\"source_unbridged_with_next_band_candidates\":"
             << source_unbridged_with_next_band_candidates
+            << ",\"source_unbridged_dead_end_candidate_atoms\":"
+            << source_unbridged_dead_end_candidate_atoms
+            << ",\"source_unbridged_unsafe_candidate_atoms\":"
+            << source_unbridged_unsafe_candidate_atoms
             << ",\"source_bridge_rejected_candidate_atoms\":"
             << source_bridge_rejected_candidate_atoms
-            << ",\"bridged_port_carry_atoms\":"
+            << ",\"bridge_reject_reasons\":";
+  append_count_object(std::cout, bridge_reject_reasons);
+  std::cout << ",\"source_bridge_reject_reasons\":";
+  append_count_object(std::cout, source_bridge_reject_reasons);
+  std::cout << ",\"bridged_port_carry_atoms\":"
             << bridged_port_carry_atoms
             << ",\"bridge_edges\":" << bridge_edges
             << ",\"target\":{\"enabled\":"

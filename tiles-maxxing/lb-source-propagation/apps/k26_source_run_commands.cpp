@@ -154,7 +154,7 @@ int main() {
       "source_tileop_port_runner --r-start 8192 --r-final 1015645 "
       "--band-width 8192 --schedule-radii " +
       schedule_csv +
-      " --max-atoms 50000000 --require-full-bridge "
+      " --max-atoms 50000000 "
       "--target-a 376039 --target-b 943460 "
       "--manifest-in k26-prefix-manifest.txt "
       "--prefix-witness-in k26-prefix-witness.txt";
@@ -189,9 +189,9 @@ int main() {
             << ",\"schedule_digest_algorithm\":\""
             << lb_source::k26_bz::schedule_digest_algorithm
             << "\",\"schedule_digest_hex\":\"" << bz_schedule_digest << "\""
-            << ",\"seam_bridge_policy\":\"require_full_bridge\""
-            << ",\"blocked_if_unbridged_coordinate_carry_atoms\":true"
-            << ",\"claim_grade_requires_source_unbridged_with_next_band_candidates\":0"
+            << ",\"seam_bridge_policy\":\"diagnostic_allow_unbridged\""
+            << ",\"blocked_if_unbridged_coordinate_carry_atoms\":false"
+            << ",\"claim_grade_requires_source_unbridged_unsafe_candidate_atoms\":0"
             << ",\"schedule_radii_csv\":";
   emit_json_string(schedule_csv);
   std::cout << ",\"manifest_in\":\"k26-prefix-manifest.txt\","

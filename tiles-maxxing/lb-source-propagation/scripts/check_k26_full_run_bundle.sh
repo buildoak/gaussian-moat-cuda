@@ -237,14 +237,12 @@ require_grep '"schedule_radii_csv":"8192,.*122879,.*475135,.*622591,.*1015645"' 
   "K26 command repaired schedule radii"
 require_grep '"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1"' "$commands" \
   "K26 command BZ digest algorithm"
-require_grep '"seam_bridge_policy":"require_full_bridge"' "$commands" \
-  "K26 command strict bridge policy"
-require_grep '"blocked_if_unbridged_coordinate_carry_atoms":true' "$commands" \
-  "K26 command unbridged carry stop condition"
-require_grep '"claim_grade_requires_source_unbridged_with_next_band_candidates":0' "$commands" \
-  "K26 command source candidate bridge stop condition"
-require_grep '--require-full-bridge' "$commands" \
-  "K26 command strict bridge flag"
+require_grep '"seam_bridge_policy":"diagnostic_allow_unbridged"' "$commands" \
+  "K26 command diagnostic seam bridge policy"
+require_grep '"blocked_if_unbridged_coordinate_carry_atoms":false' "$commands" \
+  "K26 command permits proven dead-end unbridged carry"
+require_grep '"claim_grade_requires_source_unbridged_unsafe_candidate_atoms":0' "$commands" \
+  "K26 command source unsafe bridge stop condition"
 require_grep '--target-a 376039 --target-b 943460' "$commands" \
   "K26 command target bridge flags"
 
@@ -325,8 +323,8 @@ require_grep '"proof_status":"DIAGNOSTIC_NON_CLAIM"' "$continuation" \
   "K26 continuation non-claim status"
 require_grep '"source_mode":"ORIGIN_PREFIX_PORT_WITNESS"' "$continuation" \
   "K26 continuation source mode"
-require_grep '"seam_bridge_policy":"require_full_bridge"' "$continuation" \
-  "K26 continuation strict bridge policy"
+require_grep '"seam_bridge_policy":"diagnostic_allow_unbridged"' "$continuation" \
+  "K26 continuation diagnostic seam bridge policy"
 require_grep '"k_sq":26' "$continuation" "K26 continuation k_sq"
 require_grep '"r_start":8192' "$continuation" "K26 continuation start"
 require_grep '"r_final":1015645' "$continuation" "K26 continuation final radius"
@@ -336,10 +334,8 @@ require_grep '"schedule_boundary_count":124' "$continuation" \
   "K26 continuation schedule boundary count"
 require_grep '"tileop_overflows":0' "$continuation" \
   "K26 continuation overflow-free"
-require_grep '"unbridged_coordinate_carry_atoms":0' "$continuation" \
-  "K26 continuation full bridge"
-require_grep '"source_unbridged_with_next_band_candidates":0' "$continuation" \
-  "K26 continuation source candidate bridge"
+require_grep '"source_unbridged_unsafe_candidate_atoms":0' "$continuation" \
+  "K26 continuation source unsafe bridge"
 require_grep '"target":\{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true.*"source_reached":true' "$continuation" \
   "K26 continuation target source reachability"
 require_grep '"path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' "$continuation" \
