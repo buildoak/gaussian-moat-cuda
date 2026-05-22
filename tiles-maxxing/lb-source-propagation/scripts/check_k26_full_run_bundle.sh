@@ -208,6 +208,12 @@ require_grep '"claim_label":"SOURCE_ORIGIN_K26"' "$commands" \
   "K26 command claim label"
 require_grep '"executable_now":false' "$commands" \
   "K26 command contract must remain non-executable"
+require_grep '"target":.*"tsuchimura_endpoint":.*"a":943460.*"b":376039.*"norm_sq":1031522101121' "$commands" \
+  "K26 command Tsuchimura endpoint"
+require_grep '"canonical_octant_endpoint":.*"a":376039.*"b":943460.*"norm_sq":1031522101121' "$commands" \
+  "K26 command canonical endpoint"
+require_grep '--endpoint-a 376039 --endpoint-b 943460' "$commands" \
+  "K26 command prefix endpoint flags"
 require_grep '"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1"' "$commands" \
   "K26 command BZ digest algorithm"
 require_grep '"seam_bridge_policy":"require_full_bridge"' "$commands" \

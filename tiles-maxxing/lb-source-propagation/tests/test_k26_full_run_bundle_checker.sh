@@ -64,7 +64,7 @@ write_bundle() {
   local dir="$1"
   mkdir -p "$dir"
   cat > "$dir/k26_source_run_commands.json" <<'JSON'
-{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"continuation":{"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"require_full_bridge","blocked_if_unbridged_coordinate_carry_atoms":true,"command":"source_tileop_port_runner --require-full-bridge --target-a 376039 --target-b 943460"}}
+{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix":{"command":"source_origin_cpu_runner --endpoint-a 376039 --endpoint-b 943460"},"continuation":{"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"require_full_bridge","blocked_if_unbridged_coordinate_carry_atoms":true,"command":"source_tileop_port_runner --require-full-bridge --target-a 376039 --target-b 943460"}}
 JSON
   cat > "$dir/k26_bz_schedule_check.json" <<'JSON'
 {"schema":"lb_source_k26_bz_schedule_check_v1","proof_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","repaired_summary":{"bad_norm_count":0,"bz_clean":true}}
@@ -157,6 +157,54 @@ if "$checker" "$bad_gap_binding" \
   exit 1
 fi
 grep -q 'K26 gap atom path length binding' "$tmp/bad-gap-binding.log"
+
+bad_command_target="$tmp/bad-command-target"
+write_bundle "$bad_command_target"
+perl -0pi -e 's/"canonical_octant_endpoint":\{"a":376039,"b":943460/"canonical_octant_endpoint":{"a":376038,"b":943460/' \
+  "$bad_command_target/k26_source_run_commands.json"
+if "$checker" "$bad_command_target" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-command-target.log" 2>&1; then
+  echo "checker accepted stale artifact hash after command target mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26_source_run_commands.json' \
+  "$tmp/bad-command-target.log"
+write_manifest "$bad_command_target"
+if "$checker" "$bad_command_target" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-command-target-rehashed.log" 2>&1; then
+  echo "checker accepted command contract with wrong canonical endpoint" >&2
+  exit 1
+fi
+grep -q 'K26 command canonical endpoint' \
+  "$tmp/bad-command-target-rehashed.log"
+
+bad_command_prefix="$tmp/bad-command-prefix"
+write_bundle "$bad_command_prefix"
+perl -0pi -e 's/--endpoint-a 376039 --endpoint-b 943460/--endpoint-a 376038 --endpoint-b 943460/' \
+  "$bad_command_prefix/k26_source_run_commands.json"
+if "$checker" "$bad_command_prefix" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-command-prefix.log" 2>&1; then
+  echo "checker accepted stale artifact hash after prefix endpoint mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26_source_run_commands.json' \
+  "$tmp/bad-command-prefix.log"
+write_manifest "$bad_command_prefix"
+if "$checker" "$bad_command_prefix" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-command-prefix-rehashed.log" 2>&1; then
+  echo "checker accepted command contract with wrong prefix endpoint flags" >&2
+  exit 1
+fi
+grep -q 'K26 command prefix endpoint flags' \
+  "$tmp/bad-command-prefix-rehashed.log"
 
 bad_digest="$tmp/bad-digest"
 write_bundle "$bad_digest"
