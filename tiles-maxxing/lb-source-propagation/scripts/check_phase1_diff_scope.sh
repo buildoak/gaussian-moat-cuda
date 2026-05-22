@@ -70,6 +70,7 @@ while IFS= read -r path; do
     reference/lb-source-propagation-goal-plan-20260522.md | \
     verification/CMakeLists.txt | \
     verification/README.md | \
+    verification/test_source_prop_schema_contract.py | \
     verification/fixtures/source_prop/* | \
     verification/schemas/*source* | \
     verification/src/source_prop_oracle.cpp | \

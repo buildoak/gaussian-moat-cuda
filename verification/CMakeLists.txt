@@ -122,6 +122,9 @@ foreach(bad_source_dead_gap
     PROPERTIES WILL_FAIL TRUE)
 endforeach()
 if(Python3_Interpreter_FOUND)
+  add_test(NAME source_prop_schema_contract_py
+    COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/test_source_prop_schema_contract.py)
   add_test(NAME stats_normalize_sweep_rows_py
     COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/stats/test_normalize_sweep_rows.py)

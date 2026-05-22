@@ -33,6 +33,7 @@ Allowed verifier/schema exceptions:
 ```text
 verification/CMakeLists.txt
 verification/README.md
+verification/test_source_prop_schema_contract.py
 verification/schemas/*source*
 verification/fixtures/source_prop/**
 verification/src/source_prop_oracle.cpp
