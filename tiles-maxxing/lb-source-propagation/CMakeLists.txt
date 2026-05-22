@@ -79,6 +79,11 @@ add_executable(k26_source_run_contract
 )
 target_link_libraries(k26_source_run_contract PRIVATE lb_source_propagation)
 
+add_executable(k26_execution_plan
+  apps/k26_execution_plan.cpp
+)
+target_link_libraries(k26_execution_plan PRIVATE lb_source_propagation)
+
 add_executable(source_origin_cpu_runner
   apps/source_origin_cpu_runner.cpp
 )
@@ -140,6 +145,13 @@ add_test(NAME k26_source_run_contract
 set_tests_properties(k26_source_run_contract PROPERTIES
   PASS_REGULAR_EXPRESSION
     "\"schema\":\"lb_source_k26_run_contract_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"conservative_guard_min_r_final\":1015645"
+  FAIL_REGULAR_EXPRESSION
+    "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME k26_execution_plan
+  COMMAND k26_execution_plan)
+set_tests_properties(k26_execution_plan PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_origin_cpu_runner_smoke

@@ -154,9 +154,12 @@ ctest --test-dir "$verify_build_dir" --output-on-failure \
 "$build_dir/k26_source_run_contract" \
   | tee "$out_dir/k26_source_run_contract.json"
 
+"$build_dir/k26_execution_plan" \
+  | tee "$out_dir/k26_execution_plan.json"
+
 cat > "$out_dir/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, and K26 non-claim run contract only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, and K26 non-claim execution plan only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 

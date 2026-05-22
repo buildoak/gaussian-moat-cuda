@@ -165,10 +165,11 @@ tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh \
   --out-dir /workspace/lb-source-remote-smoke
 ```
 
-This only builds/tests the sidecar and runs the CPU TileOp source smoke. It
-does not start K32, does not run a long campaign, and does not claim a moat
-result. The smoke artifact set includes `source_origin_cpu_runner_smoke.json`
-and `k26_source_run_contract.json`, which must remain non-claim artifacts until
+This builds/tests the sidecar, runs the independent `verification/` CTest
+suite, and runs the CPU TileOp source smoke. It does not start K32, does not
+run a long campaign, and does not claim a moat result. The smoke artifact set
+includes `source_origin_cpu_runner_smoke.json`, `k26_source_run_contract.json`,
+and `k26_execution_plan` output, which must remain non-claim artifacts until
 the blockers listed in the K26 contract are closed.
 
 The sqrt(26) readiness guard lives in
@@ -179,6 +180,13 @@ comparison target. It is intentionally a non-claim artifact:
 `"executable_now": false` remains correct until a campaign-scale source runner,
 scalable terminal inventory digest, accepted K26 BZ evidence, and
 `SOURCE_DEAD_CERT` verifier exist.
+
+`k26_execution_plan` emits the machine-checkable execution plan for the same
+target. It expands the conservative `R_final=1015645` guard into 124 radial
+rows at preferred width 8192, records the final row width 8029, binds the active
+Vast budget caps, and lists the pre-run gates that must pass before the plan can
+be treated as executable. This is also a non-claim artifact and must keep
+`"executable_now": false` until the K26 blockers are closed.
 
 ## Integration Boundary
 
