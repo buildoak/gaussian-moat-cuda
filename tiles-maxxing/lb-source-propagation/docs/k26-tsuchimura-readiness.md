@@ -85,6 +85,8 @@ source coordinate carry atom remained unbridged, if TileOp overflow occurred,
 if terminal source death was not reached at `R_final=1015645`, if the terminal
 inventory count is not `14,542,615,005`, if the cert's terminal inventory
 summary does not match the executed continuation count/digest/max-norm/tie-set,
+if `endpoint_atom_id` is not the stable coordinate atom id
+`1615075207964004` for the canonical endpoint,
 if `metadata.artifact_hash` is not exactly the SHA-256 hash of
 `k26-continuation-result.json`,
 or if the independent `source_dead_cert_check` does not accept a listed

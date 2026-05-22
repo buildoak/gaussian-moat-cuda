@@ -778,6 +778,7 @@ std::string source_certificate_draft_json(
       << (certificate.negative_guard_pass ? "true" : "false")
       << ",\"endpoint\":";
   append_path_point_json(out, certificate.endpoint);
+  out << ",\"endpoint_atom_id\":" << certificate.endpoint_atom_id;
   out << ",\"source_path\":";
   append_path_json(out, certificate.source_path);
   out

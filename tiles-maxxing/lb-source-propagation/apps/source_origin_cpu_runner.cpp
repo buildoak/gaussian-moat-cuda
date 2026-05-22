@@ -655,6 +655,7 @@ int main(int argc, char** argv) {
         .terminal_radius = config.r_final,
         .negative_guard_pass = true,
         .endpoint = {config.endpoint_a, config.endpoint_b, endpoint_norm},
+        .endpoint_atom_id = endpoint_id,
         .source_path = make_source_path_points(source_path, point_by_id),
         .terminal_source_inventory = inventory};
 

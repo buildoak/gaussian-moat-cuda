@@ -15,6 +15,7 @@
   "terminal_radius": 20,
   "negative_guard_pass": true,
   "endpoint": { "a": 1, "b": 8, "norm_sq": 65 },
+  "endpoint_atom_id": 4294967304,
   "source_path": [
     { "a": 0, "b": 3, "norm_sq": 9 },
     { "a": 1, "b": 8, "norm_sq": 65 }

@@ -102,6 +102,7 @@ int main() {
       .endpoint = {static_cast<std::int64_t>(kCanonicalEndpointA),
                    static_cast<std::int64_t>(kCanonicalEndpointB),
                    kEndpointNorm},
+      .endpoint_atom_id = 1615075207964004LL,
       .source_path = {},
       .terminal_source_inventory = {},
   };

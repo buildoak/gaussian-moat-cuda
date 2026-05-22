@@ -596,6 +596,7 @@ void test_draft_profile_and_certificate_json_output() {
       .terminal_radius = 20,
       .negative_guard_pass = true,
       .endpoint = {0, 3, 9},
+      .endpoint_atom_id = 3,
       .source_path = {{0, 3, 9}},
       .terminal_source_inventory = {1, 2},
   };
@@ -613,6 +614,8 @@ void test_draft_profile_and_certificate_json_output() {
              std::string::npos);
   CHECK_TRUE(cert_json.find("\"endpoint\":{\"a\":0,\"b\":3,"
                             "\"norm_sq\":9}") != std::string::npos);
+  CHECK_TRUE(cert_json.find("\"endpoint_atom_id\":3") !=
+             std::string::npos);
   CHECK_TRUE(cert_json.find("\"source_path\":[{\"a\":0,\"b\":3,"
                             "\"norm_sq\":9}]") != std::string::npos);
   CHECK_TRUE(cert_json.find("\"terminal_source_inventory\":[1,2]") !=

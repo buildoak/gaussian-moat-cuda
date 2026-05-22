@@ -571,6 +571,10 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
       static_cast<unsigned __int128>(terminal_radius) * terminal_radius) {
     throw std::runtime_error("endpoint lies outside terminal radius");
   }
+  const std::int64_t endpoint_atom_id = coordinate_atom_id_for_point(endpoint);
+  if (require_i64(cert, "endpoint_atom_id") != endpoint_atom_id) {
+    throw std::runtime_error("endpoint_atom_id does not match endpoint");
+  }
 
   const std::vector<Point> source_path = require_source_path(cert);
   if (!(source_path.back() == endpoint)) {
@@ -645,7 +649,6 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   if (inventory.empty()) {
     throw std::runtime_error("terminal_source_inventory must be nonempty");
   }
-  const std::int64_t endpoint_atom_id = coordinate_atom_id_for_point(endpoint);
   if (!std::binary_search(inventory.begin(), inventory.end(),
                           endpoint_atom_id)) {
     throw std::runtime_error(

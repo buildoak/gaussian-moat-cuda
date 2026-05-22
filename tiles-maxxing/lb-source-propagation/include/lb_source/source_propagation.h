@@ -164,6 +164,7 @@ struct SourceCertificateDraft {
   std::uint64_t terminal_radius = 0;
   bool negative_guard_pass = false;
   SourcePathPoint endpoint;
+  AtomId endpoint_atom_id = 0;
   std::vector<SourcePathPoint> source_path;
   std::vector<AtomId> terminal_source_inventory;
 };
