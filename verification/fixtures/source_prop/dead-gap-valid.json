@@ -1,0 +1,44 @@
+{
+  "schema": "lb_source_k26_source_dead_gap_v1",
+  "claim_label": "SOURCE_ORIGIN_K26",
+  "proof_status": "DIAGNOSTIC_NON_CLAIM",
+  "blocker": "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING",
+  "non_claim": "executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT",
+  "k_sq": 26,
+  "terminal_radius": 1015645,
+  "target": {
+    "tsuchimura_endpoint": {
+      "a": 943460,
+      "b": 376039,
+      "norm_sq": 1031522101121
+    },
+    "canonical_octant_endpoint": {
+      "a": 376039,
+      "b": 943460,
+      "norm_sq": 1031522101121
+    }
+  },
+  "continuation_artifact": {
+    "name": "k26-continuation-result.json",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "target_path_provenance": "mixed_coordinate_port_atom_chain_non_claim",
+  "target_atom_path_length": 3,
+  "target_atom_path": [
+    1615075207963900,
+    -9223372036854775800,
+    1615075207964004
+  ],
+  "terminal_source_inventory_summary": {
+    "count": 14542615005,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "max_norm_sq": 1031522101121,
+    "max_norm_atom_ids": [1615075207964004]
+  },
+  "missing_for_source_dead_cert": [
+    "coordinate Gaussian-prime source_path from origin prefix to canonical endpoint",
+    "per-port representative coordinate path expansion for TileOp atom-chain edges",
+    "claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"
+  ]
+}

@@ -23,6 +23,7 @@ foreach(tool
     boundary_semantics_test
     exact_global_uf
     source_dead_cert_check
+    source_dead_gap_check
     source_prop_oracle
     tile_sample_check
     span_cert_check)
@@ -74,6 +75,9 @@ add_test(NAME source_dead_cert_fixture_first_quadrant_valid
 add_test(NAME source_dead_cert_fixture_summary_nonclaim_valid
   COMMAND source_dead_cert_check
     ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-cert-summary-nonclaim-valid.json)
+add_test(NAME source_dead_gap_fixture_valid
+  COMMAND source_dead_gap_check
+    ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-gap-valid.json)
 foreach(bad_source_dead_cert
     dead-cert-bad-artifact-hash
     dead-cert-bad-digest
@@ -87,6 +91,16 @@ foreach(bad_source_dead_cert
     COMMAND source_dead_cert_check
       ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/${bad_source_dead_cert}.json)
   set_tests_properties(source_dead_cert_fixture_${bad_source_dead_cert}_reject
+    PROPERTIES WILL_FAIL TRUE)
+endforeach()
+foreach(bad_source_dead_gap
+    dead-gap-bad-claim-status
+    dead-gap-bad-endpoint-atom
+    dead-gap-bad-inventory-tie)
+  add_test(NAME source_dead_gap_fixture_${bad_source_dead_gap}_reject
+    COMMAND source_dead_gap_check
+      ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/${bad_source_dead_gap}.json)
+  set_tests_properties(source_dead_gap_fixture_${bad_source_dead_gap}_reject
     PROPERTIES WILL_FAIL TRUE)
 endforeach()
 if(Python3_Interpreter_FOUND)

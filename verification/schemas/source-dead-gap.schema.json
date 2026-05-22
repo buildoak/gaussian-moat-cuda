@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gaussian-moat.local/schemas/source-dead-gap.schema.json",
+  "title": "LB source dead gap artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "claim_label",
+    "proof_status",
+    "blocker",
+    "non_claim",
+    "k_sq",
+    "terminal_radius",
+    "target",
+    "continuation_artifact",
+    "target_path_provenance",
+    "target_atom_path_length",
+    "target_atom_path",
+    "terminal_source_inventory_summary",
+    "missing_for_source_dead_cert"
+  ],
+  "properties": {
+    "schema": { "const": "lb_source_k26_source_dead_gap_v1" },
+    "claim_label": { "const": "SOURCE_ORIGIN_K26" },
+    "proof_status": { "const": "DIAGNOSTIC_NON_CLAIM" },
+    "blocker": { "const": "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING" },
+    "non_claim": { "type": "string", "minLength": 1 },
+    "k_sq": { "const": 26 },
+    "terminal_radius": { "const": 1015645 },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tsuchimura_endpoint", "canonical_octant_endpoint"],
+      "properties": {
+        "tsuchimura_endpoint": { "$ref": "#/$defs/point" },
+        "canonical_octant_endpoint": { "$ref": "#/$defs/point" }
+      }
+    },
+    "continuation_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": { "const": "k26-continuation-result.json" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "target_path_provenance": {
+      "const": "mixed_coordinate_port_atom_chain_non_claim"
+    },
+    "target_atom_path_length": { "type": "integer", "minimum": 1 },
+    "target_atom_path": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "integer" }
+    },
+    "terminal_source_inventory_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "count",
+        "digest_algorithm",
+        "digest_hex",
+        "max_norm_sq",
+        "max_norm_atom_ids"
+      ],
+      "properties": {
+        "count": { "const": 14542615005 },
+        "digest_algorithm": { "const": "sha256:lb_source_inventory_v1" },
+        "digest_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "max_norm_sq": { "const": 1031522101121 },
+        "max_norm_atom_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "integer" }
+        }
+      }
+    },
+    "missing_for_source_dead_cert": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["a", "b", "norm_sq"],
+      "properties": {
+        "a": { "type": "integer", "minimum": 0 },
+        "b": { "type": "integer", "minimum": 0 },
+        "norm_sq": { "const": 1031522101121 }
+      }
+    }
+  }
+}
