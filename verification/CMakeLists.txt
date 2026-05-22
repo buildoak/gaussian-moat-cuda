@@ -60,6 +60,7 @@ foreach(source_prop_case
       ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/${source_prop_case}.json)
 endforeach()
 foreach(bad_source_prop_case
+    bad-composed-band-count-too-small
     overflow-reject
     bad-k32-carry-width-too-small)
   add_test(NAME source_prop_fixture_${bad_source_prop_case}

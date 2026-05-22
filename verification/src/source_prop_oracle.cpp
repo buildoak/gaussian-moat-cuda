@@ -476,8 +476,9 @@ RunResult run_composed(const Fixture& fixture,
 }
 
 void validate_guards(const Fixture& fixture) {
-  constexpr std::array<const char*, 5> allowed = {
+  constexpr std::array<const char*, 6> allowed = {
       "composed_equals_big",
+      "composed_band_count_guard",
       "false_weld_guard",
       "drop_non_source_carry_guard",
       "terminal_death_guard",
@@ -629,6 +630,13 @@ void validate_fixture(const Fixture& fixture) {
         fixture.carry_width != 6) {
       throw std::runtime_error(
           "k32_carry_width_minimum requires k_sq=32 and carry_width=6");
+    }
+  }
+
+  if (fixture.guards.contains("composed_band_count_guard")) {
+    if (fixture.bands.size() < 5 || fixture.bands.size() > 10) {
+      throw std::runtime_error(
+          "composed_band_count_guard requires 5 to 10 stitched bands");
     }
   }
 

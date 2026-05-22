@@ -68,7 +68,7 @@
     { "id": "b8", "r_inner": 40, "r_outer": 45 },
     { "id": "b9", "r_inner": 45, "r_outer": 50 }
   ],
-  "guards": ["composed_equals_big"],
+  "guards": ["composed_equals_big", "composed_band_count_guard"],
   "overflow_counters": {
     "component_label_overflow": 0,
     "carry_atom_overflow": 0

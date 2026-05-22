@@ -72,6 +72,7 @@
       "items": {
         "enum": [
           "composed_equals_big",
+          "composed_band_count_guard",
           "false_weld_guard",
           "drop_non_source_carry_guard",
           "terminal_death_guard",
