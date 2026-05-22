@@ -116,6 +116,7 @@ ctest --test-dir "$build_dir" --output-on-failure \
   --endpoint-a 0 \
   --endpoint-b 251 \
   --manifest-out "$out_dir/source_origin_prefix_manifest.txt" \
+  --prefix-witness-out "$out_dir/source_origin_prefix_witness.txt" \
   | tee "$out_dir/source_origin_prefix_manifest_smoke.json"
 
 "$build_dir/source_tileop_cpu_runner" \
@@ -125,6 +126,7 @@ ctest --test-dir "$build_dir" --output-on-failure \
   --endpoint-a 0 \
   --endpoint-b 251 \
   --manifest-in "$out_dir/source_origin_prefix_manifest.txt" \
+  --prefix-witness-in "$out_dir/source_origin_prefix_witness.txt" \
   | tee "$out_dir/source_tileop_cpu_runner_manifest_smoke.json"
 
 "$build_dir/k26_tsuchimura_preflight" \

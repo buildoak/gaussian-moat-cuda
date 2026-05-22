@@ -69,7 +69,11 @@ The TileOp-fed runner can also start from a carry manifest emitted by
 `source_origin_cpu_runner --manifest-out`. That is the intended handoff shape
 for K26: the coordinate-fed prefix certifies the origin component up to a radius
 where campaign `Grid` preconditions hold, then campaign TileOp bands continue
-from the exact separator state instead of inventing a new source seed.
+from the exact separator state instead of inventing a new source seed. For
+diagnostic positive-witness checks, the prefix runner can also emit
+`--prefix-witness-out`; the TileOp-fed runner consumes it with
+`--prefix-witness-in` and splices the origin-prefix path to the continuation
+path.
 
 ## Small Source Runner
 
@@ -85,7 +89,10 @@ when the run has accepted terminal source death, a reached endpoint, a source
 path, and terminal inventory.
 With `--manifest-out`, it writes the live carry separator when source survives
 into the final carry window, allowing the TileOp-fed runner to continue from
-the prefix without changing source semantics.
+the prefix without changing source semantics. With `--prefix-witness-out`, it
+also writes line-oriented origin-prefix paths to each live source carry atom, so
+the manifest bridge can prove a positive path rather than only propagate a
+source bit.
 
 This closes the first executable gap between the abstract sidecar protocol and
 a source/origin run, but it is still a non-claim surface. It is not TileOp/CUDA

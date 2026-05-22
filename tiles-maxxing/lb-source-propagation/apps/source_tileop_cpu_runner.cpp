@@ -33,6 +33,7 @@ struct Config {
   std::int64_t endpoint_b = 251;
   std::size_t max_atoms = 65535;
   std::optional<std::string> manifest_in;
+  std::optional<std::string> prefix_witness_in;
 };
 
 struct Point {
@@ -40,6 +41,16 @@ struct Point {
   std::int64_t b = 0;
   std::uint64_t norm_sq = 0;
 };
+
+struct PrefixWitness {
+  std::uint64_t k_sq = 0;
+  std::uint64_t outer_radius = 0;
+  std::map<lb_source::AtomId, std::vector<Point>> path_by_target;
+};
+
+std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b);
+lb_source::AtomId checked_atom_id(std::int64_t a, std::int64_t b);
+std::uint64_t dist_sq(const Point& lhs, const Point& rhs);
 
 bool parse_uint64(std::string_view text, std::uint64_t& out) {
   try {
@@ -90,7 +101,10 @@ void usage(const char* prog) {
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
       << "                        (default 65535)\n"
       << "  --manifest-in PATH    read an incoming origin-prefix carry manifest\n"
-      << "                        at --r-start instead of seeding one atom\n";
+      << "                        at --r-start instead of seeding one atom\n"
+      << "  --prefix-witness-in PATH\n"
+      << "                        read diagnostic origin-prefix paths for the\n"
+      << "                        incoming source carry atoms\n";
 }
 
 bool parse_args(int argc, char** argv, Config& config) {
@@ -168,6 +182,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.manifest_in = value;
+    } else if (take_value("--prefix-witness-in", value)) {
+      if (value.empty()) {
+        std::cerr << "--prefix-witness-in must not be empty\n";
+        return false;
+      }
+      config.prefix_witness_in = value;
     } else {
       std::cerr << "unknown argument: " << arg << "\n";
       return false;
@@ -194,6 +214,10 @@ bool parse_args(int argc, char** argv, Config& config) {
     std::cerr << "endpoint must be in canonical octant: 0 <= a <= b\n";
     return false;
   }
+  if (config.prefix_witness_in.has_value() && !config.manifest_in.has_value()) {
+    std::cerr << "--prefix-witness-in requires --manifest-in\n";
+    return false;
+  }
   return true;
 }
 
@@ -210,6 +234,100 @@ lb_source::CarryManifest read_manifest_or_die(const std::string& path) {
     std::exit(EXIT_FAILURE);
   }
   return decoded.manifest;
+}
+
+void fail_prefix_witness(const std::string& diagnostic) {
+  std::cerr << "invalid --prefix-witness-in: " << diagnostic << "\n";
+  std::exit(EXIT_FAILURE);
+}
+
+PrefixWitness read_prefix_witness_or_die(const std::string& path) {
+  std::ifstream in(path);
+  if (!in) {
+    std::cerr << "cannot open --prefix-witness-in path: " << path << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  PrefixWitness witness;
+  std::string token;
+  if (!(in >> token) || token != "LB_SOURCE_PREFIX_WITNESS_V1") {
+    fail_prefix_witness("missing prefix witness header");
+  }
+  if (!(in >> token) || token != "k_sq" || !(in >> witness.k_sq)) {
+    fail_prefix_witness("missing k_sq");
+  }
+  if (!(in >> token) || token != "outer_radius" ||
+      !(in >> witness.outer_radius)) {
+    fail_prefix_witness("missing outer_radius");
+  }
+  std::uint64_t witness_count = 0;
+  if (!(in >> token) || token != "witness_count" ||
+      !(in >> witness_count)) {
+    fail_prefix_witness("missing witness_count");
+  }
+
+  for (std::uint64_t i = 0; i < witness_count; ++i) {
+    lb_source::AtomId raw_id = 0;
+    Point target;
+    std::uint64_t path_count = 0;
+    if (!(in >> token) || token != "witness" || !(in >> raw_id) ||
+        !(in >> target.a) || !(in >> target.b) ||
+        !(in >> target.norm_sq) || !(in >> path_count)) {
+      fail_prefix_witness("malformed witness row");
+    }
+    if (target.a < 0 || target.b < 0 || target.b < target.a ||
+        norm_sq_i64(target.a, target.b) != target.norm_sq) {
+      fail_prefix_witness("invalid witness target coordinate");
+    }
+    const lb_source::AtomId target_id = checked_atom_id(target.a, target.b);
+    if (target_id != raw_id) {
+      fail_prefix_witness("target atom id does not match coordinate");
+    }
+    if (path_count == 0) {
+      fail_prefix_witness("empty source path");
+    }
+
+    std::vector<Point> path_points;
+    path_points.reserve(static_cast<std::size_t>(path_count));
+    for (std::uint64_t j = 0; j < path_count; ++j) {
+      Point point;
+      if (!(in >> token) || token != "point" || !(in >> point.a) ||
+          !(in >> point.b) || !(in >> point.norm_sq)) {
+        fail_prefix_witness("malformed path point");
+      }
+      if (point.a < 0 || point.b < 0 || point.b < point.a ||
+          norm_sq_i64(point.a, point.b) != point.norm_sq) {
+        fail_prefix_witness("invalid path coordinate");
+      }
+      (void)checked_atom_id(point.a, point.b);
+      path_points.push_back(point);
+    }
+
+    if (path_points.front().norm_sq > witness.k_sq) {
+      fail_prefix_witness("path does not start from an origin source seed");
+    }
+    if (path_points.back().a != target.a || path_points.back().b != target.b ||
+        path_points.back().norm_sq != target.norm_sq) {
+      fail_prefix_witness("path does not end at its target");
+    }
+    for (std::size_t j = 1; j < path_points.size(); ++j) {
+      if (dist_sq(path_points[j - 1], path_points[j]) > witness.k_sq) {
+        fail_prefix_witness("path step exceeds k_sq");
+      }
+    }
+    if (!witness.path_by_target.emplace(target_id, std::move(path_points))
+             .second) {
+      fail_prefix_witness("duplicate witness target");
+    }
+  }
+
+  if (!(in >> token) || token != "END") {
+    fail_prefix_witness("missing END marker");
+  }
+  if (in >> token) {
+    fail_prefix_witness("unexpected trailing token");
+  }
+  return witness;
 }
 
 std::uint64_t square_u64(std::uint64_t value) {
@@ -420,6 +538,30 @@ void append_source_path_json(
   out << ']';
 }
 
+std::vector<Point> make_path_points(
+    const std::vector<lb_source::AtomId>& source_path,
+    const std::map<lb_source::AtomId, Point>& point_by_id) {
+  std::vector<Point> points;
+  points.reserve(source_path.size());
+  for (const lb_source::AtomId id : source_path) {
+    points.push_back(point_by_id.at(id));
+  }
+  return points;
+}
+
+void append_point_path_json(std::ostream& out,
+                            const std::vector<Point>& source_path) {
+  out << '[';
+  for (std::size_t i = 0; i < source_path.size(); ++i) {
+    if (i != 0) {
+      out << ',';
+    }
+    out << "{\"a\":" << source_path[i].a << ",\"b\":" << source_path[i].b
+        << ",\"norm_sq\":" << source_path[i].norm_sq << '}';
+  }
+  out << ']';
+}
+
 bool has_source_carry(const lb_source::SeparatorState& state) {
   return std::find(state.source_bit_per_component.begin(),
                    state.source_bit_per_component.end(),
@@ -446,8 +588,10 @@ int main(int argc, char** argv) {
   std::map<lb_source::AtomId, std::vector<lb_source::AtomId>> adjacency;
   std::vector<lb_source::AtomId> source_seed_ids;
   std::optional<lb_source::SeparatorState> incoming;
+  std::optional<PrefixWitness> prefix_witness;
   std::string source_mode = "CERTIFIED_SEED";
   std::uint64_t manifest_source_carry_atoms = 0;
+  std::uint64_t prefix_witness_targets = 0;
   if (config.manifest_in.has_value()) {
     const lb_source::CarryManifest manifest =
         read_manifest_or_die(*config.manifest_in);
@@ -466,6 +610,19 @@ int main(int argc, char** argv) {
     incoming = manifest.separator;
     source_mode = "ORIGIN_PREFIX_MANIFEST";
     manifest_source_carry_atoms = manifest.separator.carry_atoms.size();
+    if (config.prefix_witness_in.has_value()) {
+      prefix_witness = read_prefix_witness_or_die(*config.prefix_witness_in);
+      if (prefix_witness->k_sq !=
+          static_cast<std::uint64_t>(campaign::k_sq_value)) {
+        std::cerr << "prefix witness k_sq does not match compiled K_SQ\n";
+        return EXIT_FAILURE;
+      }
+      if (prefix_witness->outer_radius != config.r_start) {
+        std::cerr << "prefix witness outer_radius must equal --r-start\n";
+        return EXIT_FAILURE;
+      }
+      source_mode = "ORIGIN_PREFIX_WITNESS";
+    }
     for (std::size_t c = 0; c < manifest.separator.component_partition.size();
          ++c) {
       if (!manifest.separator.source_bit_per_component[c]) {
@@ -473,8 +630,23 @@ int main(int argc, char** argv) {
       }
       for (const lb_source::AtomId id :
            manifest.separator.component_partition[c]) {
+        if (prefix_witness.has_value()) {
+          const auto witness_it = prefix_witness->path_by_target.find(id);
+          if (witness_it == prefix_witness->path_by_target.end()) {
+            std::cerr << "prefix witness is missing a source carry atom\n";
+            return EXIT_FAILURE;
+          }
+          const Point& target = witness_it->second.back();
+          point_by_id.emplace(id, target);
+          ++prefix_witness_targets;
+        }
         source_seed_ids.push_back(id);
       }
+    }
+    if (prefix_witness.has_value() &&
+        prefix_witness_targets != prefix_witness->path_by_target.size()) {
+      std::cerr << "prefix witness contains non-source carry targets\n";
+      return EXIT_FAILURE;
     }
   }
   lb_source::ProcessResult last;
@@ -506,7 +678,9 @@ int main(int argc, char** argv) {
           std::cerr << "incoming carry atom is not a stable coordinate atom\n";
           return EXIT_FAILURE;
         }
-        edge_points.push_back({decoded->a, decoded->b, atom.norm_sq});
+        const Point carry_point{decoded->a, decoded->b, atom.norm_sq};
+        point_by_id.emplace(atom.id, carry_point);
+        edge_points.push_back(carry_point);
       }
     }
 
@@ -577,6 +751,19 @@ int main(int argc, char** argv) {
           ? source_path_to_endpoint(source_seed_ids, endpoint_id, point_by_id,
                                     adjacency)
           : std::vector<lb_source::AtomId>{};
+  std::vector<Point> source_path_points =
+      make_path_points(source_path, point_by_id);
+  if (prefix_witness.has_value() && !source_path.empty()) {
+    const auto witness_it = prefix_witness->path_by_target.find(source_path[0]);
+    if (witness_it == prefix_witness->path_by_target.end()) {
+      std::cerr << "continuation path starts outside prefix witness set\n";
+      return EXIT_FAILURE;
+    }
+    source_path_points = witness_it->second;
+    for (std::size_t i = 1; i < source_path.size(); ++i) {
+      source_path_points.push_back(point_by_id.at(source_path[i]));
+    }
+  }
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_cpu_runner_v1\","
@@ -595,6 +782,7 @@ int main(int argc, char** argv) {
             << lb_source::ceil_sqrt(campaign::k_sq_value)
             << ",\"manifest_source_carry_atoms\":"
             << manifest_source_carry_atoms
+            << ",\"prefix_witness_targets\":" << prefix_witness_targets
             << ",\"bands_processed\":" << bands_processed
             << ",\"campaign_tiles_processed\":" << campaign_tiles_processed
             << ",\"tileop_overflows\":" << tileop_overflows
@@ -619,9 +807,9 @@ int main(int argc, char** argv) {
             << ",\"source_inventory_digest_hex\":\""
             << inventory_summary.digest_hex << "\""
             << ",\"max_source_norm_sq\":" << inventory_summary.max_norm_sq
-            << ",\"source_path_length\":" << source_path.size()
+            << ",\"source_path_length\":" << source_path_points.size()
             << ",\"source_path\":";
-  append_source_path_json(std::cout, source_path, point_by_id);
+  append_point_path_json(std::cout, source_path_points);
   std::cout << ",\"non_claim\":\"CPU TileOp-fed sidecar diagnostic; not a CUDA campaign or SOURCE_DEAD_CERT\""
             << "}\n";
 

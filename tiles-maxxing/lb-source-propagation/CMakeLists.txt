@@ -140,10 +140,11 @@ add_test(NAME source_origin_prefix_manifest_smoke
     --band-width 128
     --endpoint-a 0
     --endpoint-b 251
-    --manifest-out ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt)
+    --manifest-out ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt
+    --prefix-witness-out ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt)
 set_tests_properties(source_origin_prefix_manifest_smoke PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"manifest_written\":true"
+    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"manifest_written\":true.*\"prefix_witness_written\":true.*\"prefix_witness_targets\":[1-9][0-9]*"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_cpu_runner_smoke
@@ -167,10 +168,11 @@ add_test(NAME source_tileop_cpu_runner_manifest_smoke
     --band-width 128
     --endpoint-a 0
     --endpoint-b 251
-    --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt)
+    --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt
+    --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt)
 set_tests_properties(source_tileop_cpu_runner_manifest_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_cpu_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_MANIFEST\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"source_reached\":true.*\"accepted\":true"
+    "\"schema\":\"lb_source_tileop_cpu_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"source_reached\":true.*\"accepted\":true.*\"source_path_length\":[1-9][0-9]*"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")

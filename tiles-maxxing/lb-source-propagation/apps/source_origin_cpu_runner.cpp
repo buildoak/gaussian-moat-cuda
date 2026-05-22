@@ -29,6 +29,7 @@ struct Config {
   std::size_t max_atoms = 65535;
   std::optional<std::string> cert_out;
   std::optional<std::string> manifest_out;
+  std::optional<std::string> prefix_witness_out;
 };
 
 struct Point {
@@ -85,7 +86,10 @@ void usage(const char* prog) {
       << "  --cert-out PATH       write lb_source_dead_cert_draft_v1 when the\n"
       << "                        endpoint is reached and source dies\n"
       << "  --manifest-out PATH   write carry manifest when source survives into\n"
-      << "                        the final carry window\n";
+      << "                        the final carry window\n"
+      << "  --prefix-witness-out PATH\n"
+      << "                        write diagnostic origin-prefix paths to live\n"
+      << "                        source carry atoms\n";
 }
 
 bool parse_args(int argc, char** argv, Config& config) {
@@ -159,6 +163,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.manifest_out = value;
+    } else if (take_value("--prefix-witness-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--prefix-witness-out must not be empty\n";
+        return false;
+      }
+      config.prefix_witness_out = value;
     } else {
       std::cerr << "unknown argument: " << arg << "\n";
       return false;
@@ -395,6 +405,76 @@ bool has_source_carry(const lb_source::SeparatorState& state) {
                    true) != state.source_bit_per_component.end();
 }
 
+std::vector<lb_source::AtomId> source_carry_ids(
+    const lb_source::SeparatorState& state) {
+  const lb_source::SeparatorState canonical =
+      lb_source::canonicalize_separator(state);
+  std::vector<lb_source::AtomId> ids;
+  for (std::size_t c = 0; c < canonical.component_partition.size(); ++c) {
+    if (!canonical.source_bit_per_component[c]) {
+      continue;
+    }
+    ids.insert(ids.end(), canonical.component_partition[c].begin(),
+               canonical.component_partition[c].end());
+  }
+  std::sort(ids.begin(), ids.end());
+  ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+  return ids;
+}
+
+std::size_t write_prefix_witness_or_die(
+    const std::string& path, std::uint64_t k_sq, std::uint64_t outer_radius,
+    const lb_source::SeparatorState& state,
+    const std::vector<lb_source::AtomId>& source_seed_ids,
+    const std::map<lb_source::AtomId, Point>& point_by_id,
+    const std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>&
+        adjacency) {
+  const std::vector<lb_source::AtomId> targets = source_carry_ids(state);
+  if (targets.empty()) {
+    std::cerr << "--prefix-witness-out requires at least one source carry atom\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  std::ofstream witness(path);
+  if (!witness) {
+    std::cerr << "cannot open --prefix-witness-out path: " << path << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  witness << "LB_SOURCE_PREFIX_WITNESS_V1\n"
+          << "k_sq " << k_sq << "\n"
+          << "outer_radius " << outer_radius << "\n"
+          << "witness_count " << targets.size() << "\n";
+
+  for (const lb_source::AtomId target : targets) {
+    const auto point_it = point_by_id.find(target);
+    if (point_it == point_by_id.end()) {
+      std::cerr << "source carry target is missing from point map\n";
+      std::exit(EXIT_FAILURE);
+    }
+    const std::vector<lb_source::AtomId> path_ids =
+        source_path_to_endpoint(source_seed_ids, target, point_by_id,
+                                adjacency);
+    if (path_ids.empty()) {
+      std::cerr << "source carry target lacks an origin-prefix witness path\n";
+      std::exit(EXIT_FAILURE);
+    }
+
+    const Point& target_point = point_it->second;
+    witness << "witness " << target << " " << target_point.a << " "
+            << target_point.b << " " << target_point.norm_sq << " "
+            << path_ids.size() << "\n";
+    for (const lb_source::AtomId id : path_ids) {
+      const Point& point = point_by_id.at(id);
+      witness << "point " << point.a << " " << point.b << " "
+              << point.norm_sq << "\n";
+    }
+  }
+
+  witness << "END\n";
+  return targets.size();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -520,6 +600,8 @@ int main(int argc, char** argv) {
                                     adjacency)
           : std::vector<lb_source::AtomId>{};
   bool manifest_written = false;
+  bool prefix_witness_written = false;
+  std::size_t prefix_witness_targets = 0;
   if (config.manifest_out.has_value()) {
     if (!last.accepted() || last.terminal_source_dead ||
         !has_source_carry(last.outgoing)) {
@@ -536,6 +618,17 @@ int main(int argc, char** argv) {
         manifest, lb_source::make_carry_manifest(config.k_sq, config.r_final,
                                                  last));
     manifest_written = true;
+  }
+  if (config.prefix_witness_out.has_value()) {
+    if (!last.accepted() || last.terminal_source_dead ||
+        !has_source_carry(last.outgoing)) {
+      std::cerr << "--prefix-witness-out requires accepted live source carry\n";
+      return EXIT_FAILURE;
+    }
+    prefix_witness_targets = write_prefix_witness_or_die(
+        *config.prefix_witness_out, config.k_sq, config.r_final, last.outgoing,
+        source_seed_ids, point_by_id, adjacency);
+    prefix_witness_written = true;
   }
   bool cert_written = false;
   if (config.cert_out.has_value()) {
@@ -611,6 +704,9 @@ int main(int argc, char** argv) {
   std::cout << ",\"cert_written\":" << (cert_written ? "true" : "false")
             << ",\"manifest_written\":"
             << (manifest_written ? "true" : "false")
+            << ",\"prefix_witness_written\":"
+            << (prefix_witness_written ? "true" : "false")
+            << ",\"prefix_witness_targets\":" << prefix_witness_targets
             << ",\"non_claim\":\"small coordinate-fed sidecar runner; not a TileOp/CUDA SOURCE_DEAD_CERT\""
             << "}\n";
 
