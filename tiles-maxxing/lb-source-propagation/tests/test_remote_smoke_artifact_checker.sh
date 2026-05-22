@@ -29,12 +29,12 @@ write_ctest_log() {
   } > "$path"
 }
 
-write_ctest_log "$tmp/ctest.log" 19
+write_ctest_log "$tmp/ctest.log" 20
 write_ctest_log "$tmp/verification-ctest.log" 43
 
 cat > "$tmp/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule diagnostic, and K26 run profile draft only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule diagnostic, K26 run profile draft, and K26 run command contract only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 
@@ -74,7 +74,7 @@ cat > "$tmp/k26_source_run_contract.json" <<'JSON'
 JSON
 
 cat > "$tmp/k26_execution_plan.json" <<'JSON'
-{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 19/19"],"non_claim":"execution plan only; no source/origin run executed"}
+{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 20/20"],"non_claim":"execution plan only; no source/origin run executed"}
 JSON
 
 cat > "$tmp/k26_bz_schedule_check.json" <<'JSON'
@@ -83,6 +83,10 @@ JSON
 
 cat > "$tmp/k26_source_run_profile.json" <<'JSON'
 {"schema":"lb_source_k26_run_profile_v1","claim_label":"SOURCE_ORIGIN_K26","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","executable_now":false,"build":{"required_k_sq":26},"schedule":{"bz_schedule":"repaired","band_count":124,"prefix_row_index":0,"tileop_port_first_row_index":1},"missing_runner_features":["full K26 source runner has not executed the repaired variable-boundary schedule"],"non_claim":"run profile only; no sqrt(26) source/origin run executed"}
+JSON
+
+cat > "$tmp/k26_source_run_commands.json" <<'JSON'
+{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"build":{"required_k_sq":26},"prefix":{"r_final":8192},"continuation":{"r_start":8192,"r_final":1015645,"schedule_boundary_count":124,"schedule_segment_count":123,"schedule_min_width":8029,"schedule_max_width":8193,"schedule_radii_csv":"8192,122879,475135,622591,1015645"},"non_claim":"command contract only; no sqrt(26) source/origin run executed"}
 JSON
 
 "$checker" "$tmp" > "$tmp/pass.log"

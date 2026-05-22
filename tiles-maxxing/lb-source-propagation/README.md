@@ -171,8 +171,9 @@ suite, and runs the CPU TileOp source smoke. It does not start K32, does not
 run a long campaign, and does not claim a moat result. The smoke artifact set
 includes `source_origin_cpu_runner_smoke.json`, `k26_source_run_contract.json`,
 `k26_execution_plan` output, `k26_bz_schedule_check.json`, and
-`k26_source_run_profile.json`, which must remain non-claim artifacts until the
-blockers listed in the K26 contract are closed.
+`k26_source_run_profile.json`, plus `k26_source_run_commands.json` with the
+exact repaired continuation schedule. These must remain non-claim artifacts
+until the blockers listed in the K26 contract are closed.
 
 The remote smoke finishes by running:
 
@@ -188,6 +189,17 @@ After pulling Vast artifacts, run the same checker with `--expect-head` and
 
 The sqrt(26) readiness guard lives in
 `docs/k26-tsuchimura-readiness.md`.
+
+The exact non-claim command contract for the eventual K26 run is emitted by:
+
+```bash
+k26_source_run_commands
+```
+
+It prints the origin-prefix command and the repaired
+`source_tileop_port_runner --schedule-radii ...` continuation command. The
+output is a run contract only; it does not execute the full sqrt(26) comparison
+and must not be treated as a `SOURCE_DEAD_CERT`.
 
 `k26_source_run_contract` emits the execution contract for the Tsuchimura
 comparison target. It is intentionally a non-claim artifact:

@@ -94,6 +94,11 @@ add_executable(k26_source_run_profile
 )
 target_link_libraries(k26_source_run_profile PRIVATE lb_source_propagation)
 
+add_executable(k26_source_run_commands
+  apps/k26_source_run_commands.cpp
+)
+target_link_libraries(k26_source_run_commands PRIVATE lb_source_propagation)
+
 add_executable(source_origin_cpu_runner
   apps/source_origin_cpu_runner.cpp
 )
@@ -161,7 +166,7 @@ add_test(NAME k26_execution_plan
   COMMAND k26_execution_plan)
 set_tests_properties(k26_execution_plan PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645"
+    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 20/20"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_bz_schedule_check
@@ -176,6 +181,13 @@ add_test(NAME k26_source_run_profile
 set_tests_properties(k26_source_run_profile PROPERTIES
   PASS_REGULAR_EXPRESSION
     "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"full K26 source runner has not executed the repaired variable-boundary schedule"
+  FAIL_REGULAR_EXPRESSION
+    "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME k26_source_run_commands
+  COMMAND k26_source_run_commands)
+set_tests_properties(k26_source_run_commands PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_k26_run_commands_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"required_k_sq\":26.*\"r_final\":8192.*\"r_start\":8192.*\"r_final\":1015645.*\"schedule_boundary_count\":124.*\"schedule_segment_count\":123.*\"schedule_min_width\":8029.*\"schedule_max_width\":8193.*122879.*475135.*622591"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME remote_smoke_artifact_checker

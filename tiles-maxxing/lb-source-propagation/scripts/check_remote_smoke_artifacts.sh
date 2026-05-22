@@ -88,7 +88,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" 19
+require_ctest_log "$out_dir/ctest.log" 20
 require_ctest_log "$out_dir/verification-ctest.log" 43
 
 for artifact in \
@@ -103,7 +103,8 @@ for artifact in \
   k26_source_run_contract.json \
   k26_execution_plan.json \
   k26_bz_schedule_check.json \
-  k26_source_run_profile.json; do
+  k26_source_run_profile.json \
+  k26_source_run_commands.json; do
   require_file "$out_dir/$artifact"
 done
 
@@ -152,7 +153,7 @@ require_grep '"index":123' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final row index"
 require_grep '"r_outer":1015645' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final radius"
-require_grep 'local sidecar ctest 19/19' \
+require_grep 'local sidecar ctest 20/20' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan sidecar gate"
 
 require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' \
@@ -200,6 +201,31 @@ require_grep '"tileop_port_first_row_index":1' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile TileOp start row"
 require_grep 'full K26 source runner has not executed the repaired variable-boundary schedule' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile runner gap"
+
+require_grep '"schema":"lb_source_k26_run_commands_v1"' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands schema"
+require_grep '"claim_label":"SOURCE_ORIGIN_K26"' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands claim label"
+require_grep '"executable_now":false' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands non-executable"
+require_grep '"required_k_sq":26' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands required build"
+require_grep '"r_final":8192' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands prefix radius"
+require_grep '"r_start":8192' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands continuation start"
+require_grep '"r_final":1015645' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands terminal radius"
+require_grep '"schedule_boundary_count":124' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands schedule boundary count"
+require_grep '"schedule_segment_count":123' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands schedule segment count"
+require_grep '"schedule_min_width":8029' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands min width"
+require_grep '"schedule_max_width":8193' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands max width"
+require_grep '122879.*475135.*622591' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands repaired boundaries"
 
 for json in "$out_dir"/*.json "$out_dir/status.txt"; do
   if grep -Eq 'SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS' "$json"; then
