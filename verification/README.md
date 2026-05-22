@@ -43,6 +43,13 @@ ctest --test-dir verification/build --output-on-failure
 `tile_sample_check` strengthens confidence in sampled production TileOps. It is
 not a global proof of a negative `MOAT` row.
 
+`source_prop_oracle` is the executable checker for source-propagation fixtures.
+The companion `source-prop-fixture.schema.json` mirrors the fixture shape and
+the `composed_band_count_guard` contract: fixtures that claim the 5-10
+stitched-band acceptance gate must carry 5 to 10 bands. Smaller adversarial
+fixtures may still use `composed_equals_big` without that guard when they are
+testing a different failure mode.
+
 ## Status Semantics
 
 Profile verdicts are detector output:

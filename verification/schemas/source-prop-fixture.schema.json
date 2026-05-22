@@ -95,6 +95,21 @@
       "maxLength": 1024
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "guards": { "contains": { "const": "composed_band_count_guard" } }
+        },
+        "required": ["guards"]
+      },
+      "then": {
+        "properties": {
+          "bands": { "minItems": 5, "maxItems": 10 }
+        }
+      }
+    }
+  ],
   "additionalProperties": false,
   "$defs": {
     "token": {
