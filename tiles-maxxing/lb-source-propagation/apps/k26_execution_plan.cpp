@@ -117,16 +117,16 @@ int main() {
   }
 
   constexpr const char* kPreRunGates[] = {
-      "local sidecar ctest 15/15",
+      "local sidecar ctest 16/16",
       "local independent verification ctest 43/43",
-      "remote 4090 smoke with sidecar ctest 15/15 and verification ctest 43/43",
-      "accepted K26 external BZ evidence for every source/origin proof row",
+      "remote 4090 smoke with sidecar ctest 16/16 and verification ctest 43/43",
+      "accepted K26 BZ evidence for every source/origin proof row after row-shift repair of nominal dirty boundaries",
       "accepted coordinate-to-port seam bridge theorem or diagnostic label",
       "accepted terminal inventory count/digest/max-norm handling at 14.5B scale"};
   constexpr const char* kCurrentBlockers[] = {
       "remote 4090 smoke has not passed on current head under the active price cap",
       "full-scale K26 source runner is not accepted",
-      "K26 external BZ evidence is not bound to run metadata",
+      "nominal K26 8192-row schedule is not BZ-clean: exact diagnostic finds dirty rows at indices 15, 58, and 75",
       "coordinate-to-port seam bridge remains diagnostic",
       "no full-scale SOURCE_DEAD_CERT artifact exists"};
 

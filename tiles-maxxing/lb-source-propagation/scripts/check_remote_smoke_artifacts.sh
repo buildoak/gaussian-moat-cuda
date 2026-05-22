@@ -8,7 +8,8 @@ Usage:
 
 Validate pulled LB source-propagation remote smoke artifacts. This checks the
 sidecar and independent verifier CTest logs, the non-claim K26 preflight,
-contract, and execution-plan JSON, and optional deployed source provenance.
+contract, execution-plan JSON, K26 BZ schedule diagnostic, and optional
+deployed source provenance.
 USAGE
 }
 
@@ -81,7 +82,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" 15
+require_ctest_log "$out_dir/ctest.log" 16
 require_ctest_log "$out_dir/verification-ctest.log" 43
 
 for artifact in \
@@ -94,7 +95,8 @@ for artifact in \
   source_tileop_cpu_runner_manifest_smoke.json \
   k26_tsuchimura_preflight.json \
   k26_source_run_contract.json \
-  k26_execution_plan.json; do
+  k26_execution_plan.json \
+  k26_bz_schedule_check.json; do
   require_file "$out_dir/$artifact"
 done
 
@@ -137,8 +139,27 @@ require_grep '"index":123' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final row index"
 require_grep '"r_outer":1015645' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final radius"
-require_grep 'local sidecar ctest 15/15' \
+require_grep 'local sidecar ctest 16/16' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan sidecar gate"
+
+require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule schema"
+require_grep '"claim_label":"SOURCE_ORIGIN_K26"' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule claim label"
+require_grep '"proof_status":"BZ_SCHEDULE_REQUIRES_ROW_SHIFTS_DIAGNOSTIC"' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule non-claim status"
+require_grep '"accepted_for_claim":false' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule not accepted"
+require_grep '"band_count":124' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule band count"
+require_grep '"rows_checked":124' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule rows checked"
+require_grep '"rows_with_bad_norms":3' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule dirty rows"
+require_grep '"bad_norm_count":3' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule dirty summary"
+require_grep '"bz_clean":false' \
+  "$out_dir/k26_bz_schedule_check.json" "K26 BZ schedule dirty flag"
 
 for json in "$out_dir"/*.json "$out_dir/status.txt"; do
   if grep -Eq 'SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS' "$json"; then

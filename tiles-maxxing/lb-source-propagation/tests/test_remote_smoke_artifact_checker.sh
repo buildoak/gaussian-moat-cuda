@@ -29,12 +29,12 @@ write_ctest_log() {
   } > "$path"
 }
 
-write_ctest_log "$tmp/ctest.log" 15
+write_ctest_log "$tmp/ctest.log" 16
 write_ctest_log "$tmp/verification-ctest.log" 43
 
 cat > "$tmp/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, and K26 non-claim execution plan only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, and K26 BZ schedule diagnostic only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 
@@ -74,7 +74,11 @@ cat > "$tmp/k26_source_run_contract.json" <<'JSON'
 JSON
 
 cat > "$tmp/k26_execution_plan.json" <<'JSON'
-{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 15/15"],"non_claim":"execution plan only; no source/origin run executed"}
+{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 16/16"],"non_claim":"execution plan only; no source/origin run executed"}
+JSON
+
+cat > "$tmp/k26_bz_schedule_check.json" <<'JSON'
+{"schema":"lb_source_k26_bz_schedule_check_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"BZ_SCHEDULE_REQUIRES_ROW_SHIFTS_DIAGNOSTIC","accepted_for_claim":false,"band_count":124,"summary":{"rows_checked":124,"rows_with_bad_norms":3,"bad_norm_count":3,"bz_clean":false},"non_claim":"exact K26 bad-zone schedule diagnostic only; nominal rows require BZ repair before any source/origin run"}
 JSON
 
 "$checker" "$tmp" > "$tmp/pass.log"

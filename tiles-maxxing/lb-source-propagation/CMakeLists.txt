@@ -84,6 +84,11 @@ add_executable(k26_execution_plan
 )
 target_link_libraries(k26_execution_plan PRIVATE lb_source_propagation)
 
+add_executable(k26_bz_schedule_check
+  apps/k26_bz_schedule_check.cpp
+)
+target_link_libraries(k26_bz_schedule_check PRIVATE lb_source_propagation)
+
 add_executable(source_origin_cpu_runner
   apps/source_origin_cpu_runner.cpp
 )
@@ -154,6 +159,13 @@ set_tests_properties(k26_execution_plan PROPERTIES
     "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME k26_bz_schedule_check
+  COMMAND k26_bz_schedule_check)
+set_tests_properties(k26_bz_schedule_check PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_k26_bz_schedule_check_v1\".*\"proof_status\":\"BZ_SCHEDULE_REQUIRES_ROW_SHIFTS_DIAGNOSTIC\".*\"accepted_for_claim\":false.*\"band_count\":124.*\"rows_checked\":124.*\"rows_with_bad_norms\":3.*\"bad_norm_count\":3.*\"bz_clean\":false"
+  FAIL_REGULAR_EXPRESSION
+    "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME remote_smoke_artifact_checker
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_remote_smoke_artifact_checker.sh
