@@ -62,8 +62,8 @@ required evidence, and current blocking gaps. It must keep
 - a campaign-scale source runner that feeds the sidecar from CPU/CUDA TileOps;
 - stable coordinate or canonical-port carry atoms, not transient TileOp group
   labels;
-- scalable terminal inventory with count/digest/max norm/tie set rather than an
-  explicit 14.5B-member atom-id vector;
+- accepted terminal inventory verification for count/digest/max norm/tie set at
+  14.5B-member scale;
 - accepted K26 non-square BZ evidence;
 - an independent `SOURCE_DEAD_CERT` schema/verifier for the positive source
   chain and negative final guard proof.

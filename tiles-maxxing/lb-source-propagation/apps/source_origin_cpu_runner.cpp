@@ -358,6 +358,8 @@ int main(int argc, char** argv) {
 
   const std::vector<lb_source::AtomId> inventory =
       last.accepted() ? source_inventory(last) : std::vector<lb_source::AtomId>{};
+  const lb_source::InventorySummary inventory_summary =
+      lb_source::summarize_inventory(inventory);
   std::uint64_t max_source_norm = 0;
   for (const lb_source::AtomId id : inventory) {
     const auto it = norm_by_id.find(id);
@@ -392,6 +394,10 @@ int main(int argc, char** argv) {
             << (last.accepted() && has_source_carry(last.outgoing) ? "true"
                                                                    : "false")
             << ",\"source_inventory_count\":" << inventory.size()
+            << ",\"source_inventory_digest_algorithm\":\""
+            << inventory_summary.digest_algorithm << "\""
+            << ",\"source_inventory_digest_hex\":\""
+            << inventory_summary.digest_hex << "\""
             << ",\"max_source_norm_sq\":" << max_source_norm
             << ",\"non_claim\":\"small coordinate-fed sidecar runner; not a TileOp/CUDA SOURCE_DEAD_CERT\""
             << "}\n";

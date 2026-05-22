@@ -12,6 +12,7 @@ endif()
 find_package(OpenMP QUIET)
 
 add_library(lb_source_propagation STATIC
+  ../cpp-campaign-v2/src/sha256.cpp
   src/source_propagation.cpp
 )
 target_compile_options(lb_source_propagation PRIVATE -Wall -Wextra -Werror)
@@ -19,6 +20,8 @@ target_compile_options(lb_source_propagation PRIVATE -Wall -Wextra -Werror)
 target_include_directories(lb_source_propagation
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
 )
 
 add_library(lb_source_campaign_tileop STATIC
@@ -105,6 +108,6 @@ add_test(NAME source_origin_cpu_runner_smoke
     --endpoint-b 3)
 set_tests_properties(source_origin_cpu_runner_smoke PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\".*\"source_reached\":true.*\"accepted\":true"
+    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\".*\"source_reached\":true.*\"accepted\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\""
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")

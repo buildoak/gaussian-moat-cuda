@@ -31,10 +31,13 @@ Draft JSON emitters are also available for profile/certificate plumbing:
 
 - `source_profile_draft_json(...)`
 - `source_certificate_draft_json(...)`
+- `summarize_inventory(...)`
 
 These are sidecar draft artifacts only. They make the source mode, geometry,
 build/BZ placeholders, carry manifest, terminal guard state, and terminal
-inventory explicit; they are not final source proof schemas.
+inventory explicit. Terminal inventory now carries a canonical
+`sha256:lb_source_inventory_v1` count/digest summary in addition to explicit
+small-run atom ids; it is still not a final source proof schema.
 
 ## CPU TileOp Smoke
 
@@ -54,7 +57,8 @@ coordinate or canonical-port atoms before running campaign-scale source claims.
 canonical-octant Gaussian-prime coordinates directly, seeds `Omega` by the
 origin rule `norm_sq <= K`, uses stable coordinate atom ids, stitches radial
 bands through `lb_source::process_band`, and emits
-`lb_source_origin_cpu_runner_v1` JSON.
+`lb_source_origin_cpu_runner_v1` JSON with source inventory count, digest, and
+maximum observed source norm.
 
 This closes the first executable gap between the abstract sidecar protocol and
 a source/origin run, but it is still a non-claim surface. It is not TileOp/CUDA

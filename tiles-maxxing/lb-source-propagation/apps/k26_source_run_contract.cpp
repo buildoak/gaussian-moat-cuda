@@ -94,7 +94,7 @@ int main() {
   constexpr const char* kBlockingGaps[] = {
       "no campaign-scale source runner feeds the sidecar from CPU/CUDA TileOps",
       "current production compositors compute ANY-SPAN/ANY-SHELL-MOAT, not SOURCE_ORIGIN_K26",
-      "current sidecar inventory stores explicit atom ids, not a scalable 14.5B-member digest",
+      "sidecar inventory digest exists, but max norm, tie set, and endpoint-chain verifier are not accepted at 14.5B scale",
       "K26 non-square BZ evidence is preflight-only in this branch",
       "no accepted SOURCE_DEAD_CERT schema/verifier exists for terminal inventory and guard proof"};
 

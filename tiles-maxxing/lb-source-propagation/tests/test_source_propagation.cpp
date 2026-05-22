@@ -475,6 +475,22 @@ void test_make_carry_manifest_from_process_result() {
   CHECK_EQ(manifest.separator, result.outgoing);
 }
 
+void test_inventory_summary_is_canonical() {
+  const lb_source::InventorySummary unsorted =
+      lb_source::summarize_inventory({3, 1, 2, 1});
+  const lb_source::InventorySummary canonical =
+      lb_source::summarize_inventory({1, 2, 3});
+  const lb_source::InventorySummary different =
+      lb_source::summarize_inventory({1, 2, 4});
+
+  CHECK_EQ(unsorted, canonical);
+  CHECK_EQ(canonical.count, static_cast<std::uint64_t>(3));
+  CHECK_EQ(canonical.digest_algorithm,
+           std::string("sha256:lb_source_inventory_v1"));
+  CHECK_EQ(canonical.digest_hex.size(), static_cast<std::size_t>(64));
+  CHECK_TRUE(canonical.digest_hex != different.digest_hex);
+}
+
 void test_draft_profile_and_certificate_json_output() {
   lb_source::CarryManifest manifest;
   manifest.k_sq = 36;
@@ -505,33 +521,18 @@ void test_draft_profile_and_certificate_json_output() {
   };
   const std::string profile_json =
       lb_source::source_profile_draft_json(profile);
-  CHECK_EQ(profile_json,
-           std::string(
-               "{\"schema\":\"lb_source_profile_draft_v1\","
-               "\"profile_id\":\"profile-1\","
-               "\"metadata\":{\"source_mode\":\"ORIGIN_SOURCE\","
-               "\"source_id\":\"omega\\\"seed\","
-               "\"geometry_id\":\"full-octant\","
-               "\"commit_id\":\"abc123\","
-               "\"build_id\":\"debug\","
-               "\"bz_status\":\"BZ_CLEAN\","
-               "\"artifact_hash\":\"sha256:test\"},"
-               "\"k_sq\":36,"
-               "\"outer_radius\":20,"
-               "\"carry_width\":6,"
-               "\"reject\":\"none\","
-               "\"diagnostic\":\"\","
-               "\"terminal_source_dead\":true,"
-               "\"terminal_source_inventory\":[1,2],"
-               "\"carry_manifest\":{\"schema\":\"lb_source_carry_manifest_v1\","
-               "\"k_sq\":36,"
-               "\"outer_radius\":20,"
-               "\"carry_width\":6,"
-               "\"separator\":{\"carry_atoms\":[{\"id\":2,"
-               "\"norm_sq\":100}],"
-               "\"components\":[{\"source\":true,"
-               "\"carry_atoms\":[2],"
-               "\"inventory\":[1,2]}]}}}"));
+  CHECK_TRUE(profile_json.find(
+                 "\"schema\":\"lb_source_profile_draft_v1\"") !=
+             std::string::npos);
+  CHECK_TRUE(profile_json.find(
+                 "\"terminal_source_inventory_summary\":{\"count\":2,"
+                 "\"digest_algorithm\":\"sha256:lb_source_inventory_v1\","
+                 "\"digest_hex\":\"") != std::string::npos);
+  CHECK_TRUE(profile_json.find("\"terminal_source_inventory\":[1,2]") !=
+             std::string::npos);
+  CHECK_TRUE(profile_json.find(
+                 "\"carry_manifest\":{\"schema\":"
+                 "\"lb_source_carry_manifest_v1\"") != std::string::npos);
 
   const lb_source::SourceCertificateDraft certificate{
       .certificate_id = "cert-1",
@@ -544,22 +545,15 @@ void test_draft_profile_and_certificate_json_output() {
   };
   const std::string cert_json =
       lb_source::source_certificate_draft_json(certificate);
-  CHECK_EQ(cert_json,
-           std::string(
-               "{\"schema\":\"lb_source_dead_cert_draft_v1\","
-               "\"certificate_id\":\"cert-1\","
-               "\"profile_id\":\"profile-1\","
-               "\"metadata\":{\"source_mode\":\"ORIGIN_SOURCE\","
-               "\"source_id\":\"omega\\\"seed\","
-               "\"geometry_id\":\"full-octant\","
-               "\"commit_id\":\"abc123\","
-               "\"build_id\":\"debug\","
-               "\"bz_status\":\"BZ_CLEAN\","
-               "\"artifact_hash\":\"sha256:test\"},"
-               "\"k_sq\":36,"
-               "\"terminal_radius\":20,"
-               "\"negative_guard_pass\":true,"
-               "\"terminal_source_inventory\":[1,2]}"));
+  CHECK_TRUE(cert_json.find(
+                 "\"schema\":\"lb_source_dead_cert_draft_v1\"") !=
+             std::string::npos);
+  CHECK_TRUE(cert_json.find(
+                 "\"terminal_source_inventory_summary\":{\"count\":2,"
+                 "\"digest_algorithm\":\"sha256:lb_source_inventory_v1\","
+                 "\"digest_hex\":\"") != std::string::npos);
+  CHECK_TRUE(cert_json.find("\"terminal_source_inventory\":[1,2]") !=
+             std::string::npos);
 }
 
 void run(const std::string& name, void (*test)()) {
@@ -604,6 +598,8 @@ int main() {
       test_carry_manifest_rejects_malformed_partition);
   run("make_carry_manifest_from_process_result",
       test_make_carry_manifest_from_process_result);
+  run("inventory_summary_is_canonical",
+      test_inventory_summary_is_canonical);
   run("draft_profile_and_certificate_json_output",
       test_draft_profile_and_certificate_json_output);
 

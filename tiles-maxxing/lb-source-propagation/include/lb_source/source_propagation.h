@@ -108,6 +108,15 @@ struct SourceDraftMetadata {
                          const SourceDraftMetadata&) = default;
 };
 
+struct InventorySummary {
+  std::uint64_t count = 0;
+  std::string digest_algorithm;
+  std::string digest_hex;
+
+  friend bool operator==(const InventorySummary&,
+                         const InventorySummary&) = default;
+};
+
 struct SourceProfileDraft {
   std::string profile_id;
   SourceDraftMetadata metadata;
@@ -152,6 +161,8 @@ std::string source_profile_draft_json(const SourceProfileDraft& profile);
 
 std::string source_certificate_draft_json(
     const SourceCertificateDraft& certificate);
+
+InventorySummary summarize_inventory(const std::vector<AtomId>& atom_ids);
 
 ProcessResult process_band(const BandInput& band,
                            const std::optional<SeparatorState>& incoming,

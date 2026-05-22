@@ -14,6 +14,8 @@
 #include <unordered_map>
 #include <utility>
 
+#include "sha256.h"
+
 namespace lb_source {
 namespace {
 
@@ -227,6 +229,15 @@ void append_atom_id_array(std::ostringstream& out,
     out << ids[i];
   }
   out << ']';
+}
+
+void append_inventory_summary_json(std::ostringstream& out,
+                                   const InventorySummary& summary) {
+  out << "{\"count\":" << summary.count << ",\"digest_algorithm\":";
+  append_json_string(out, summary.digest_algorithm);
+  out << ",\"digest_hex\":";
+  append_json_string(out, summary.digest_hex);
+  out << '}';
 }
 
 void append_metadata_json(std::ostringstream& out,
@@ -588,8 +599,29 @@ CarryManifestReadResult carry_manifest_from_string(std::string_view text) {
   return read_carry_manifest(in);
 }
 
+InventorySummary summarize_inventory(const std::vector<AtomId>& atom_ids) {
+  std::vector<AtomId> canonical = atom_ids;
+  std::sort(canonical.begin(), canonical.end());
+  canonical.erase(std::unique(canonical.begin(), canonical.end()),
+                  canonical.end());
+
+  std::ostringstream payload;
+  payload << "LB_SOURCE_INVENTORY_V1\n";
+  for (const AtomId id : canonical) {
+    payload << id << "\n";
+  }
+
+  InventorySummary summary;
+  summary.count = static_cast<std::uint64_t>(canonical.size());
+  summary.digest_algorithm = "sha256:lb_source_inventory_v1";
+  summary.digest_hex = campaign::detail::sha256_hex(payload.str());
+  return summary;
+}
+
 std::string source_profile_draft_json(const SourceProfileDraft& profile) {
   std::ostringstream out;
+  const InventorySummary inventory_summary =
+      summarize_inventory(profile.terminal_source_inventory);
   out << "{\"schema\":\"lb_source_profile_draft_v1\",\"profile_id\":";
   append_json_string(out, profile.profile_id);
   out << ",\"metadata\":";
@@ -603,7 +635,9 @@ std::string source_profile_draft_json(const SourceProfileDraft& profile) {
   append_json_string(out, profile.diagnostic);
   out << ",\"terminal_source_dead\":"
       << (profile.terminal_source_dead ? "true" : "false")
-      << ",\"terminal_source_inventory\":";
+      << ",\"terminal_source_inventory_summary\":";
+  append_inventory_summary_json(out, inventory_summary);
+  out << ",\"terminal_source_inventory\":";
   append_atom_id_array(out, profile.terminal_source_inventory);
   out << ",\"carry_manifest\":";
   append_manifest_json(out, profile.carry_manifest);
@@ -614,6 +648,8 @@ std::string source_profile_draft_json(const SourceProfileDraft& profile) {
 std::string source_certificate_draft_json(
     const SourceCertificateDraft& certificate) {
   std::ostringstream out;
+  const InventorySummary inventory_summary =
+      summarize_inventory(certificate.terminal_source_inventory);
   out << "{\"schema\":\"lb_source_dead_cert_draft_v1\",\"certificate_id\":";
   append_json_string(out, certificate.certificate_id);
   out << ",\"profile_id\":";
@@ -624,7 +660,9 @@ std::string source_certificate_draft_json(
       << ",\"terminal_radius\":" << certificate.terminal_radius
       << ",\"negative_guard_pass\":"
       << (certificate.negative_guard_pass ? "true" : "false")
-      << ",\"terminal_source_inventory\":";
+      << ",\"terminal_source_inventory_summary\":";
+  append_inventory_summary_json(out, inventory_summary);
+  out << ",\"terminal_source_inventory\":";
   append_atom_id_array(out, certificate.terminal_source_inventory);
   out << '}';
   return out.str();
