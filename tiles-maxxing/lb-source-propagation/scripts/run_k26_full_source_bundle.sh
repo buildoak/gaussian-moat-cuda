@@ -167,6 +167,8 @@ run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
     --schedule-radii "$schedule_csv" \
     --max-atoms "$max_atoms" \
     --require-full-bridge \
+    --target-a 376039 \
+    --target-b 943460 \
     --manifest-in "$out_dir/k26-prefix-manifest.txt" \
     --prefix-witness-in "$out_dir/k26-prefix-witness.txt"
 

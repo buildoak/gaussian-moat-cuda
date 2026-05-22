@@ -116,7 +116,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" 23
+require_ctest_log "$out_dir/ctest.log" 24
 require_ctest_log "$out_dir/verification-ctest.log" 46
 
 for artifact in \
@@ -189,7 +189,7 @@ require_grep '"index":123' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final row index"
 require_grep '"r_outer":1015645' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final radius"
-require_grep 'local sidecar ctest 23/23' \
+require_grep 'local sidecar ctest 24/24' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan sidecar gate"
 
 require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' \
@@ -266,6 +266,8 @@ require_grep '"blocked_if_unbridged_coordinate_carry_atoms":true' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands unbridged block"
 require_grep '--require-full-bridge' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands strict bridge flag"
+require_grep '--target-a 376039 --target-b 943460' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands target bridge flags"
 
 bz_digest="$(require_json_string_value "$out_dir/k26_bz_schedule_check.json" schedule_digest_hex)"
 plan_digest="$(require_json_string_value "$out_dir/k26_execution_plan.json" schedule_digest_hex)"

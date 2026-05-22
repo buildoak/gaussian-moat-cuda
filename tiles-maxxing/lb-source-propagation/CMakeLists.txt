@@ -167,7 +167,7 @@ add_test(NAME k26_execution_plan
   COMMAND k26_execution_plan)
 set_tests_properties(k26_execution_plan PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 23/23"
+    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 24/24"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_bz_schedule_check
@@ -188,7 +188,7 @@ add_test(NAME k26_source_run_commands
   COMMAND k26_source_run_commands)
 set_tests_properties(k26_source_run_commands PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_run_commands_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"required_k_sq\":26.*endpoint-a 376039 --endpoint-b 943460.*\"schedule_boundary_count\":124.*\"schedule_segment_count\":123.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"seam_bridge_policy\":\"require_full_bridge\".*--require-full-bridge"
+    "\"schema\":\"lb_source_k26_run_commands_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"required_k_sq\":26.*endpoint-a 376039 --endpoint-b 943460.*\"schedule_boundary_count\":124.*\"schedule_segment_count\":123.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"seam_bridge_policy\":\"require_full_bridge\".*--require-full-bridge --target-a 376039 --target-b 943460"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME remote_smoke_artifact_checker
@@ -305,6 +305,21 @@ set_tests_properties(source_tileop_port_runner_manifest_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
     "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"unbridged_coordinate_carry_atoms\":[0-9][0-9]*.*\"bridged_port_carry_atoms\":[1-9][0-9]*.*\"bridge_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"source_inventory_count\":[1-9][0-9]*.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\".*\"max_source_norm_sq\":[1-9][0-9]*.*\"manifest_written\":false"
+  FAIL_REGULAR_EXPRESSION
+    "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME source_tileop_port_runner_target_smoke
+  COMMAND source_tileop_port_runner
+    --r-start 248
+    --r-final 512
+    --band-width 128
+    --target-a 0
+    --target-b 251
+    --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt
+    --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt)
+set_tests_properties(source_tileop_port_runner_target_smoke PROPERTIES
+  DEPENDS source_origin_prefix_manifest_smoke
+  PASS_REGULAR_EXPRESSION
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"target\":\\{\"enabled\":true,\"a\":0,\"b\":251,\"norm_sq\":63001,\"seen\":true,\"port_atoms\":[1-9][0-9]*,\"bridge_edges\":[1-9][0-9]*,\"source_reached\":true\\}.*\"accepted\":true.*\"terminal_source_dead\":true"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_manifest_full_bridge_reject

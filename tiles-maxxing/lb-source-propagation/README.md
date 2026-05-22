@@ -116,6 +116,11 @@ when any source coordinate carry atom lacks a first-band TileOp-port bridge.
 That strict mode is a guardrail for future claim-grade execution; the current
 K26 plan remains diagnostic until the seam bridge either satisfies this strict
 gate or has an accepted verifier/theorem for the unbridged carry atoms.
+With `--target-a/--target-b`, the runner also inserts a canonical coordinate
+target atom when the target prime is seen in a TileOp band, bridges it to its
+visible TileOp-port component, and reports whether that coordinate target is in
+the propagated source inventory. This is target reachability plumbing, not a
+full source path certificate.
 
 ## Small Source Runner
 
@@ -239,9 +244,10 @@ output is a run contract only; it uses the canonical-octant representative
 `376039 + 943460i` for Tsuchimura's endpoint `943460 + 376039i`, does not
 execute the full sqrt(26) comparison, and must not be treated as a
 `SOURCE_DEAD_CERT`. The emitted continuation command includes
-`--require-full-bridge`; if any source coordinate carry atom lacks a first-band
-TileOp-port bridge, the run must stop instead of falling back to diagnostic
-unbridged bridge semantics.
+`--require-full-bridge --target-a 376039 --target-b 943460`; if any source
+coordinate carry atom lacks a first-band TileOp-port bridge, the run must stop,
+and the canonical endpoint must be seen and source-reached in the continuation
+artifact before the full bundle checker can pass.
 
 `k26_source_run_contract` emits the execution contract for the Tsuchimura
 comparison target. It is intentionally a non-claim artifact:

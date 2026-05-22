@@ -132,6 +132,8 @@ require_grep '"blocked_if_unbridged_coordinate_carry_atoms":true' "$commands" \
   "K26 command unbridged carry stop condition"
 require_grep '--require-full-bridge' "$commands" \
   "K26 command strict bridge flag"
+require_grep '--target-a 376039 --target-b 943460' "$commands" \
+  "K26 command target bridge flags"
 
 require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' "$bz" \
   "K26 BZ schema"
@@ -196,6 +198,8 @@ require_grep '"tileop_overflows":0' "$continuation" \
   "K26 continuation overflow-free"
 require_grep '"unbridged_coordinate_carry_atoms":0' "$continuation" \
   "K26 continuation full bridge"
+require_grep '"target":\{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true.*"source_reached":true' "$continuation" \
+  "K26 continuation target source reachability"
 require_grep '"accepted":true' "$continuation" \
   "K26 continuation accepted"
 require_grep '"terminal_source_dead":true' "$continuation" \

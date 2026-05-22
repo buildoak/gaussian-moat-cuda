@@ -155,6 +155,7 @@ int main() {
       "--band-width 8192 --schedule-radii " +
       schedule_csv +
       " --max-atoms 50000000 --require-full-bridge "
+      "--target-a 376039 --target-b 943460 "
       "--manifest-in k26-prefix-manifest.txt "
       "--prefix-witness-in k26-prefix-witness.txt";
 
@@ -194,6 +195,9 @@ int main() {
   emit_json_string(schedule_csv);
   std::cout << ",\"manifest_in\":\"k26-prefix-manifest.txt\","
             << "\"prefix_witness_in\":\"k26-prefix-witness.txt\","
+            << "\"target\":{\"a\":" << kCanonicalEndpointA
+            << ",\"b\":" << kCanonicalEndpointB
+            << ",\"norm_sq\":" << kEndpointNorm << "},"
             << "\"command\":";
   emit_json_string(continuation_command);
   std::cout << "},\"repaired_boundaries\":["

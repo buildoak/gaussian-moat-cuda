@@ -29,7 +29,7 @@ write_ctest_log() {
   } > "$path"
 }
 
-write_ctest_log "$tmp/ctest.log" 23
+write_ctest_log "$tmp/ctest.log" 24
 write_ctest_log "$tmp/verification-ctest.log" 46
 
 cat > "$tmp/status.txt" <<'STATUS'
@@ -74,7 +74,7 @@ cat > "$tmp/k26_source_run_contract.json" <<'JSON'
 JSON
 
 cat > "$tmp/k26_execution_plan.json" <<'JSON'
-{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"},"repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 23/23"],"non_claim":"execution plan only; no source/origin run executed"}
+{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"},"repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 24/24"],"non_claim":"execution plan only; no source/origin run executed"}
 JSON
 
 cat > "$tmp/k26_bz_schedule_check.json" <<'JSON'
@@ -86,7 +86,7 @@ cat > "$tmp/k26_source_run_profile.json" <<'JSON'
 JSON
 
 cat > "$tmp/k26_source_run_commands.json" <<'JSON'
-{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"build":{"required_k_sq":26},"target":{"tsuchimura_endpoint":{"a":943460,"b":376039},"canonical_octant_endpoint":{"a":376039,"b":943460}},"prefix":{"r_final":8192,"command":"source_origin_cpu_runner --endpoint-a 376039 --endpoint-b 943460"},"continuation":{"r_start":8192,"r_final":1015645,"schedule_boundary_count":124,"schedule_segment_count":123,"schedule_min_width":8029,"schedule_max_width":8193,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"require_full_bridge","blocked_if_unbridged_coordinate_carry_atoms":true,"schedule_radii_csv":"8192,122879,475135,622591,1015645","command":"source_tileop_port_runner --require-full-bridge"},"non_claim":"command contract only; no sqrt(26) source/origin run executed"}
+{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"build":{"required_k_sq":26},"target":{"tsuchimura_endpoint":{"a":943460,"b":376039},"canonical_octant_endpoint":{"a":376039,"b":943460}},"prefix":{"r_final":8192,"command":"source_origin_cpu_runner --endpoint-a 376039 --endpoint-b 943460"},"continuation":{"r_start":8192,"r_final":1015645,"schedule_boundary_count":124,"schedule_segment_count":123,"schedule_min_width":8029,"schedule_max_width":8193,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"require_full_bridge","blocked_if_unbridged_coordinate_carry_atoms":true,"schedule_radii_csv":"8192,122879,475135,622591,1015645","command":"source_tileop_port_runner --require-full-bridge --target-a 376039 --target-b 943460"},"non_claim":"command contract only; no sqrt(26) source/origin run executed"}
 JSON
 
 "$checker" "$tmp" > "$tmp/pass.log"

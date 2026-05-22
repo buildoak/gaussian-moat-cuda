@@ -35,6 +35,8 @@ struct Config {
   std::optional<std::string> manifest_in;
   std::optional<std::string> prefix_witness_in;
   std::optional<std::string> manifest_out;
+  std::optional<std::uint64_t> target_a;
+  std::optional<std::uint64_t> target_b;
 };
 
 struct Point {
@@ -53,6 +55,12 @@ struct PortManifestBridgeResult {
   std::uint64_t bridged_coordinate_carry_atoms = 0;
   std::uint64_t unbridged_coordinate_carry_atoms = 0;
   std::uint64_t bridged_port_carry_atoms = 0;
+  std::uint64_t bridge_edges = 0;
+};
+
+struct TargetBridgeResult {
+  bool seen = false;
+  std::uint64_t port_atoms = 0;
   std::uint64_t bridge_edges = 0;
 };
 
@@ -132,6 +140,9 @@ void usage(const char* prog) {
       << "  --prefix-witness-in PATH\n"
       << "                        read diagnostic origin-prefix paths for\n"
       << "                        incoming source carry atoms\n"
+      << "  --target-a A --target-b B\n"
+      << "                        add a canonical coordinate target atom and\n"
+      << "                        bridge it to its TileOp port component when seen\n"
       << "  --manifest-out PATH   write final carry manifest when source survives\n";
 }
 
@@ -205,6 +216,24 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.prefix_witness_in = value;
+    } else if (take_value("--target-a", value)) {
+      std::uint64_t parsed = 0;
+      if (!parse_uint64(value, parsed) ||
+          parsed > static_cast<std::uint64_t>(
+                       std::numeric_limits<std::int64_t>::max())) {
+        std::cerr << "invalid --target-a: " << value << "\n";
+        return false;
+      }
+      config.target_a = parsed;
+    } else if (take_value("--target-b", value)) {
+      std::uint64_t parsed = 0;
+      if (!parse_uint64(value, parsed) ||
+          parsed > static_cast<std::uint64_t>(
+                       std::numeric_limits<std::int64_t>::max())) {
+        std::cerr << "invalid --target-b: " << value << "\n";
+        return false;
+      }
+      config.target_b = parsed;
     } else if (take_value("--manifest-out", value)) {
       if (value.empty()) {
         std::cerr << "--manifest-out must not be empty\n";
@@ -253,6 +282,15 @@ bool parse_args(int argc, char** argv, Config& config) {
   }
   if (config.prefix_witness_in.has_value() && !config.manifest_in.has_value()) {
     std::cerr << "--prefix-witness-in requires --manifest-in\n";
+    return false;
+  }
+  if (config.target_a.has_value() != config.target_b.has_value()) {
+    std::cerr << "--target-a and --target-b must be supplied together\n";
+    return false;
+  }
+  if (config.target_a.has_value() && *config.target_b < *config.target_a) {
+    std::cerr << "--target coordinates must be canonical with target-b >= "
+                 "target-a\n";
     return false;
   }
   return true;
@@ -619,6 +657,81 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
   return result;
 }
 
+TargetBridgeResult bridge_target_coordinate_to_ports(
+    const Point& target,
+    const campaign::CampaignConstants& constants,
+    const std::vector<campaign::TileCoord>& coords,
+    const std::vector<campaign::TileOp>& tileops,
+    lb_source::BandInput& graph_band) {
+  TargetBridgeResult result;
+  const lb_source::AtomId target_id =
+      checked_coordinate_atom_id(target.a, target.b);
+
+  std::set<lb_source::AtomId> graph_atoms;
+  for (const lb_source::BandAtom& atom : graph_band.atoms) {
+    graph_atoms.insert(atom.id);
+  }
+
+  std::set<lb_source::AtomId> target_ports;
+  for (std::size_t t = 0; t < coords.size(); ++t) {
+    const std::vector<campaign::Prime> primes =
+        campaign::sieve_tile(coords[t], constants);
+    for (const campaign::Prime& prime : primes) {
+      if (prime.a != target.a || prime.b != target.b ||
+          prime.norm_sq != target.norm_sq) {
+        continue;
+      }
+      result.seen = true;
+      const lb_source::CoordinatePortBridgeResult bridge =
+          lb_source::bridge_coordinate_prime_to_ports({
+              .coord = coords[t],
+              .constants = constants,
+              .tileop = tileops[t],
+              .target = prime,
+              .primes = primes,
+          });
+      if (!bridge.accepted()) {
+        std::cerr << "target TileOp-port bridge rejected: "
+                  << bridge.diagnostic << "\n";
+        std::exit(EXIT_FAILURE);
+      }
+      target_ports.insert(bridge.port_atoms.begin(), bridge.port_atoms.end());
+    }
+  }
+
+  if (!result.seen) {
+    return result;
+  }
+  if (graph_atoms.find(target_id) != graph_atoms.end()) {
+    std::cerr << "target coordinate atom collides with TileOp port graph\n";
+    std::exit(EXIT_FAILURE);
+  }
+  graph_band.atoms.push_back(
+      {.id = target_id, .norm_sq = target.norm_sq, .certified_source = false});
+  graph_atoms.insert(target_id);
+
+  for (const lb_source::AtomId port_id : target_ports) {
+    if (graph_atoms.find(port_id) == graph_atoms.end()) {
+      std::cerr << "target bridge port is missing from TileOp port graph\n";
+      std::exit(EXIT_FAILURE);
+    }
+    lb_source::AtomId lhs = target_id;
+    lb_source::AtomId rhs = port_id;
+    if (rhs < lhs) {
+      std::swap(lhs, rhs);
+    }
+    graph_band.edges.push_back({lhs, rhs});
+  }
+  std::sort(graph_band.edges.begin(), graph_band.edges.end());
+  graph_band.edges.erase(
+      std::unique(graph_band.edges.begin(), graph_band.edges.end()),
+      graph_band.edges.end());
+
+  result.port_atoms = target_ports.size();
+  result.bridge_edges = target_ports.size();
+  return result;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -629,6 +742,14 @@ int main(int argc, char** argv) {
 
   std::optional<lb_source::CarryManifest> coordinate_manifest;
   std::optional<PrefixWitness> prefix_witness;
+  std::optional<Point> target;
+  std::optional<lb_source::AtomId> target_id;
+  if (config.target_a.has_value()) {
+    const std::int64_t a = static_cast<std::int64_t>(*config.target_a);
+    const std::int64_t b = static_cast<std::int64_t>(*config.target_b);
+    target = Point{a, b, norm_sq_i64(a, b)};
+    target_id = checked_coordinate_atom_id(a, b);
+  }
   std::string source_mode = config.seed_inner_flags ? "GEO_I_PORT_DIAGNOSTIC"
                                                     : "NONE";
   std::uint64_t manifest_source_carry_atoms = 0;
@@ -637,6 +758,9 @@ int main(int argc, char** argv) {
   std::uint64_t unbridged_coordinate_carry_atoms = 0;
   std::uint64_t bridged_port_carry_atoms = 0;
   std::uint64_t bridge_edges = 0;
+  bool target_seen = false;
+  std::uint64_t target_port_atoms = 0;
+  std::uint64_t target_bridge_edges = 0;
   if (config.manifest_in.has_value()) {
     coordinate_manifest = read_manifest_or_die(*config.manifest_in);
     if (coordinate_manifest->k_sq !=
@@ -750,8 +874,20 @@ int main(int argc, char** argv) {
     for (const lb_source::BandAtom& atom : graph.band.atoms) {
       norm_by_id.emplace(atom.id, atom.norm_sq);
     }
+    lb_source::BandInput band = graph.band;
+    if (target.has_value() && !target_seen) {
+      const TargetBridgeResult target_bridge =
+          bridge_target_coordinate_to_ports(*target, constants, coords, tileops,
+                                            band);
+      if (target_bridge.seen) {
+        target_seen = true;
+        target_port_atoms = target_bridge.port_atoms;
+        target_bridge_edges = target_bridge.bridge_edges;
+        norm_by_id.emplace(*target_id, target->norm_sq);
+      }
+    }
     if (coordinate_manifest.has_value() && bands_processed == 0) {
-      lb_source::BandInput bridged_band = graph.band;
+      lb_source::BandInput bridged_band = band;
       for (const lb_source::CarryAtom& atom :
            coordinate_manifest->separator.carry_atoms) {
         norm_by_id.emplace(atom.id, atom.norm_sq);
@@ -781,7 +917,7 @@ int main(int argc, char** argv) {
       bridge_edges = bridge.bridge_edges;
     } else {
       last = lb_source::process_band(
-          graph.band, incoming,
+          band, incoming,
           {.max_atoms = config.max_atoms,
            .max_carry_atoms = config.max_atoms,
            .max_components = config.max_atoms});
@@ -827,6 +963,9 @@ int main(int argc, char** argv) {
       accepted ? source_inventory(last) : std::vector<lb_source::AtomId>{};
   const RunnerInventorySummary inventory_summary =
       summarize_runner_inventory(inventory, norm_by_id);
+  const bool target_source_reached =
+      target_id.has_value() &&
+      std::binary_search(inventory.begin(), inventory.end(), *target_id);
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_port_runner_v1\","
@@ -865,6 +1004,18 @@ int main(int argc, char** argv) {
             << ",\"bridged_port_carry_atoms\":"
             << bridged_port_carry_atoms
             << ",\"bridge_edges\":" << bridge_edges
+            << ",\"target\":{\"enabled\":"
+            << (target.has_value() ? "true" : "false");
+  if (target.has_value()) {
+    std::cout << ",\"a\":" << target->a << ",\"b\":" << target->b
+              << ",\"norm_sq\":" << target->norm_sq
+              << ",\"seen\":" << (target_seen ? "true" : "false")
+              << ",\"port_atoms\":" << target_port_atoms
+              << ",\"bridge_edges\":" << target_bridge_edges
+              << ",\"source_reached\":"
+              << (target_source_reached ? "true" : "false");
+  }
+  std::cout << "}"
             << ",\"accepted\":" << (accepted ? "true" : "false")
             << ",\"reject\":\"" << lb_source::reject_reason_name(last.reject)
             << "\""
