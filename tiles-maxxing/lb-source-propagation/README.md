@@ -165,6 +165,28 @@ preflight/run-contract constants.
 
 ## Remote Smoke
 
+Find a qualifying Vast 4090 without renting:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/vast_sidecar_smoke_guard.sh \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26
+```
+
+To create only when the cap is satisfied, and stop the new instance if SSH
+never opens:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/vast_sidecar_smoke_guard.sh \
+  --execute \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26 \
+  --wait-ssh-seconds 300 \
+  --stop-on-ssh-timeout
+```
+
 After a qualifying Vast 4090 is rented and the repo is copied to the host, run:
 
 ```bash

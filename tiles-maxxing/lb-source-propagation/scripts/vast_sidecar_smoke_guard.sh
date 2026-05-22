@@ -7,11 +7,14 @@ Usage:
   vast_sidecar_smoke_guard.sh [--execute] [--max-dph PRICE] [--max-budget USD]
                               [--k-sq N]
                               [--offer-id ID] [--remote DIR] [--pull-dir DIR]
+                              [--wait-ssh-seconds N] [--ssh-poll-seconds N]
+                              [--stop-on-ssh-timeout]
 
 Dry-run by default. Searches for a single RTX 4090 offer, enforces the price
 cap, and prints the exact create/deploy/smoke/pull commands. With --execute it
-creates the instance only; deploy/smoke/pull remain explicit operator steps
-because SSH readiness and cleanup need human-visible instance metadata.
+creates the instance only by default; deploy/smoke/pull remain explicit
+operator steps because cleanup needs human-visible instance metadata. Optional
+SSH readiness polling can stop a newly-created instance when SSH never opens.
 
 Hard defaults from the LB source-propagation goal:
   --max-dph     0.37
@@ -30,6 +33,9 @@ offer_id=""
 k_sq="26"
 remote_dir="/workspace/gaussian-moat-cuda"
 pull_dir="tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull"
+wait_ssh_seconds="0"
+ssh_poll_seconds="10"
+stop_on_ssh_timeout=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -61,6 +67,18 @@ while [[ $# -gt 0 ]]; do
       pull_dir="$2"
       shift 2
       ;;
+    --wait-ssh-seconds)
+      wait_ssh_seconds="$2"
+      shift 2
+      ;;
+    --ssh-poll-seconds)
+      ssh_poll_seconds="$2"
+      shift 2
+      ;;
+    --stop-on-ssh-timeout)
+      stop_on_ssh_timeout=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -91,6 +109,87 @@ shell_join() {
     out+="${out:+ }${arg}"
   done
   printf '%s\n' "$out"
+}
+
+require_nonnegative_integer() {
+  local value="$1"
+  local label="$2"
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "${label} must be a nonnegative integer: $value" >&2
+    exit 2
+  fi
+}
+
+require_nonnegative_integer "$wait_ssh_seconds" "--wait-ssh-seconds"
+require_nonnegative_integer "$ssh_poll_seconds" "--ssh-poll-seconds"
+if [[ "$wait_ssh_seconds" != "0" && "$ssh_poll_seconds" == "0" ]]; then
+  echo "--ssh-poll-seconds must be positive when SSH readiness polling is enabled" >&2
+  exit 2
+fi
+
+parse_created_instance_id() {
+  CREATE_OUTPUT="$1" python3 <<'PY'
+import os
+import re
+
+text = os.environ.get("CREATE_OUTPUT", "")
+match = re.search(r"['\"]new_contract['\"]\s*:\s*([0-9]+)", text)
+if match:
+    print(match.group(1))
+PY
+}
+
+instance_ssh_fields() {
+  local instance_id="$1"
+  vastai show instances --raw | python3 -c '
+import json
+import sys
+
+instance_id = int(sys.argv[1])
+for item in json.load(sys.stdin):
+    if int(item.get("id", -1)) == instance_id:
+        print(
+            "{} {} {} {}".format(
+                item.get("cur_state") or "",
+                item.get("intended_status") or "",
+                item.get("ssh_host") or "",
+                item.get("ssh_port") or "",
+            )
+        )
+        break
+' "$instance_id"
+}
+
+wait_for_ssh_ready() {
+  local instance_id="$1"
+  local deadline="$((SECONDS + wait_ssh_seconds))"
+  local state intended host port
+  while (( SECONDS <= deadline )); do
+    state=""
+    intended=""
+    host=""
+    port=""
+    read -r state intended host port < <(instance_ssh_fields "$instance_id" || true) || true
+    if [[ -n "${host:-}" && -n "${port:-}" ]]; then
+      echo "SSH_PROBE id=${instance_id} state=${state:-unknown} intended=${intended:-unknown} host=${host} port=${port}"
+      if ssh -o StrictHostKeyChecking=accept-new \
+          -o ConnectTimeout=8 \
+          -p "$port" "root@${host}" 'echo SSH_READY && hostname' >/dev/null; then
+        echo "SSH_READY id=${instance_id} host=${host} port=${port}"
+        return 0
+      fi
+    else
+      echo "SSH_PROBE id=${instance_id} metadata_unavailable"
+    fi
+    sleep "$ssh_poll_seconds"
+  done
+
+  echo "SSH_TIMEOUT id=${instance_id} waited_seconds=${wait_ssh_seconds}" >&2
+  if [[ "$stop_on_ssh_timeout" -eq 1 ]]; then
+    echo "STOPPING_UNREADY_INSTANCE id=${instance_id}" >&2
+    vastai stop instance "$instance_id"
+  fi
+  return 5
 }
 
 filter="gpu_name=RTX_4090 cuda_vers>=12.0 disk_space>=40 num_gpus=1 dph<=${max_dph} reliability>=0.95"
@@ -170,7 +269,25 @@ if [[ "$execute" -eq 0 ]]; then
   exit 0
 fi
 
-"${create_cmd[@]}"
+set +e
+create_output="$("${create_cmd[@]}" 2>&1)"
+create_status="$?"
+set -e
+printf '%s\n' "$create_output"
+if [[ "$create_status" -ne 0 ]]; then
+  exit "$create_status"
+fi
+
+created_instance_id="$(parse_created_instance_id "$create_output")"
+if [[ -z "$created_instance_id" ]]; then
+  echo "Could not parse created instance id from Vast output" >&2
+  exit 5
+fi
+echo "CREATED_INSTANCE id=${created_instance_id}"
+
+if [[ "$wait_ssh_seconds" != "0" ]]; then
+  wait_for_ssh_ready "$created_instance_id"
+fi
 
 cat <<'EOF'
 Instance creation requested. Wait for SSH readiness, then run the DEPLOY,
