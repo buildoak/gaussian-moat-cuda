@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "case_id": "k32-carry-width-minimum",
+  "k_sq": 32,
+  "carry_width": 6,
+  "source_atoms": ["p0"],
+  "atoms": [
+    { "id": "p0", "r": 5 },
+    { "id": "p1", "r": 10 },
+    { "id": "p2", "r": 16 },
+    { "id": "p3", "r": 20 }
+  ],
+  "edges": [
+    { "a": "p0", "b": "p1" },
+    { "a": "p1", "b": "p2" },
+    { "a": "p2", "b": "p3" }
+  ],
+  "bands": [
+    { "id": "b0", "r_inner": 0, "r_outer": 10 },
+    { "id": "b1", "r_inner": 10, "r_outer": 20 }
+  ],
+  "guards": ["composed_equals_big", "k32_carry_width_minimum"],
+  "overflow_counters": {
+    "component_label_overflow": 0,
+    "carry_atom_overflow": 0
+  },
+  "notes": "K=32 must use ceil_sqrt(32)=6 for source carry width."
+}

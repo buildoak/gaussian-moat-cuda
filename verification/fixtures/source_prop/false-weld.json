@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "case_id": "false-weld",
+  "k_sq": 9,
+  "carry_width": 3,
+  "source_atoms": ["s"],
+  "atoms": [
+    { "id": "s", "r": 7 },
+    { "id": "a", "r": 9 },
+    { "id": "b", "r": 9 },
+    { "id": "c", "r": 12 }
+  ],
+  "edges": [
+    { "a": "s", "b": "a" },
+    { "a": "b", "b": "c" }
+  ],
+  "bands": [
+    { "id": "b0", "r_inner": 0, "r_outer": 10 },
+    { "id": "b1", "r_inner": 10, "r_outer": 14 }
+  ],
+  "guards": ["composed_equals_big", "false_weld_guard"],
+  "overflow_counters": {
+    "component_label_overflow": 0,
+    "carry_atom_overflow": 0
+  },
+  "notes": "At the seam, b is carry but not source. Wiring all carry classes as source falsely reaches c."
+}

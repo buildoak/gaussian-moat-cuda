@@ -22,6 +22,7 @@ foreach(tool
     bz_exact_check
     boundary_semantics_test
     exact_global_uf
+    source_prop_oracle
     tile_sample_check
     span_cert_check)
   add_executable(${tool} src/${tool}.cpp)
@@ -42,6 +43,25 @@ add_test(NAME exact_global_uf_tiny
 add_test(NAME no_campaign_includes
   COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_CURRENT_SOURCE_DIR}
           -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/no_campaign_includes.cmake)
+
+foreach(source_prop_case
+    composed-vs-big-equivalence
+    false-weld
+    k32-carry-width-minimum
+    source-only-carry-loss
+    terminal-death-inventory)
+  add_test(NAME source_prop_fixture_${source_prop_case}
+    COMMAND source_prop_oracle
+      ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/${source_prop_case}.json)
+endforeach()
+foreach(bad_source_prop_case
+    overflow-reject
+    bad-k32-carry-width-too-small)
+  add_test(NAME source_prop_fixture_${bad_source_prop_case}
+    COMMAND source_prop_oracle
+      ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/${bad_source_prop_case}.json)
+  set_tests_properties(source_prop_fixture_${bad_source_prop_case} PROPERTIES WILL_FAIL TRUE)
+endforeach()
 if(Python3_Interpreter_FOUND)
   add_test(NAME stats_normalize_sweep_rows_py
     COMMAND ${Python3_EXECUTABLE}

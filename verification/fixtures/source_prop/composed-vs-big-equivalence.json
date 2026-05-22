@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "case_id": "composed-vs-big-equivalence",
+  "k_sq": 9,
+  "carry_width": 3,
+  "source_atoms": ["p0"],
+  "atoms": [
+    { "id": "p0", "r": 7 },
+    { "id": "p1", "r": 9 },
+    { "id": "p2", "r": 12 },
+    { "id": "p3", "r": 15 },
+    { "id": "p4", "r": 18 },
+    { "id": "p5", "r": 21 },
+    { "id": "p6", "r": 24 },
+    { "id": "p7", "r": 27 },
+    { "id": "p8", "r": 30 },
+    { "id": "p9", "r": 33 },
+    { "id": "p10", "r": 36 },
+    { "id": "p11", "r": 39 },
+    { "id": "p12", "r": 42 },
+    { "id": "p13", "r": 45 },
+    { "id": "p14", "r": 48 },
+    { "id": "q0", "r": 18 },
+    { "id": "q1", "r": 21 },
+    { "id": "q2", "r": 24 }
+  ],
+  "edges": [
+    { "a": "p0", "b": "p1" },
+    { "a": "p1", "b": "p2" },
+    { "a": "p2", "b": "p3" },
+    { "a": "p3", "b": "p4" },
+    { "a": "p4", "b": "p5" },
+    { "a": "p5", "b": "p6" },
+    { "a": "p6", "b": "p7" },
+    { "a": "p7", "b": "p8" },
+    { "a": "p8", "b": "p9" },
+    { "a": "p9", "b": "p10" },
+    { "a": "p10", "b": "p11" },
+    { "a": "p11", "b": "p12" },
+    { "a": "p12", "b": "p13" },
+    { "a": "p13", "b": "p14" },
+    { "a": "q0", "b": "q1" },
+    { "a": "q1", "b": "q2" }
+  ],
+  "bands": [
+    { "id": "b0", "r_inner": 0, "r_outer": 10 },
+    { "id": "b1", "r_inner": 10, "r_outer": 20 },
+    { "id": "b2", "r_inner": 20, "r_outer": 30 },
+    { "id": "b3", "r_inner": 30, "r_outer": 40 },
+    { "id": "b4", "r_inner": 40, "r_outer": 50 }
+  ],
+  "guards": ["composed_equals_big"],
+  "overflow_counters": {
+    "component_label_overflow": 0,
+    "carry_atom_overflow": 0
+  },
+  "notes": "Five stitched bands must produce the same final separator state as one large prefix."
+}

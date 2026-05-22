@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "overflow-reject",
+  "k_sq": 9,
+  "carry_width": 3,
+  "source_atoms": ["s"],
+  "atoms": [
+    { "id": "s", "r": 7 },
+    { "id": "a", "r": 9 }
+  ],
+  "edges": [
+    { "a": "s", "b": "a" }
+  ],
+  "bands": [
+    { "id": "b0", "r_inner": 0, "r_outer": 10 }
+  ],
+  "guards": ["composed_equals_big"],
+  "overflow_counters": {
+    "component_label_overflow": 1,
+    "carry_atom_overflow": 0
+  },
+  "notes": "Any overflow counter is a hard reject for source/origin claims."
+}

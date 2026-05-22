@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "case_id": "bad-k32-carry-width-too-small",
+  "k_sq": 32,
+  "carry_width": 5,
+  "source_atoms": ["p0"],
+  "atoms": [
+    { "id": "p0", "r": 5 },
+    { "id": "p1", "r": 10 },
+    { "id": "p2", "r": 16 }
+  ],
+  "edges": [
+    { "a": "p0", "b": "p1" },
+    { "a": "p1", "b": "p2" }
+  ],
+  "bands": [
+    { "id": "b0", "r_inner": 0, "r_outer": 10 },
+    { "id": "b1", "r_inner": 10, "r_outer": 20 }
+  ],
+  "guards": ["composed_equals_big"],
+  "overflow_counters": {
+    "component_label_overflow": 0,
+    "carry_atom_overflow": 0
+  },
+  "notes": "Negative fixture: K=32 with carry_width 5 must reject because ceil_sqrt(32)=6."
+}

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gaussian-moat.local/schemas/source-prop-fixture.schema.json",
+  "title": "Source propagation oracle fixture",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "case_id",
+    "k_sq",
+    "carry_width",
+    "source_atoms",
+    "atoms",
+    "edges",
+    "bands",
+    "guards"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "case_id": { "$ref": "#/$defs/token" },
+    "k_sq": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "carry_width": { "type": "integer", "minimum": 1 },
+    "source_atoms": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "atoms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "r"],
+        "properties": {
+          "id": { "$ref": "#/$defs/token" },
+          "r": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["a", "b"],
+        "properties": {
+          "a": { "$ref": "#/$defs/token" },
+          "b": { "$ref": "#/$defs/token" },
+          "band": { "$ref": "#/$defs/token" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "bands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "r_inner", "r_outer"],
+        "properties": {
+          "id": { "$ref": "#/$defs/token" },
+          "r_inner": { "type": "integer", "minimum": 0 },
+          "r_outer": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "guards": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "composed_equals_big",
+          "false_weld_guard",
+          "drop_non_source_carry_guard",
+          "terminal_death_guard",
+          "k32_carry_width_minimum"
+        ]
+      }
+    },
+    "overflow_counters": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "expected_terminal_inventory": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\s\\x00-\\x1f\\x7f]+$"
+    }
+  }
+}
