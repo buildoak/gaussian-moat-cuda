@@ -85,6 +85,7 @@ int main() {
       "stable coordinate or canonical-port carry atoms; no transient TileOp group labels",
       "per-band H_i manifests: carry_atoms + component_partition + source_bit_per_component",
       "source terminal inventory with count, digest, max norm, and max-coordinate tie set",
+      "coordinate-to-port seam projection report: bridged carry, dropped carry, source-dropped carry, component merge counts",
       "positive source chain to 943460+376039i",
       "negative final guard proof at R_final >= 1015645 under conservative K26 shell",
       "zero overflow across all source/origin proof rows",
@@ -94,7 +95,8 @@ int main() {
   constexpr const char* kBlockingGaps[] = {
       "CPU TileOp-fed diagnostic runner exists, but no full-scale K26 source runner feeds the sidecar from campaign TileOps",
       "current production compositors compute ANY-SPAN/ANY-SHELL-MOAT, not SOURCE_ORIGIN_K26",
-      "canonical-port atom ids, a TileOp port-graph primitive, and a diagnostic port scheduler exist, but no full-scale runner bridges the origin-prefix witness into K26 source carry manifests",
+      "diagnostic origin-prefix-to-port bridge exists, but the K36 smoke is a lossy projection: 133 source coordinate carry atoms project to 106 bridgeable coordinate carry atoms and 7 canonical port atoms, dropping 27 source carry atoms",
+      "no accepted seam-projection theorem yet proves that dropped coordinate carry atoms are irrelevant for K26 source/origin death",
       "sidecar inventory count/digest/max-norm/tie-set checks exist, but endpoint-chain and inventory handling are not accepted at 14.5B scale",
       "K26 non-square BZ evidence is preflight-only in this branch",
       "independent SOURCE_DEAD_CERT draft checker exists, but no full-scale K26 certificate artifact passes it"};

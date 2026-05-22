@@ -112,6 +112,33 @@ This payload does not grant new connectivity. It exists so a component that is
 neutral at seam `i` but later merges into the source can still contribute its
 retired vertices to a terminal certificate.
 
+## Coordinate-To-Port Projection
+
+The coordinate sidecar and the TileOp port graph use different stable atoms.
+Coordinate atoms identify Gaussian-prime coordinates. Port atoms identify
+canonical TileOp face/ordinal positions. Moving a prefix manifest from
+coordinate atoms into a TileOp-port band is therefore not a free relabeling.
+
+A coordinate carry atom below a radial seam may influence the first TileOp-port
+band only through a first-band prime within squared distance `K`. That
+first-band prime then bridges to every canonical port atom carrying its
+TileOp-visible local component. If no such port-visible continuation exists,
+the coordinate carry atom has been projected away from the port representation.
+
+This projection is diagnostic until accepted by an explicit seam lemma or
+verified zero-loss gate. The runner must report:
+
+- coordinate carry atoms consumed from the manifest,
+- coordinate carry atoms that bridged to at least one TileOp port,
+- source coordinate carry atoms that were dropped,
+- resulting canonical port carry atoms,
+- component counts before and after projection.
+
+A lossy projection can be useful evidence for where source appears to die, but
+it is not by itself a `SOURCE_DEAD_CERT`. If source carry is dropped before the
+negative terminal guard, the certificate layer must either prove that the drop
+cannot affect future source reachability or stop as diagnostic/non-claim.
+
 ## Lemma 1: Local TileOp Equivalence
 
 For a fixed band, the existing TileOp construction and port stitching represent
