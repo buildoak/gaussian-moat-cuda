@@ -70,7 +70,7 @@ JSON
 {"schema":"lb_source_k26_bz_schedule_check_v1","proof_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","repaired_summary":{"bad_norm_count":0,"bz_clean":true}}
 JSON
   cat > "$dir/k26_source_run_profile.json" <<'JSON'
-{"schema":"lb_source_k26_run_profile_v1","claim_label":"SOURCE_ORIGIN_K26","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"expected_component_size":14542615005},"schedule":{"bz_evidence":{"accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"}}}
+{"schema":"lb_source_k26_run_profile_v1","claim_label":"SOURCE_ORIGIN_K26","profile_id":"k26-source-run-profile","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"expected_component_size":14542615005},"schedule":{"bz_evidence":{"accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"}}}
 JSON
   cat > "$dir/k26-prefix-result.json" <<'JSON'
 {"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"manifest_written":true,"prefix_witness_written":true}
@@ -205,6 +205,30 @@ fi
 grep -q 'K26 profile claim label' \
   "$tmp/bad-profile-claim-rehashed.log"
 
+bad_profile_id="$tmp/bad-profile-id"
+write_bundle "$bad_profile_id"
+perl -0pi -e 's/"profile_id":"k26-source-run-profile"/"profile_id":"k26-other-profile"/' \
+  "$bad_profile_id/k26_source_run_profile.json"
+if "$checker" "$bad_profile_id" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-profile-id.log" 2>&1; then
+  echo "checker accepted stale artifact hash after profile id mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26_source_run_profile.json' \
+  "$tmp/bad-profile-id.log"
+write_manifest "$bad_profile_id"
+if "$checker" "$bad_profile_id" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-profile-id-rehashed.log" 2>&1; then
+  echo "checker accepted non-K26 source run profile id" >&2
+  exit 1
+fi
+grep -q 'K26 profile id' \
+  "$tmp/bad-profile-id-rehashed.log"
+
 bad_bridge="$tmp/bad-bridge"
 write_bundle "$bad_bridge"
 perl -0pi -e 's/"unbridged_coordinate_carry_atoms":0/"unbridged_coordinate_carry_atoms":1/' \
@@ -275,6 +299,30 @@ if "$checker" "$bad_cert_metadata" \
 fi
 grep -q 'K26 source-dead cert source mode' \
   "$tmp/bad-cert-metadata-rehashed.log"
+
+bad_cert_profile="$tmp/bad-cert-profile"
+write_bundle "$bad_cert_profile"
+perl -0pi -e 's/"profile_id":"k26-source-run-profile"/"profile_id":"k26-other-profile"/' \
+  "$bad_cert_profile/k26-source-dead-cert.json"
+if "$checker" "$bad_cert_profile" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-cert-profile.log" 2>&1; then
+  echo "checker accepted stale artifact hash after cert profile mutation" >&2
+  exit 1
+fi
+grep -q 'artifact hash mismatch for k26-source-dead-cert.json' \
+  "$tmp/bad-cert-profile.log"
+write_manifest "$bad_cert_profile"
+if "$checker" "$bad_cert_profile" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-cert-profile-rehashed.log" 2>&1; then
+  echo "checker accepted source-dead cert bound to wrong profile id" >&2
+  exit 1
+fi
+grep -q 'K26 source-dead cert profile binding' \
+  "$tmp/bad-cert-profile-rehashed.log"
 
 bad_cert_artifact_hash="$tmp/bad-cert-artifact-hash"
 write_bundle "$bad_cert_artifact_hash"

@@ -132,6 +132,7 @@ int main() {
       << "{"
       << "\"schema\":\"lb_source_k26_run_profile_v1\","
       << "\"claim_label\":\"SOURCE_ORIGIN_K26\","
+      << "\"profile_id\":\"k26-source-run-profile\","
       << "\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\","
       << "\"executable_now\":false,"
       << "\"non_claim\":\"run profile only; no sqrt(26) source/origin run executed\","

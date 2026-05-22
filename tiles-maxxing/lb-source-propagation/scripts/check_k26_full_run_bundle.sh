@@ -236,6 +236,9 @@ require_grep '"schema":"lb_source_k26_run_profile_v1"' "$profile" \
   "K26 profile schema"
 require_grep '"claim_label":"SOURCE_ORIGIN_K26"' "$profile" \
   "K26 profile claim label"
+profile_id="$(require_json_string_value "$profile" profile_id)"
+require_equal "k26-source-run-profile" "$profile_id" \
+  "K26 profile id"
 require_grep '"profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM"' "$profile" \
   "K26 profile status"
 require_grep '"target":.*"tsuchimura_endpoint":.*"a":943460.*"b":376039.*"norm_sq":1031522101121' "$profile" \
@@ -385,8 +388,9 @@ require_grep '"schema":"lb_source_dead_cert_draft_v1"' "$cert" \
   "K26 source-dead cert schema"
 require_grep '"certificate_id":"[^"]+"' "$cert" \
   "K26 source-dead cert certificate id"
-require_grep '"profile_id":"[^"]+"' "$cert" \
-  "K26 source-dead cert profile id"
+cert_profile_id="$(require_json_string_value "$cert" profile_id)"
+require_equal "$profile_id" "$cert_profile_id" \
+  "K26 source-dead cert profile binding"
 cert_source_mode="$(require_json_string_value "$cert" source_mode)"
 cert_geometry_id="$(require_json_string_value "$cert" geometry_id)"
 cert_bz_status="$(require_json_string_value "$cert" bz_status)"
