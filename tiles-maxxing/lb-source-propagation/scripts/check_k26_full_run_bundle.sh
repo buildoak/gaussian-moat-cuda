@@ -393,6 +393,8 @@ if ! grep -Eq '"artifact_hash":"sha256:[0-9a-f]{64}"' "$cert"; then
   echo "K26_FULL_RUN_BUNDLE_REJECT: K26 source-dead cert artifact hash binding ($cert)" >&2
   exit 1
 fi
+require_equal "sha256:${actual_continuation_digest}" "$cert_artifact_hash" \
+  "K26 source-dead cert continuation artifact hash binding"
 require_grep '"k_sq":26' "$cert" "K26 source-dead cert k_sq"
 require_grep '"terminal_radius":1015645' "$cert" \
   "K26 source-dead cert terminal radius"
