@@ -64,6 +64,25 @@ overflow rejection, `K=32` carry width, associativity across band groupings,
 certified source seed application/rejection, carry-manifest round-trip/rejection,
 exact draft JSON output, and CPU TileOp producer smoke.
 
+## Remote Smoke
+
+After a qualifying Vast 4090 is rented and the repo is copied to the host, run:
+
+```bash
+cd /workspace/gaussian-moat-cuda
+tiles-maxxing/lb-source-propagation/scripts/remote_sidecar_smoke.sh \
+  --repo /workspace/gaussian-moat-cuda \
+  --build-dir /tmp/gm-lbsp-remote-smoke \
+  --out-dir /workspace/lb-source-remote-smoke
+```
+
+This only builds/tests the sidecar and runs the CPU TileOp source smoke. It
+does not start K32, does not run a long campaign, and does not claim a moat
+result.
+
+The sqrt(26) readiness guard lives in
+`docs/k26-tsuchimura-readiness.md`.
+
 ## Integration Boundary
 
 Phase 2 should feed this protocol from the existing CPU TileOp/band machinery
