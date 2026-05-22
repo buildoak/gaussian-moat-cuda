@@ -326,6 +326,36 @@ void test_coordinate_atom_ids_are_stable_and_canonical() {
   CHECK_TRUE(!lb_source::decode_coordinate_atom_id(-1).has_value());
 }
 
+void test_port_atom_ids_are_stable_and_label_free() {
+  const std::optional<AtomId> port =
+      lb_source::port_atom_id(3907, 1472, 1, 37);
+  CHECK_TRUE(port.has_value());
+  CHECK_TRUE(*port < 0);
+  CHECK_TRUE(!lb_source::decode_coordinate_atom_id(*port).has_value());
+
+  const std::optional<lb_source::PortAtom> decoded =
+      lb_source::decode_port_atom_id(*port);
+  CHECK_TRUE(decoded.has_value());
+  CHECK_EQ(decoded->tile_i, static_cast<std::int32_t>(3907));
+  CHECK_EQ(decoded->tile_j, static_cast<std::int32_t>(1472));
+  CHECK_EQ(decoded->face, static_cast<std::uint8_t>(1));
+  CHECK_EQ(decoded->ordinal, static_cast<std::uint8_t>(37));
+  CHECK_EQ(lb_source::port_atom_id(decoded->tile_i, decoded->tile_j,
+                                   decoded->face, decoded->ordinal),
+           port);
+
+  const std::optional<AtomId> same_port_different_group_label =
+      lb_source::port_atom_id(3907, 1472, 1, 37);
+  CHECK_EQ(same_port_different_group_label, port);
+
+  CHECK_TRUE(!lb_source::port_atom_id(-1, 0, 0, 0).has_value());
+  CHECK_TRUE(!lb_source::port_atom_id(0, -1, 0, 0).has_value());
+  CHECK_TRUE(!lb_source::port_atom_id(1 << 24, 0, 0, 0).has_value());
+  CHECK_TRUE(!lb_source::port_atom_id(0, 0, 4, 0).has_value());
+  CHECK_TRUE(!lb_source::port_atom_id(0, 0, 0, 256).has_value());
+  CHECK_TRUE(!lb_source::decode_port_atom_id(0).has_value());
+}
+
 void test_associativity_across_band_grouping() {
   const std::vector<BandInput> atomized = {
       {.k_sq = 36,
@@ -621,6 +651,8 @@ int main() {
       test_k32_ceil_sqrt_carry_width_is_six);
   run("coordinate_atom_ids_are_stable_and_canonical",
       test_coordinate_atom_ids_are_stable_and_canonical);
+  run("port_atom_ids_are_stable_and_label_free",
+      test_port_atom_ids_are_stable_and_label_free);
   run("associativity_across_band_grouping",
       test_associativity_across_band_grouping);
   run("source_seed_provider_marks_certified_atoms",

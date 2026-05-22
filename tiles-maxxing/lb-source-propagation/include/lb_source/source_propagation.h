@@ -137,6 +137,15 @@ struct CoordinateAtom {
                          const CoordinateAtom&) = default;
 };
 
+struct PortAtom {
+  std::int32_t tile_i = 0;
+  std::int32_t tile_j = 0;
+  std::uint8_t face = 0;
+  std::uint8_t ordinal = 0;
+
+  friend bool operator==(const PortAtom&, const PortAtom&) = default;
+};
+
 struct SourceProfileDraft {
   std::string profile_id;
   SourceDraftMetadata metadata;
@@ -164,6 +173,13 @@ std::uint64_t ceil_sqrt(std::uint64_t n);
 std::optional<AtomId> coordinate_atom_id(std::int64_t a, std::int64_t b);
 
 std::optional<CoordinateAtom> decode_coordinate_atom_id(AtomId id);
+
+std::optional<AtomId> port_atom_id(std::int64_t tile_i,
+                                   std::int64_t tile_j,
+                                   std::uint64_t face,
+                                   std::uint64_t ordinal);
+
+std::optional<PortAtom> decode_port_atom_id(AtomId id);
 
 SeparatorState canonicalize_separator(const SeparatorState& state);
 

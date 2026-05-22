@@ -373,6 +373,56 @@ std::optional<CoordinateAtom> decode_coordinate_atom_id(AtomId id) {
   return CoordinateAtom{a, b, static_cast<std::uint64_t>(norm)};
 }
 
+std::optional<AtomId> port_atom_id(std::int64_t tile_i,
+                                   std::int64_t tile_j,
+                                   std::uint64_t face,
+                                   std::uint64_t ordinal) {
+  constexpr std::uint64_t kMaxTileCoord = (1ULL << 24) - 1ULL;
+  if (tile_i < 0 || tile_j < 0 || face > 3 || ordinal > 255 ||
+      static_cast<std::uint64_t>(tile_i) > kMaxTileCoord ||
+      static_cast<std::uint64_t>(tile_j) > kMaxTileCoord) {
+    return std::nullopt;
+  }
+
+  const std::uint64_t raw =
+      (static_cast<std::uint64_t>(tile_i) << 34) |
+      (static_cast<std::uint64_t>(tile_j) << 10) |
+      (face << 8) | ordinal;
+  if (raw > static_cast<std::uint64_t>(
+                std::numeric_limits<AtomId>::max())) {
+    return std::nullopt;
+  }
+  return static_cast<AtomId>(-1 - static_cast<AtomId>(raw));
+}
+
+std::optional<PortAtom> decode_port_atom_id(AtomId id) {
+  if (id >= 0) {
+    return std::nullopt;
+  }
+  if (id == std::numeric_limits<AtomId>::min()) {
+    return std::nullopt;
+  }
+  const std::uint64_t raw =
+      static_cast<std::uint64_t>(-1 - id);
+  if ((raw >> 58) != 0) {
+    return std::nullopt;
+  }
+  const std::uint64_t tile_i = raw >> 34;
+  const std::uint64_t tile_j = (raw >> 10) & ((1ULL << 24) - 1ULL);
+  const std::uint64_t face = (raw >> 8) & 0x3ULL;
+  const std::uint64_t ordinal = raw & 0xffULL;
+  if (tile_i > static_cast<std::uint64_t>(
+                   std::numeric_limits<std::int32_t>::max()) ||
+      tile_j > static_cast<std::uint64_t>(
+                   std::numeric_limits<std::int32_t>::max())) {
+    return std::nullopt;
+  }
+  return PortAtom{static_cast<std::int32_t>(tile_i),
+                  static_cast<std::int32_t>(tile_j),
+                  static_cast<std::uint8_t>(face),
+                  static_cast<std::uint8_t>(ordinal)};
+}
+
 SeparatorState canonicalize_separator(const SeparatorState& state) {
   SeparatorState out;
   out.carry_atoms = state.carry_atoms;

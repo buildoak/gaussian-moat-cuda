@@ -22,6 +22,12 @@ small runners, TileOp producer smokes, carry manifests, and future certificate
 chains on one stable coordinate identity instead of app-local encodings or
 transient union-find roots.
 
+It also exposes `port_atom_id(tile_i, tile_j, face, ordinal)` /
+`decode_port_atom_id(id)` for campaign-scale carry state. Port atoms are
+negative ids and encode only canonical TileOp port position. They deliberately
+do not encode transient per-tile group labels, so future K26 runners can carry
+TileOp-compressed boundary state without depending on local union-find names.
+
 The library exposes deterministic carry-manifest helpers:
 
 - `make_carry_manifest(k_sq, outer_radius, result)`
@@ -54,8 +60,8 @@ calls `campaign::process_tile`, derives coordinate-stable source atoms from
 propagator, and round-trips the carry manifest.
 
 This is intentionally a smoke path. `TileOp` group labels are not persisted as
-source carry atoms because they are tile-local; Phase 2 should promote stable
-coordinate or canonical-port atoms before running campaign-scale source claims.
+source carry atoms because they are tile-local; campaign-scale source claims
+must use stable coordinate or canonical-port atoms.
 
 `source_tileop_cpu_runner` is the next diagnostic bridge: it builds campaign
 `Grid` objects per radial band, calls `campaign::process_tile` on each active
