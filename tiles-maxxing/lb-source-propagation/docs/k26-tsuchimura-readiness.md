@@ -544,6 +544,12 @@ execute path rechecked the market before creating and found no qualifying offer.
 The nearest observed qualifying-market offer was `$0.5081/hr`, `0.1381/hr`
 over cap. No Vast instance was created.
 
+After binding the K26 mixed coordinate/TileOp-port atom chain to local
+per-port expansion evidence at local head `e3fd90f`, a capped dry-run Vast
+offer probe used the same `$0.37/hr` and `$1.50` caps. No RTX 4090 offer
+satisfied the cap; the nearest observed qualifying-market offer was
+`$0.6681/hr`, `0.2981/hr` over cap. No Vast instance was created.
+
 After any partial continuation, run:
 
 ```bash
