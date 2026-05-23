@@ -82,6 +82,9 @@
           },
           "metadata": {
             "properties": {
+              "source_mode": {
+                "const": "ORIGIN_SOURCE"
+              },
               "bz_status": {
                 "const": "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE"
               }

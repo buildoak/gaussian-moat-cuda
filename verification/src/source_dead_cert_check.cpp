@@ -632,6 +632,10 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
       require_string(require_object(cert, "metadata"), "geometry_id");
   const bool is_k26_cert = geometry_id == "SOURCE_ORIGIN_K26";
   if (is_k26_cert) {
+    if (source_mode != "ORIGIN_SOURCE") {
+      throw std::runtime_error(
+          "SOURCE_ORIGIN_K26 cert requires ORIGIN_SOURCE metadata");
+    }
     if (k_sq != kK26Sq || terminal_radius != kK26TerminalRadius) {
       throw std::runtime_error(
           "SOURCE_ORIGIN_K26 cert has wrong K26 constants");

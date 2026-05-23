@@ -204,6 +204,14 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             k26_rule["endpoint"]["properties"]["norm_sq"]["const"],
             1031522101121,
         )
+        self.assertEqual(
+            k26_rule["metadata"]["properties"]["source_mode"]["const"],
+            "ORIGIN_SOURCE",
+        )
+        self.assertEqual(
+            k26_rule["metadata"]["properties"]["bz_status"]["const"],
+            "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE",
+        )
         self.assertEqual(k26_rule["endpoint_atom_id"]["const"], 1615075207964004)
 
         source_path_target = k26_rule["source_path"]["contains"]["properties"]
