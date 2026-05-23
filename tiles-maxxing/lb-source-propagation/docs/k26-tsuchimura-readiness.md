@@ -95,7 +95,10 @@ executed continuation count/digest/max-norm/tie-set,
 if `endpoint_atom_id` is not the stable coordinate atom id
 `1615075207964004` for the canonical endpoint,
 if `metadata.artifact_hash` is not exactly the SHA-256 hash of
-`k26-continuation-result.json`, or if the independent
+`k26-continuation-result.json`, if K26 cert metadata does not bind the exact
+repaired BZ schedule digest
+`sha256:lb_source_k26_repaired_bz_schedule_v1:7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95`,
+or if the independent
 `source_dead_cert_check` does not accept a listed source-dead draft. The
 independent cert checker also rejects a cert whose endpoint still lies in the
 conservative terminal guard shell

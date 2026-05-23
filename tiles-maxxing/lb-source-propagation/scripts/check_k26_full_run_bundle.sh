@@ -898,6 +898,8 @@ require_equal "$profile_id" "$cert_profile_id" \
 cert_source_mode="$(require_json_string_value "$cert" source_mode)"
 cert_geometry_id="$(require_json_string_value "$cert" geometry_id)"
 cert_bz_status="$(require_json_string_value "$cert" bz_status)"
+cert_bz_digest_algorithm="$(require_json_string_value "$cert" bz_schedule_digest_algorithm)"
+cert_bz_digest_hex="$(require_json_string_value "$cert" bz_schedule_digest_hex)"
 cert_artifact_hash="$(require_json_string_value "$cert" artifact_hash)"
 require_equal "ORIGIN_SOURCE" "$cert_source_mode" \
   "K26 source-dead cert source mode"
@@ -905,6 +907,10 @@ require_equal "SOURCE_ORIGIN_K26" "$cert_geometry_id" \
   "K26 source-dead cert geometry binding"
 require_equal "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE" "$cert_bz_status" \
   "K26 source-dead cert BZ status binding"
+require_equal "sha256:lb_source_k26_repaired_bz_schedule_v1" "$cert_bz_digest_algorithm" \
+  "K26 source-dead cert BZ digest algorithm binding"
+require_equal "$bz_digest" "$cert_bz_digest_hex" \
+  "K26 source-dead cert BZ digest binding"
 if ! grep -Eq '"artifact_hash":"sha256:[0-9a-f]{64}"' "$cert"; then
   echo "K26_FULL_RUN_BUNDLE_REJECT: K26 source-dead cert artifact hash binding ($cert)" >&2
   exit 1

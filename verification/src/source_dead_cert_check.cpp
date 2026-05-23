@@ -25,6 +25,10 @@ constexpr std::uint64_t kK26EndpointNormSq = 1031522101121ULL;
 constexpr std::uint64_t kK26ExpectedComponentSize = 14542615005ULL;
 constexpr std::string_view kK26BzStatus =
     "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE";
+constexpr std::string_view kK26BzDigestAlgorithm =
+    "sha256:lb_source_k26_repaired_bz_schedule_v1";
+constexpr std::string_view kK26BzDigestHex =
+    "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95";
 
 std::string type_name(const nlohmann::json& value) {
   return std::string(value.type_name());
@@ -157,6 +161,17 @@ void require_nonpending_metadata(const nlohmann::json& metadata) {
   if (geometry_id == "SOURCE_ORIGIN_K26" && bz_status != kK26BzStatus) {
     throw std::runtime_error(
         "SOURCE_ORIGIN_K26 cert requires repaired K26 BZ status");
+  }
+  if (geometry_id == "SOURCE_ORIGIN_K26") {
+    const std::string bz_digest_algorithm =
+        require_string(metadata, "bz_schedule_digest_algorithm");
+    const std::string bz_digest_hex =
+        require_string(metadata, "bz_schedule_digest_hex");
+    if (bz_digest_algorithm != kK26BzDigestAlgorithm ||
+        bz_digest_hex != kK26BzDigestHex) {
+      throw std::runtime_error(
+          "SOURCE_ORIGIN_K26 cert requires repaired K26 BZ schedule digest");
+    }
   }
 }
 

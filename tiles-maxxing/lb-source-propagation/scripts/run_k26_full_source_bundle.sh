@@ -1223,6 +1223,11 @@ cert = {
         "commit_id": "lb-source-propagation-bundle",
         "build_id": "k26-source-bundle",
         "bz_status": bz.get("proof_status", "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE"),
+        "bz_schedule_digest_algorithm": bz.get(
+            "schedule_digest_algorithm",
+            "sha256:lb_source_k26_repaired_bz_schedule_v1",
+        ),
+        "bz_schedule_digest_hex": bz.get("schedule_digest_hex"),
         "artifact_hash": f"sha256:{continuation_digest}",
     },
     "k_sq": 26,
