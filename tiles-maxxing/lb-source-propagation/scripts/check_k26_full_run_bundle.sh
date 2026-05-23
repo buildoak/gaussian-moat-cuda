@@ -767,12 +767,17 @@ require_equal "$continuation_max_norm" "$cert_max_norm" \
 require_equal "$continuation_max_ties" "$cert_max_ties" \
   "K26 cert max-norm tie binding"
 
-checker_output="$("$source_dead_checker" "$cert")"
-if grep -q '"status":"SOURCE_DEAD_CERT_DRAFT_PASS"' <<<"$checker_output"; then
-  echo '{"status":"K26_FULL_RUN_BUNDLE_DRAFT_PASS"}'
-elif grep -q '"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"' <<<"$checker_output"; then
-  echo '{"status":"K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM"}'
-  exit 3
+if checker_output="$("$source_dead_checker" "$cert" 2>&1)"; then
+  if grep -q '"status":"SOURCE_DEAD_CERT_DRAFT_PASS"' <<<"$checker_output"; then
+    echo '{"status":"K26_FULL_RUN_BUNDLE_DRAFT_PASS"}'
+  elif grep -q '"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"' <<<"$checker_output"; then
+    echo '{"status":"K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM"}'
+    exit 3
+  else
+    echo "K26_FULL_RUN_BUNDLE_REJECT: source-dead checker did not accept draft cert" >&2
+    echo "$checker_output" >&2
+    exit 1
+  fi
 else
   echo "K26_FULL_RUN_BUNDLE_REJECT: source-dead checker did not accept draft cert" >&2
   echo "$checker_output" >&2

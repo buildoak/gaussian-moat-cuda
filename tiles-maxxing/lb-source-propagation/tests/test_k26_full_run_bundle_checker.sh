@@ -556,6 +556,21 @@ fi
 grep -q 'K26 source-dead cert coordinate path provenance' \
   "$tmp/bad-cert-path-provenance-rehashed.log"
 
+bad_cert_origin_path="$tmp/bad-cert-origin-path"
+write_bundle "$bad_cert_origin_path"
+perl -0pi -e 's/"source_path":\[\{"a":0,"b":3,"norm_sq":9\},\{"a":376039,"b":943460,"norm_sq":1031522101121\}\]/"source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}]/' \
+  "$bad_cert_origin_path/k26-source-dead-cert.json"
+write_manifest "$bad_cert_origin_path"
+if "$checker" "$bad_cert_origin_path" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-cert-origin-path.log" 2>&1; then
+  echo "checker accepted K26 source-dead cert whose path starts at endpoint" >&2
+  exit 1
+fi
+grep -q 'source-dead checker did not accept draft cert' \
+  "$tmp/bad-cert-origin-path.log"
+
 missing="$tmp/missing"
 write_bundle "$missing"
 rm "$missing/k26-source-dead-cert.json"
