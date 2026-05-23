@@ -167,7 +167,7 @@ add_test(NAME k26_execution_plan
   COMMAND k26_execution_plan)
 set_tests_properties(k26_execution_plan PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 26/26"
+    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 27/27"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_bz_schedule_check
@@ -300,6 +300,10 @@ set_tests_properties(source_tileop_port_runner_schedule_smoke PROPERTIES
     "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"schedule_min_width\":127.*\"schedule_max_width\":137.*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_carry_atoms\":[1-9][0-9]*"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+add_test(NAME source_tileop_port_runner_resume_smoke
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_tileop_port_runner_resume.sh
+    $<TARGET_FILE:source_tileop_port_runner>)
 add_test(NAME source_tileop_port_runner_manifest_smoke
   COMMAND source_tileop_port_runner
     --r-start 248

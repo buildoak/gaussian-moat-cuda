@@ -116,7 +116,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" 26
+require_ctest_log "$out_dir/ctest.log" 27
 require_ctest_log "$out_dir/verification-ctest.log" 73
 
 for artifact in \
@@ -189,7 +189,7 @@ require_grep '"index":123' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final row index"
 require_grep '"r_outer":1015645' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final radius"
-require_grep 'local sidecar ctest 26/26' \
+require_grep 'local sidecar ctest 27/27' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan sidecar gate"
 
 require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' \

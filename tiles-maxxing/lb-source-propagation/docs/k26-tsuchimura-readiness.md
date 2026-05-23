@@ -164,8 +164,16 @@ carry. It reports `terminal_source_dead=false`, `has_source_carry=true`,
 `max_source_norm_sq=621084672` at `R=24576`. This corrected an earlier false
 terminal diagnostic at `R=16384`; the old `SOURCE_DEAD_CERT_TARGET_NOT_REACHED`
 shape remains verifier-covered, but it is not the current local continuation
-result. The sidecar runner parallelizes this TileOp build loop with standard
-C++ worker threads, while preserving output order and reporting
+result. The runner now supports checkpointable TileOp-port continuation:
+`--stop-after-bands N` can write a live port carry manifest at the actual
+processed boundary, and a later run can resume from that port manifest without
+redoing the origin-prefix coordinate bridge. A 2026-05-23 K26-scale resume
+probe verified that the uninterrupted two-band run through `R=24576` and a
+one-band checkpoint at `R=16384` followed by a resumed second band produce
+byte-identical final carry manifests, with `source_carry_atoms=2337` and
+`source_inventory_count=2107474`. The sidecar runner parallelizes this TileOp
+build loop with standard C++ worker threads, while preserving output order and
+reporting
 `tileop_worker_threads`; `--tileop-threads N` can pin the count, while
 `--tileop-threads 0` uses hardware auto. This is a sidecar execution
 optimization and does not change production TileOp semantics. Neither progress
@@ -293,8 +301,11 @@ terminal inventory are missing.
 A bounded local bundle harness run with `--timeout-seconds 120` now stops with
 `K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_TIMEOUT` while building band
 `40960 -> 49152`; by then bands through `32768 -> 40960` have completed with
-live source carry. The current local blocker is therefore runtime/budget, not
-the earlier target-not-reached terminal diagnostic.
+live source carry. The current runner can checkpoint and resume TileOp-port
+separator state, but the bundle harness still needs an accepted chunked
+execution plan before this becomes the default paid-run protocol. The current
+local blocker is therefore runtime/budget, not the earlier target-not-reached
+terminal diagnostic.
 
 ## Stop Conditions
 

@@ -358,9 +358,15 @@ It reports `terminal_source_dead=false`, `has_source_carry=true`, and
 `source_carry_atoms=2337` at `R=24576`. This corrected an earlier false
 terminal diagnostic at `R=16384`; the previous
 `SOURCE_DEAD_CERT_TARGET_NOT_REACHED` artifact remains a valid gap shape, but
-it is no longer the current local K26 continuation result. The TileOp build
-loop is parallelized only inside this sidecar runner with standard C++ worker
-threads, preserving the deterministic output order and reporting
+it is no longer the current local K26 continuation result. The TileOp-port
+runner can also checkpoint live continuation state with `--stop-after-bands N`
+and resume from the written port carry manifest. A K26-scale probe verified
+that full two-band continuation through `R=24576` and a one-band checkpoint at
+`R=16384` plus resumed second band produce byte-identical final carry
+manifests, with `source_carry_atoms=2337` and `source_inventory_count=2107474`.
+The TileOp build loop is parallelized only inside this sidecar runner with
+standard C++ worker threads, preserving the deterministic output order and
+reporting
 `tileop_worker_threads` in progress/final JSON. Use `--tileop-threads N` to pin
 the worker count, or `--tileop-threads 0` for hardware auto. This does not
 alter the underlying TileOp implementation or any existing campaign verdict

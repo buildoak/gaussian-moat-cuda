@@ -146,9 +146,9 @@ int main() {
       lb_source::k26_bz::repaired_schedule_digest_hex(nominal, repaired);
 
   constexpr const char* kPreRunGates[] = {
-      "local sidecar ctest 26/26",
+      "local sidecar ctest 27/27",
       "local independent verification ctest 73/73",
-      "remote 4090 smoke with sidecar ctest 26/26 and verification ctest 73/73",
+      "remote 4090 smoke with sidecar ctest 27/27 and verification ctest 73/73",
       "accepted K26 repaired BZ schedule evidence for every source/origin proof row",
       "accepted coordinate-to-port seam bridge theorem or diagnostic label",
       "accepted terminal inventory count/digest/max-norm handling at 14.5B scale"};

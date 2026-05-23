@@ -33,6 +33,7 @@ struct Config {
   std::uint64_t r_start = 248;
   std::uint64_t r_final = 512;
   std::uint64_t band_width = 128;
+  std::size_t stop_after_bands = 0;
   std::size_t max_atoms = 1000000;
   std::size_t tileop_threads = 0;
   bool seed_inner_flags = false;
@@ -91,6 +92,12 @@ struct RunnerInventorySummary {
   lb_source::InventorySummary digest;
   std::uint64_t max_norm_sq = 0;
   std::vector<lb_source::AtomId> max_norm_atom_ids;
+};
+
+enum class ManifestKind {
+  kNone,
+  kCoordinateCarry,
+  kPortCarry,
 };
 
 std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b);
@@ -153,6 +160,8 @@ void usage(const char* prog) {
       << "  --r-start R           starting radius (default 248)\n"
       << "  --r-final R           final radius (default 512)\n"
       << "  --band-width W        radial band width (default 128)\n"
+      << "  --stop-after-bands N  stop after N processed bands and allow\n"
+      << "                        --manifest-out to checkpoint the separator\n"
       << "  --schedule-radii CSV  explicit increasing radial boundaries;\n"
       << "                        first must equal --r-start and last --r-final\n"
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
@@ -218,6 +227,14 @@ bool parse_args(int argc, char** argv, Config& config) {
         std::cerr << "invalid --band-width: " << value << "\n";
         return false;
       }
+    } else if (take_value("--stop-after-bands", value)) {
+      std::uint64_t parsed = 0;
+      if (!parse_uint64(value, parsed) || parsed == 0 ||
+          parsed > std::numeric_limits<std::size_t>::max()) {
+        std::cerr << "invalid --stop-after-bands: " << value << "\n";
+        return false;
+      }
+      config.stop_after_bands = static_cast<std::size_t>(parsed);
     } else if (take_value("--schedule-radii", value)) {
       if (!parse_schedule_radii(value, config.schedule_radii)) {
         std::cerr << "invalid --schedule-radii: " << value << "\n";
@@ -339,6 +356,34 @@ bool parse_args(int argc, char** argv, Config& config) {
     return false;
   }
   return true;
+}
+
+ManifestKind classify_manifest_or_die(const lb_source::CarryManifest& manifest) {
+  if (manifest.separator.carry_atoms.empty()) {
+    std::cerr << "manifest carry atom set is empty\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  bool all_coordinate = true;
+  bool all_port = true;
+  for (const lb_source::CarryAtom& atom : manifest.separator.carry_atoms) {
+    const std::optional<lb_source::CoordinateAtom> coordinate =
+        lb_source::decode_coordinate_atom_id(atom.id);
+    if (!coordinate.has_value() || coordinate->norm_sq != atom.norm_sq) {
+      all_coordinate = false;
+    }
+    if (!lb_source::decode_port_atom_id(atom.id).has_value()) {
+      all_port = false;
+    }
+  }
+
+  if (all_coordinate == all_port) {
+    std::cerr << "manifest carry atoms must be all coordinate atoms or all "
+                 "TileOp port atoms\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return all_coordinate ? ManifestKind::kCoordinateCarry
+                        : ManifestKind::kPortCarry;
 }
 
 std::vector<std::uint64_t> build_schedule_radii(const Config& config) {
@@ -1387,6 +1432,7 @@ int main(int argc, char** argv) {
   }
 
   std::optional<lb_source::CarryManifest> coordinate_manifest;
+  ManifestKind manifest_kind = ManifestKind::kNone;
   std::optional<PrefixWitness> prefix_witness;
   std::optional<Point> target;
   std::optional<lb_source::AtomId> target_id;
@@ -1432,6 +1478,7 @@ int main(int argc, char** argv) {
                         std::numeric_limits<std::uint64_t>::max(), 0, 0,
                         std::numeric_limits<std::uint64_t>::max());
     coordinate_manifest = read_manifest_or_die(*config.manifest_in);
+    manifest_kind = classify_manifest_or_die(*coordinate_manifest);
     emit_phase_progress(progress, "manifest_read", "end",
                         std::numeric_limits<std::uint64_t>::max(), 0, 0,
                         elapsed_ms(manifest_read_begin,
@@ -1450,7 +1497,9 @@ int main(int argc, char** argv) {
       std::cerr << "manifest carry_width mismatch\n";
       return EXIT_FAILURE;
     }
-    source_mode = "ORIGIN_PREFIX_PORT_MANIFEST";
+    source_mode = manifest_kind == ManifestKind::kCoordinateCarry
+                      ? "ORIGIN_PREFIX_PORT_MANIFEST"
+                      : "PORT_CARRY_MANIFEST";
     for (std::size_t c = 0;
          c < coordinate_manifest->separator.component_partition.size(); ++c) {
       if (!coordinate_manifest->separator.source_bit_per_component[c]) {
@@ -1464,6 +1513,11 @@ int main(int argc, char** argv) {
           coordinate_manifest->separator.component_partition[c].end());
     }
     if (config.prefix_witness_in.has_value()) {
+      if (manifest_kind != ManifestKind::kCoordinateCarry) {
+        std::cerr << "--prefix-witness-in requires a coordinate carry "
+                     "manifest\n";
+        return EXIT_FAILURE;
+      }
       const auto prefix_witness_read_begin = std::chrono::steady_clock::now();
       emit_phase_progress(progress, "prefix_witness_read", "begin",
                           std::numeric_limits<std::uint64_t>::max(), 0, 0,
@@ -1503,6 +1557,12 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
       }
     }
+    if (config.require_full_bridge &&
+        manifest_kind != ManifestKind::kCoordinateCarry) {
+      std::cerr << "--require-full-bridge requires a coordinate carry "
+                   "manifest\n";
+      return EXIT_FAILURE;
+    }
   }
 
   std::optional<lb_source::SeparatorState> incoming;
@@ -1516,6 +1576,25 @@ int main(int argc, char** argv) {
   std::uint64_t internal_edges = 0;
   std::uint64_t seam_edges = 0;
   std::map<lb_source::AtomId, std::uint64_t> norm_by_id;
+  std::uint64_t processed_outer = config.r_start;
+  if (coordinate_manifest.has_value() &&
+      manifest_kind == ManifestKind::kPortCarry) {
+    incoming = coordinate_manifest->separator;
+    add_partition_adjacency(provenance_adjacency,
+                            coordinate_manifest->separator);
+    for (const lb_source::CarryAtom& atom :
+         coordinate_manifest->separator.carry_atoms) {
+      norm_by_id.emplace(atom.id, atom.norm_sq);
+    }
+  }
+
+  const std::size_t total_segments =
+      schedule_radii.empty() ? 0 : schedule_radii.size() - 1;
+  if (config.stop_after_bands != 0 &&
+      config.stop_after_bands > total_segments) {
+    std::cerr << "--stop-after-bands exceeds scheduled band count\n";
+    return EXIT_FAILURE;
+  }
 
   for (std::size_t segment = 0; segment + 1 < schedule_radii.size();
        ++segment) {
@@ -1624,7 +1703,9 @@ int main(int argc, char** argv) {
                         elapsed_ms(graph_done, target_bridge_done));
     auto bridge_done = target_bridge_done;
     PortManifestBridgeResult segment_bridge;
-    if (coordinate_manifest.has_value() && bands_processed == 0) {
+    if (coordinate_manifest.has_value() &&
+        manifest_kind == ManifestKind::kCoordinateCarry &&
+        bands_processed == 0) {
       lb_source::BandInput bridged_band = band;
       for (const lb_source::CarryAtom& atom :
            coordinate_manifest->separator.carry_atoms) {
@@ -1730,6 +1811,7 @@ int main(int argc, char** argv) {
     seam_edges += graph.seam_edges;
 
     ++bands_processed;
+    processed_outer = outer;
     if (progress) {
       const bool segment_accepted = last.accepted();
       const bool segment_source_carry =
@@ -1833,6 +1915,10 @@ int main(int argc, char** argv) {
       break;
     }
     incoming = last.outgoing;
+    if (config.stop_after_bands != 0 &&
+        bands_processed >= config.stop_after_bands) {
+      break;
+    }
   }
 
   bool manifest_written = false;
@@ -1851,7 +1937,7 @@ int main(int argc, char** argv) {
     lb_source::write_carry_manifest(
         manifest, lb_source::make_carry_manifest(
                       static_cast<std::uint64_t>(campaign::k_sq_value),
-                      config.r_final, last));
+                      processed_outer, last));
     manifest_written = true;
   }
 
@@ -1887,8 +1973,10 @@ int main(int argc, char** argv) {
             << "\","
             << "\"k_sq\":" << campaign::k_sq_value
             << ",\"r_start\":" << config.r_start
-            << ",\"r_final\":" << config.r_final
+            << ",\"r_final\":" << processed_outer
+            << ",\"requested_r_final\":" << config.r_final
             << ",\"band_width\":" << config.band_width
+            << ",\"stop_after_bands\":" << config.stop_after_bands
             << ",\"schedule_mode\":\""
             << (config.schedule_radii.empty() ? "fixed_width"
                                                : "explicit_radii")
