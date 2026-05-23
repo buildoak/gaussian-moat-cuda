@@ -249,7 +249,7 @@ require_grep '"prefix_row_index":0' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile prefix row"
 require_grep '"tileop_port_first_row_index":1' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile TileOp start row"
-require_grep 'full K26 source runner has not executed the repaired variable-boundary schedule' \
+require_grep 'full-run K26 bundle harness has not produced accepted artifacts for the repaired variable-boundary schedule' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile runner gap"
 
 require_grep '"schema":"lb_source_k26_run_commands_v1"' \

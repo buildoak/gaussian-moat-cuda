@@ -82,7 +82,7 @@ cat > "$tmp/k26_bz_schedule_check.json" <<'JSON'
 JSON
 
 cat > "$tmp/k26_source_run_profile.json" <<'JSON'
-{"schema":"lb_source_k26_run_profile_v1","claim_label":"SOURCE_ORIGIN_K26","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","executable_now":false,"build":{"required_k_sq":26},"schedule":{"bz_schedule":"repaired","bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"},"band_count":124,"prefix_row_index":0,"tileop_port_first_row_index":1},"missing_runner_features":["full K26 source runner has not executed the repaired variable-boundary schedule"],"non_claim":"run profile only; no sqrt(26) source/origin run executed"}
+{"schema":"lb_source_k26_run_profile_v1","claim_label":"SOURCE_ORIGIN_K26","profile_status":"RUN_PROFILE_DRAFT_NON_CLAIM","executable_now":false,"build":{"required_k_sq":26},"schedule":{"bz_schedule":"repaired","bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"},"band_count":124,"prefix_row_index":0,"tileop_port_first_row_index":1},"missing_runner_features":["full-run K26 bundle harness has not produced accepted artifacts for the repaired variable-boundary schedule"],"non_claim":"run profile only; no sqrt(26) source/origin run executed"}
 JSON
 
 cat > "$tmp/k26_source_run_commands.json" <<'JSON'
