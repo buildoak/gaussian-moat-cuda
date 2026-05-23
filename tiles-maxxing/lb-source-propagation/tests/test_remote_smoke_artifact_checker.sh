@@ -44,7 +44,7 @@ hostname=fixture
 repo=/workspace/gaussian-moat-cuda
 commit=fixture
 branch=ttc/lb-source-propagation
-k_sq=36
+k_sq=26
 nvidia_smi=unavailable
 ENV
 
@@ -97,7 +97,7 @@ deployed_local_head=abc1234
 deployed_local_branch=ttc/lb-source-propagation
 SRC
 "$checker" "$tmp" --expect-head abc1234 --expect-branch ttc/lb-source-propagation \
-  --expect-k-sq 36 \
+  --expect-k-sq 26 \
   > "$tmp/provenance-pass.log"
 grep -q "REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS" "$tmp/provenance-pass.log"
 
@@ -134,7 +134,7 @@ if "$checker" "$bad" > "$tmp/bad.log" 2>&1; then
   exit 1
 fi
 
-if "$checker" "$tmp" --expect-k-sq 26 > "$tmp/bad-ksq.log" 2>&1; then
+if "$checker" "$tmp" --expect-k-sq 36 > "$tmp/bad-ksq.log" 2>&1; then
   echo "checker accepted a mismatched remote K_SQ" >&2
   exit 1
 fi

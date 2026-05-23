@@ -15,7 +15,7 @@ Defaults:
   --repo             current working directory
   --build-dir        /tmp/gm-lbsp-remote-smoke
   --verify-build-dir /tmp/gm-lbsp-remote-verify
-  --k-sq             36
+  --k-sq             26
   --out-dir          <repo>/tiles-maxxing/lb-source-propagation/artifacts/remote-smoke
 USAGE
 }
@@ -23,7 +23,7 @@ USAGE
 repo_dir="$(pwd)"
 build_dir="/tmp/gm-lbsp-remote-smoke"
 verify_build_dir="/tmp/gm-lbsp-remote-verify"
-k_sq="36"
+k_sq="26"
 out_dir=""
 
 while [[ $# -gt 0 ]]; do
