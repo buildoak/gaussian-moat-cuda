@@ -385,9 +385,13 @@ status explicit: accepted for this schedule, not accepted for a source claim
 until a claim-grade BZ gate exists. When the mixed target atom chain is present,
 `coordinate_path_obligation` also binds its first coordinate atom to a target
 row in `k26-prefix-witness.txt`; the remaining path blocker is the missing
-coordinate expansion of TileOp-port edges. `target_bridge_obligation` mirrors
-the continuation target bridge, so the gap also records whether the canonical
-endpoint was seen, bridged to TileOp ports, and source-reached.
+coordinate expansion of TileOp-port edges. The TileOp-port continuation also
+reports a compact `prefix_witness_path` summary for that first coordinate atom,
+so the gap checker can verify that the origin-to-row-0 prefix segment is backed
+by a valid coordinate source path before the mixed TileOp-port step begins.
+`target_bridge_obligation` mirrors the continuation target bridge, so the gap
+also records whether the canonical endpoint was seen, bridged to TileOp ports,
+and source-reached.
 When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
 checker before stopping on either a target-not-reached gap or the missing cert,

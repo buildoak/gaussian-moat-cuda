@@ -116,6 +116,14 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             ]["count"]["const"],
             14542615005,
         )
+        reached_path_obligation = reached_rule["properties"][
+            "coordinate_path_obligation"
+        ]["properties"]
+        self.assertTrue(
+            reached_path_obligation[
+                "origin_prefix_witness_path_available"
+            ]["const"]
+        )
 
         target_not_reached_rule = rules_by_blocker[
             "SOURCE_DEAD_CERT_TARGET_NOT_REACHED"
@@ -135,6 +143,14 @@ class SourcePropSchemaContractTest(unittest.TestCase):
         self.assertEqual(
             target_not_reached_rule["properties"]["target_atom_path"]["maxItems"],
             0,
+        )
+        target_not_reached_path = target_not_reached_rule["properties"][
+            "coordinate_path_obligation"
+        ]["properties"]
+        self.assertFalse(
+            target_not_reached_path[
+                "origin_prefix_witness_path_available"
+            ]["const"]
         )
         self.assertEqual(
             target_not_reached_rule["properties"][

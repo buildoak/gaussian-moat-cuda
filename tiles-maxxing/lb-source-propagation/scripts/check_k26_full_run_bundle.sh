@@ -630,6 +630,8 @@ require_grep '"coordinate_path_obligation":.*"required_provenance":"coordinate_g
   "K26 source-dead gap coordinate path obligation"
 require_grep '"coordinate_path_obligation":.*"origin_prefix_witness_artifact":"k26-prefix-witness.txt".*"origin_prefix_witness_target_atom_id":[0-9]+.*"origin_prefix_witness_accepted":true' "$gap" \
   "K26 source-dead gap origin-prefix witness obligation"
+require_grep '"coordinate_path_obligation":.*"origin_prefix_witness_path_available":true.*"origin_prefix_witness_path_target_atom_id":[0-9]+.*"origin_prefix_witness_path_points":[1-9][0-9]*.*"origin_prefix_witness_seed_norm_sq":[1-9][0-9]*.*"origin_prefix_witness_path_target_norm_sq":[1-9][0-9]*' "$gap" \
+  "K26 source-dead gap origin-prefix witness path obligation"
 require_grep '"target_bridge_obligation":.*"endpoint_atom_id":1615075207964004.*"observed_target_seen":true.*"observed_target_source_reached":true.*"observed_target_port_atoms":[1-9][0-9]*.*"observed_target_bridge_edges":[1-9][0-9]*.*"endpoint_bridge_accepted":true' "$gap" \
   "K26 source-dead gap target bridge obligation"
 require_grep '"terminal_inventory_obligation":.*"required_mode":"claim_grade_terminal_inventory".*"observed_mode":"summary_digest_only_non_claim".*"listed_inventory_present":false.*"claim_grade_inventory_accepted":false' "$gap" \
@@ -772,9 +774,24 @@ require_equal "${atom_path_counts##* }" "$gap_port_atom_count" \
 gap_prefix_atom_id="$(
   require_json_number_value "$gap" origin_prefix_witness_target_atom_id
 )"
+gap_prefix_path_atom_id="$(
+  require_json_number_value "$gap" origin_prefix_witness_path_target_atom_id
+)"
+gap_prefix_path_points="$(
+  require_json_number_value "$gap" origin_prefix_witness_path_points
+)"
+gap_prefix_seed_norm="$(
+  require_json_number_value "$gap" origin_prefix_witness_seed_norm_sq
+)"
 first_coordinate_atom="$(first_coordinate_atom_id "$gap_atom_path")"
 require_equal "$first_coordinate_atom" "$gap_prefix_atom_id" \
   "K26 gap origin-prefix witness target atom binding"
+require_equal "$gap_prefix_atom_id" "$gap_prefix_path_atom_id" \
+  "K26 gap origin-prefix witness path target binding"
+if [[ "$gap_prefix_path_points" == "0" || "$gap_prefix_seed_norm" -gt 26 ]]; then
+  echo "K26_FULL_RUN_BUNDLE_REJECT: K26 gap origin-prefix witness path seed binding" >&2
+  exit 1
+fi
 require_fixed "witness ${gap_prefix_atom_id} " "$out_dir/k26-prefix-witness.txt" \
   "K26 prefix witness target row binding"
 continuation_target_port_atoms="$(

@@ -35,7 +35,7 @@
     "accepted_for_schedule": true,
     "accepted_for_claim": false,
     "schedule_digest_algorithm": "sha256:lb_source_k26_repaired_bz_schedule_v1",
-    "schedule_digest_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+    "schedule_digest_hex": "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"
   },
   "target_path_provenance": "mixed_coordinate_port_atom_chain_non_claim",
   "target_atom_path_length": 3,
@@ -68,10 +68,23 @@
     "origin_prefix_witness_path_available": true,
     "origin_prefix_witness_path_target_atom_id": 1615075207963900,
     "origin_prefix_witness_path_points": 2,
-    "origin_prefix_witness_seed_norm_sq": 9,
+    "origin_prefix_witness_seed_norm_sq": 27,
     "origin_prefix_witness_path_target_norm_sq": 1031325872257
   },
   "terminal_source_inventory_summary": {
+    "count": 14542615005,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "max_norm_sq": 1031522101121,
+    "max_norm_atom_ids": [
+      1615075207964004
+    ]
+  },
+  "terminal_source_inventory_accumulator": {
+    "mode": "summary_digest_only_non_claim",
+    "provenance": "terminal_component_inventory_accumulator",
+    "listed_inventory_present": false,
+    "claim_grade_inventory_accepted": false,
     "count": 14542615005,
     "digest_algorithm": "sha256:lb_source_inventory_v1",
     "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -107,7 +120,7 @@
     "required_status": "claim_grade_bz_schedule",
     "observed_status": "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE",
     "observed_schedule_digest_algorithm": "sha256:lb_source_k26_repaired_bz_schedule_v1",
-    "observed_schedule_digest_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+    "observed_schedule_digest_hex": "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95",
     "accepted_for_schedule": true,
     "accepted_for_claim": false,
     "claim_grade_bz_accepted": false

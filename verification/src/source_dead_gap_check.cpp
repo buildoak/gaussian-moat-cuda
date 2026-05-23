@@ -467,8 +467,21 @@ std::string verify_gap(const nlohmann::json& gap) {
       require_field(path_obligation, "origin_prefix_witness_target_atom_id");
   const bool prefix_accepted =
       require_bool(path_obligation, "origin_prefix_witness_accepted");
+  const nlohmann::json& prefix_path_target = require_field(
+      path_obligation, "origin_prefix_witness_path_target_atom_id");
+  const bool prefix_path_available =
+      require_bool(path_obligation, "origin_prefix_witness_path_available");
+  const std::uint64_t prefix_path_points =
+      require_u64(path_obligation, "origin_prefix_witness_path_points");
+  const std::uint64_t prefix_seed_norm =
+      require_u64(path_obligation, "origin_prefix_witness_seed_norm_sq");
+  const std::uint64_t prefix_path_target_norm = require_u64(
+      path_obligation, "origin_prefix_witness_path_target_norm_sq");
   if (target_not_reached) {
-    if (!prefix_target.is_null() || prefix_accepted) {
+    if (!prefix_target.is_null() || prefix_accepted ||
+        !prefix_path_target.is_null() || prefix_path_available ||
+        prefix_path_points != 0 || prefix_seed_norm != 0 ||
+        prefix_path_target_norm != 0) {
       throw std::runtime_error(
           "target-not-reached gap must not accept origin-prefix witness");
     }
@@ -484,6 +497,26 @@ std::string verify_gap(const nlohmann::json& gap) {
     if (prefix_target.get<std::int64_t>() != atom_path.front()) {
       throw std::runtime_error(
           "origin-prefix witness target does not match first path atom");
+    }
+    if (!prefix_path_available) {
+      throw std::runtime_error(
+          "reached mixed path must carry origin-prefix witness path");
+    }
+    if (!prefix_path_target.is_number_integer() ||
+        prefix_path_target.get<std::int64_t>() !=
+            prefix_target.get<std::int64_t>()) {
+      throw std::runtime_error(
+          "origin-prefix witness path target does not match first path atom");
+    }
+    if (prefix_path_points == 0 || prefix_seed_norm == 0 ||
+        prefix_seed_norm > kSq) {
+      throw std::runtime_error("origin-prefix witness path has invalid seed");
+    }
+    const std::uint64_t first_path_norm =
+        coordinate_atom_norm_sq(prefix_target.get<std::int64_t>());
+    if (prefix_path_target_norm != first_path_norm) {
+      throw std::runtime_error(
+          "origin-prefix witness path target norm mismatch");
     }
   }
   if (!target_not_reached && port_atoms == 0) {

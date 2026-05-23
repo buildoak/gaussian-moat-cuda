@@ -212,6 +212,11 @@
         "origin_prefix_witness_artifact",
         "origin_prefix_witness_target_atom_id",
         "origin_prefix_witness_accepted",
+        "origin_prefix_witness_path_available",
+        "origin_prefix_witness_path_target_atom_id",
+        "origin_prefix_witness_path_points",
+        "origin_prefix_witness_seed_norm_sq",
+        "origin_prefix_witness_path_target_norm_sq",
         "per_port_coordinate_expansion",
         "claim_grade_path_accepted"
       ],
@@ -241,6 +246,24 @@
         },
         "origin_prefix_witness_accepted": {
           "type": "boolean"
+        },
+        "origin_prefix_witness_path_available": {
+          "type": "boolean"
+        },
+        "origin_prefix_witness_path_target_atom_id": {
+          "type": ["integer", "null"]
+        },
+        "origin_prefix_witness_path_points": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "origin_prefix_witness_seed_norm_sq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "origin_prefix_witness_path_target_norm_sq": {
+          "type": "integer",
+          "minimum": 0
         },
         "per_port_coordinate_expansion": { "const": "missing" },
         "claim_grade_path_accepted": { "const": false }
@@ -427,6 +450,25 @@
               "observed_port_atom_count": {
                 "type": "integer",
                 "minimum": 1
+              },
+              "origin_prefix_witness_path_available": {
+                "const": true
+              },
+              "origin_prefix_witness_path_target_atom_id": {
+                "type": "integer"
+              },
+              "origin_prefix_witness_path_points": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "origin_prefix_witness_seed_norm_sq": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 26
+              },
+              "origin_prefix_witness_path_target_norm_sq": {
+                "type": "integer",
+                "minimum": 1
               }
             }
           },
@@ -466,7 +508,12 @@
                 "const": "component_reachability_only"
               },
               "observed_coordinate_atom_count": { "const": 0 },
-              "observed_port_atom_count": { "const": 0 }
+              "observed_port_atom_count": { "const": 0 },
+              "origin_prefix_witness_path_available": { "const": false },
+              "origin_prefix_witness_path_target_atom_id": { "type": "null" },
+              "origin_prefix_witness_path_points": { "const": 0 },
+              "origin_prefix_witness_seed_norm_sq": { "const": 0 },
+              "origin_prefix_witness_path_target_norm_sq": { "const": 0 }
             }
           },
           "terminal_source_inventory_summary": {

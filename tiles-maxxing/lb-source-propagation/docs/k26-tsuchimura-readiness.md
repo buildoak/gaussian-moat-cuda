@@ -152,7 +152,11 @@ until the cert layer has a claim-grade BZ gate. When the mixed target atom chain
 is present, the gap also requires the first coordinate atom to be a target row
 in `k26-prefix-witness.txt`; the origin-prefix side is then bound, while the
 TileOp-port edges still need coordinate expansion before any `SOURCE_DEAD_CERT`
-claim. The same gap records a `target_bridge_obligation`
+claim. The continuation now preserves a compact `prefix_witness_path` summary
+for that first coordinate atom, and the gap binds it into
+`coordinate_path_obligation`; this verifies that the row-0 prefix segment starts
+from an origin source seed and ends at the first mixed-chain coordinate atom.
+The same gap records a `target_bridge_obligation`
 that mirrors whether the canonical endpoint was seen, bridged to TileOp ports,
 and source-reached. For chunked runs it also binds
 `k26-continuation-chunks.jsonl` by SHA-256, so the gap report carries the

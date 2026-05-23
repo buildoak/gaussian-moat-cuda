@@ -64,7 +64,12 @@
     "claim_grade_path_accepted": false,
     "origin_prefix_witness_artifact": "k26-prefix-witness.txt",
     "origin_prefix_witness_target_atom_id": 1,
-    "origin_prefix_witness_accepted": true
+    "origin_prefix_witness_accepted": true,
+    "origin_prefix_witness_path_available": true,
+    "origin_prefix_witness_path_target_atom_id": 1,
+    "origin_prefix_witness_path_points": 2,
+    "origin_prefix_witness_seed_norm_sq": 9,
+    "origin_prefix_witness_path_target_norm_sq": 1
   },
   "terminal_source_inventory_summary": {
     "count": 14542615005,

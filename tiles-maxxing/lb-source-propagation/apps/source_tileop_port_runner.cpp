@@ -77,10 +77,17 @@ struct PointKeyHash {
   }
 };
 
+struct PrefixWitnessPathSummary {
+  std::uint64_t path_points = 0;
+  std::uint64_t seed_norm_sq = 0;
+  std::uint64_t target_norm_sq = 0;
+};
+
 struct PrefixWitness {
   std::uint64_t k_sq = 0;
   std::uint64_t outer_radius = 0;
   std::set<lb_source::AtomId> target_ids;
+  std::map<lb_source::AtomId, PrefixWitnessPathSummary> path_by_target;
 };
 
 struct PortManifestBridgeResult {
@@ -630,6 +637,16 @@ PrefixWitness read_prefix_witness_or_die(const std::string& path) {
     }
     if (!witness.target_ids.insert(target_id).second) {
       fail_prefix_witness("duplicate witness target");
+    }
+    if (!witness.path_by_target
+             .emplace(target_id,
+                      PrefixWitnessPathSummary{
+                          .path_points = path_count,
+                          .seed_norm_sq = first_point.norm_sq,
+                          .target_norm_sq = last_point.norm_sq,
+                      })
+             .second) {
+      fail_prefix_witness("duplicate witness path target");
     }
   }
 
@@ -2013,6 +2030,29 @@ int main(int argc, char** argv) {
     std::cerr << "target source reachability lacks atom-chain provenance\n";
     return EXIT_FAILURE;
   }
+  std::optional<lb_source::AtomId> target_prefix_atom_id;
+  std::optional<PrefixWitnessPathSummary> target_prefix_path;
+  if (prefix_witness.has_value() && !target_atom_path.empty()) {
+    for (const lb_source::AtomId atom_id : target_atom_path) {
+      if (atom_id < 0) {
+        continue;
+      }
+      target_prefix_atom_id = atom_id;
+      break;
+    }
+    if (target_prefix_atom_id.has_value()) {
+      const auto path_it =
+          prefix_witness->path_by_target.find(*target_prefix_atom_id);
+      if (path_it != prefix_witness->path_by_target.end()) {
+        target_prefix_path = path_it->second;
+      }
+    }
+  }
+  if (target_source_reached && prefix_witness.has_value() &&
+      !target_prefix_path.has_value()) {
+    std::cerr << "target atom-chain lacks prefix witness path provenance\n";
+    return EXIT_FAILURE;
+  }
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_port_runner_v1\","
@@ -2103,6 +2143,27 @@ int main(int argc, char** argv) {
               << "\",\"atom_path_length\":" << target_atom_path.size()
               << ",\"atom_path\":";
     append_atom_id_array(std::cout, target_atom_path);
+    std::cout << ",\"prefix_witness_path\":{\"available\":"
+              << (target_prefix_path.has_value() ? "true" : "false")
+              << ",\"target_atom_id\":";
+    if (target_prefix_atom_id.has_value()) {
+      std::cout << *target_prefix_atom_id;
+    } else {
+      std::cout << "null";
+    }
+    std::cout << ",\"path_points\":"
+              << (target_prefix_path.has_value()
+                      ? target_prefix_path->path_points
+                      : 0)
+              << ",\"seed_norm_sq\":"
+              << (target_prefix_path.has_value()
+                      ? target_prefix_path->seed_norm_sq
+                      : 0)
+              << ",\"target_norm_sq\":"
+              << (target_prefix_path.has_value()
+                      ? target_prefix_path->target_norm_sq
+                      : 0)
+              << '}';
   }
   std::cout << "}"
             << ",\"accepted\":" << (accepted ? "true" : "false")
