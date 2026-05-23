@@ -431,19 +431,40 @@ continuation_digest="$("$build_dir/source_tileop_port_runner" \
   --target-a 376039 --target-b 943460 \
   | shasum -a 256 | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
 cat > "$cert" <<JSON
-{"schema":"lb_source_dead_cert_draft_v1","certificate_id":"k26-source-dead-cert-draft","profile_id":"k26-source-run-profile","metadata":{"source_mode":"ORIGIN_SOURCE","source_id":"omega","geometry_id":"SOURCE_ORIGIN_K26","commit_id":"abc123","build_id":"remote-test","bz_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","artifact_hash":"sha256:$continuation_digest"},"k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"endpoint_atom_id":1615075207964004,"source_path_provenance":"coordinate_gaussian_prime_path","source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]}}
+{"schema":"lb_source_dead_cert_draft_v1","certificate_id":"k26-source-dead-cert-draft","profile_id":"k26-source-run-profile","metadata":{"source_mode":"ORIGIN_SOURCE","source_id":"omega","geometry_id":"SOURCE_ORIGIN_K26","commit_id":"abc123","build_id":"remote-test","bz_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","artifact_hash":"sha256:$continuation_digest"},"k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"endpoint_atom_id":1615075207964004,"source_path_provenance":"coordinate_gaussian_prime_path","source_path":[{"a":0,"b":3,"norm_sq":9},{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]}}
 JSON
 
 fake_source_dead_checker="$tmp/fake-source-dead-checker"
 cat > "$fake_source_dead_checker" <<'SH'
 #!/usr/bin/env bash
-if grep -q '"proof_status":"SUMMARY_ONLY_NON_CLAIM"' "$1"; then
-  echo '{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}'
-elif grep -q '"terminal_source_inventory_summary":{"count":14542615005' "$1"; then
-  echo '{"status":"SOURCE_DEAD_CERT_DRAFT_PASS"}'
-else
-  exit 1
-fi
+set -euo pipefail
+python3 - "$1" <<'PY'
+import json
+import sys
+
+cert = json.loads(open(sys.argv[1]).read())
+if cert.get("proof_status") == "SUMMARY_ONLY_NON_CLAIM":
+    print('{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}')
+    raise SystemExit(0)
+
+if cert.get("schema") != "lb_source_dead_cert_draft_v1":
+    raise SystemExit(1)
+
+if cert.get("metadata", {}).get("geometry_id") == "SOURCE_ORIGIN_K26":
+    source_path = cert.get("source_path", [])
+    if len(source_path) < 2 or source_path[0].get("norm_sq", 10**30) > 26:
+        print(
+            "SOURCE_DEAD_CERT_DRAFT_REJECT: bad K26 origin path fixture",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+summary = cert.get("terminal_source_inventory_summary", {})
+if summary.get("count") == 14542615005:
+    print('{"status":"SOURCE_DEAD_CERT_DRAFT_PASS"}')
+else:
+    raise SystemExit(1)
+PY
 SH
 chmod +x "$fake_source_dead_checker"
 
@@ -482,6 +503,27 @@ grep -q 'k26-source-dead-gap.json' \
   "$checked_out/k26-full-run-artifacts.sha256"
 grep -q 'SOURCE_DEAD_GAP_NON_CLAIM_PASS' \
   "$checked_out/k26-source-dead-gap-check.log"
+
+bad_origin_path_cert="$tmp/bad-origin-path-cert.json"
+cp "$cert" "$bad_origin_path_cert"
+perl -0pi -e 's/"source_path":\[\{"a":0,"b":3,"norm_sq":9\},\{"a":376039,"b":943460,"norm_sq":1031522101121\}\]/"source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}]/' \
+  "$bad_origin_path_cert"
+bad_origin_path_out="$tmp/bad-origin-path"
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$bad_origin_path_out" \
+    --cert-in "$bad_origin_path_cert" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    >/tmp/k26-harness-bad-origin-path.out \
+    2>/tmp/k26-harness-bad-origin-path.err; then
+  echo "harness accepted a K26 source-dead cert whose path starts at endpoint" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_BUNDLE_CHECK_REJECTED' \
+  "$bad_origin_path_out/status.txt"
+grep -q 'source-dead checker did not accept draft cert' \
+  "$bad_origin_path_out/k26-full-run-bundle-check.log"
 
 checked_chunked_out="$tmp/checked-chunked"
 "$harness" \
