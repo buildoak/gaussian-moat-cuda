@@ -767,6 +767,18 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
       throw std::runtime_error(
           "summary-only inventory count is smaller than max-norm tie set");
     }
+    std::set<std::int64_t> source_path_atom_ids;
+    for (const Point& path_point : source_path) {
+      source_path_atom_ids.insert(coordinate_atom_id_for_point(path_point));
+      if (path_point.norm_sq > max_norm_sq) {
+        throw std::runtime_error(
+            "summary-only inventory max_norm_sq is below source_path");
+      }
+    }
+    if (count < source_path_atom_ids.size()) {
+      throw std::runtime_error(
+          "summary-only inventory count is smaller than source_path atom set");
+    }
     for (const std::int64_t id : ties) {
       if (coordinate_atom_norm_sq(id) != max_norm_sq) {
         throw std::runtime_error(
