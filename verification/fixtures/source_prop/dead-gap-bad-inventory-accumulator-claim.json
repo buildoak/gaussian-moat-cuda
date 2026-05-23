@@ -66,7 +66,7 @@
     "mode": "summary_digest_only_non_claim",
     "provenance": "terminal_component_inventory_accumulator",
     "listed_inventory_present": false,
-    "claim_grade_inventory_accepted": false,
+    "claim_grade_inventory_accepted": true,
     "count": 14542615005,
     "digest_algorithm": "sha256:lb_source_inventory_v1",
     "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

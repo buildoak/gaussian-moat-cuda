@@ -212,6 +212,42 @@
         }
       }
     },
+    "terminal_source_inventory_accumulator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "provenance",
+        "listed_inventory_present",
+        "claim_grade_inventory_accepted",
+        "count",
+        "digest_algorithm",
+        "digest_hex",
+        "max_norm_sq",
+        "max_norm_atom_ids"
+      ],
+      "properties": {
+        "mode": { "const": "summary_digest_only_non_claim" },
+        "provenance": {
+          "const": "terminal_component_inventory_accumulator"
+        },
+        "listed_inventory_present": { "const": false },
+        "claim_grade_inventory_accepted": { "const": false },
+        "count": { "type": "integer", "minimum": 1 },
+        "digest_algorithm": { "const": "sha256:lb_source_inventory_v1" },
+        "digest_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "max_norm_sq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1031522101121
+        },
+        "max_norm_atom_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "integer" }
+        }
+      }
+    },
     "terminal_inventory_obligation": {
       "type": "object",
       "additionalProperties": false,

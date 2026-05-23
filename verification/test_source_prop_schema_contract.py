@@ -193,6 +193,23 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             bridge_safety["required"],
         )
 
+    def test_source_dead_gap_schema_allows_non_claim_accumulator_binding(self) -> None:
+        schema = load_json(DEAD_GAP_SCHEMA_PATH)
+        self.assertNotIn("terminal_source_inventory_accumulator", schema["required"])
+        accumulator = schema["properties"]["terminal_source_inventory_accumulator"]
+        self.assertEqual(
+            accumulator["properties"]["mode"]["const"],
+            "summary_digest_only_non_claim",
+        )
+        self.assertEqual(
+            accumulator["properties"]["provenance"]["const"],
+            "terminal_component_inventory_accumulator",
+        )
+        self.assertEqual(
+            accumulator["properties"]["claim_grade_inventory_accepted"]["const"],
+            False,
+        )
+
     def test_source_dead_cert_schema_pins_hash_shape_and_k26_endpoint(self) -> None:
         schema = load_json(DEAD_CERT_SCHEMA_PATH)
         self.assertEqual(
@@ -265,6 +282,10 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             "SUMMARY_ONLY_NON_CLAIM",
         )
         self.assertIn(
+            "terminal_source_inventory_accumulator",
+            summary_rule["then"]["required"],
+        )
+        self.assertIn(
             "terminal_source_inventory",
             summary_rule["then"]["not"]["required"],
         )
@@ -272,6 +293,20 @@ class SourcePropSchemaContractTest(unittest.TestCase):
         listed_forbidden = summary_rule["else"]["not"]["anyOf"]
         self.assertIn({"required": ["proof_status"]}, listed_forbidden)
         self.assertIn({"required": ["non_claim"]}, listed_forbidden)
+        self.assertIn(
+            {"required": ["terminal_source_inventory_accumulator"]},
+            listed_forbidden,
+        )
+
+        accumulator = schema["properties"]["terminal_source_inventory_accumulator"]
+        self.assertEqual(
+            accumulator["properties"]["mode"]["const"],
+            "summary_digest_only_non_claim",
+        )
+        self.assertEqual(
+            accumulator["properties"]["claim_grade_inventory_accepted"]["const"],
+            False,
+        )
 
 
 if __name__ == "__main__":

@@ -39,6 +39,10 @@ const nlohmann::json& require_field(const nlohmann::json& object,
   return *it;
 }
 
+bool has_field(const nlohmann::json& object, const char* field) {
+  return object.find(field) != object.end();
+}
+
 std::string require_string(const nlohmann::json& object, const char* field) {
   const nlohmann::json& value = require_field(object, field);
   if (!value.is_string()) {
@@ -176,6 +180,56 @@ std::vector<std::int64_t> require_i64_array(const nlohmann::json& object,
     values.push_back(item.get<std::int64_t>());
   }
   return values;
+}
+
+std::vector<std::int64_t> sorted_i64_array(const nlohmann::json& object,
+                                           const char* field) {
+  std::vector<std::int64_t> values = require_i64_array(object, field);
+  std::sort(values.begin(), values.end());
+  return values;
+}
+
+void require_terminal_inventory_accumulator_shape(
+    const nlohmann::json& accumulator, const nlohmann::json& summary) {
+  if (require_string(accumulator, "mode") !=
+      "summary_digest_only_non_claim") {
+    throw std::runtime_error("unsupported terminal inventory accumulator mode");
+  }
+  if (require_string(accumulator, "provenance") !=
+      "terminal_component_inventory_accumulator") {
+    throw std::runtime_error(
+        "unsupported terminal inventory accumulator provenance");
+  }
+  if (require_bool(accumulator, "listed_inventory_present")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator must not report listed inventory");
+  }
+  if (require_bool(accumulator, "claim_grade_inventory_accepted")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator must be non-claim");
+  }
+  if (require_u64(accumulator, "count") != require_u64(summary, "count")) {
+    throw std::runtime_error("terminal inventory accumulator count mismatch");
+  }
+  if (require_string(accumulator, "digest_algorithm") !=
+      require_string(summary, "digest_algorithm")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator digest algorithm mismatch");
+  }
+  if (require_string(accumulator, "digest_hex") !=
+      require_string(summary, "digest_hex")) {
+    throw std::runtime_error("terminal inventory accumulator digest mismatch");
+  }
+  if (require_u64(accumulator, "max_norm_sq") !=
+      require_u64(summary, "max_norm_sq")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator max norm mismatch");
+  }
+  if (sorted_i64_array(accumulator, "max_norm_atom_ids") !=
+      sorted_i64_array(summary, "max_norm_atom_ids")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator max norm ties mismatch");
+  }
 }
 
 std::string verify_gap(const nlohmann::json& gap) {
@@ -378,6 +432,11 @@ std::string verify_gap(const nlohmann::json& gap) {
 
   const nlohmann::json& summary =
       require_object(gap, "terminal_source_inventory_summary");
+  if (has_field(gap, "terminal_source_inventory_accumulator")) {
+    require_terminal_inventory_accumulator_shape(
+        require_object(gap, "terminal_source_inventory_accumulator"),
+        summary);
+  }
   const std::uint64_t inventory_count = require_u64(summary, "count");
   if (!target_not_reached && inventory_count != kExpectedComponentSize) {
     throw std::runtime_error("terminal inventory count does not match Tsuchimura");

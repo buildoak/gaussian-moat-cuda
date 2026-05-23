@@ -551,6 +551,48 @@ std::vector<std::int64_t> require_summary_ties(const nlohmann::json& summary) {
   return expected_ties;
 }
 
+void require_terminal_inventory_accumulator_shape(
+    const nlohmann::json& accumulator, const nlohmann::json& summary) {
+  if (require_string(accumulator, "mode") !=
+      "summary_digest_only_non_claim") {
+    throw std::runtime_error("unsupported terminal inventory accumulator mode");
+  }
+  if (require_string(accumulator, "provenance") !=
+      "terminal_component_inventory_accumulator") {
+    throw std::runtime_error(
+        "unsupported terminal inventory accumulator provenance");
+  }
+  if (require_bool(accumulator, "listed_inventory_present")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator must not report listed inventory");
+  }
+  if (require_bool(accumulator, "claim_grade_inventory_accepted")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator must be non-claim");
+  }
+  if (require_u64(accumulator, "count") != require_u64(summary, "count")) {
+    throw std::runtime_error("terminal inventory accumulator count mismatch");
+  }
+  if (require_string(accumulator, "digest_algorithm") !=
+      require_string(summary, "digest_algorithm")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator digest algorithm mismatch");
+  }
+  if (require_string(accumulator, "digest_hex") !=
+      require_string(summary, "digest_hex")) {
+    throw std::runtime_error("terminal inventory accumulator digest mismatch");
+  }
+  if (require_u64(accumulator, "max_norm_sq") !=
+      require_u64(summary, "max_norm_sq")) {
+    throw std::runtime_error(
+        "terminal inventory accumulator max norm mismatch");
+  }
+  if (require_summary_ties(accumulator) != require_summary_ties(summary)) {
+    throw std::runtime_error(
+        "terminal inventory accumulator max norm ties mismatch");
+  }
+}
+
 bool has_i64(const std::vector<std::int64_t>& values, std::int64_t value) {
   return std::find(values.begin(), values.end(), value) != values.end();
 }
@@ -652,6 +694,9 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
       throw std::runtime_error(
           "summary_only_non_claim must not include listed inventory");
     }
+    require_terminal_inventory_accumulator_shape(
+        require_object(cert, "terminal_source_inventory_accumulator"),
+        summary);
     if (require_string(cert, "proof_status") != "SUMMARY_ONLY_NON_CLAIM") {
       throw std::runtime_error(
           "summary-only inventory requires SUMMARY_ONLY_NON_CLAIM proof_status");
@@ -699,6 +744,10 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   if (has_field(cert, "proof_status") || has_field(cert, "non_claim")) {
     throw std::runtime_error(
         "listed terminal inventory cert must not carry non-claim markers");
+  }
+  if (has_field(cert, "terminal_source_inventory_accumulator")) {
+    throw std::runtime_error(
+        "listed terminal inventory cert must not carry non-claim accumulator");
   }
 
   const std::vector<std::int64_t> inventory = require_inventory(cert);

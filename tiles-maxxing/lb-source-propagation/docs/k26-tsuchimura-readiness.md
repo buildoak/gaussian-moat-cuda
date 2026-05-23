@@ -110,7 +110,10 @@ diagnostic that never reaches the target is blocked by
 `SOURCE_DEAD_CERT_TARGET_NOT_REACHED`. If source carry is still live at
 `R_final`, the harness reports `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE`
 and does not write a source-dead gap. A `summary_only_non_claim` cert remains
-useful diagnostic shape evidence, but the bundle checker reports
+useful diagnostic shape evidence only when it also carries an explicit
+`terminal_source_inventory_accumulator` with
+`mode=summary_digest_only_non_claim` and
+`claim_grade_inventory_accepted=false`; the bundle checker reports
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM` instead
 of accepting the bundle.
 
@@ -484,6 +487,12 @@ guarded one-band Vast retry was attempted again with a 120-second offer wait.
 No RTX 4090 offer satisfied the active `$0.37/hr` cap; the nearest observed
 qualifying-market offer was about `$0.4000/hr`, `0.0300/hr` over cap. No Vast
 instance was created.
+
+After binding the explicit non-claim terminal accumulator contract at local
+head `7d1098a`, a dry-run Vast offer probe was attempted with the same
+`$0.37/hr` and `$1.50` caps. No RTX 4090 offer satisfied the cap; the nearest
+observed qualifying-market offer was `$0.6685/hr`, `0.2985/hr` over cap. No
+Vast instance was created.
 
 After any partial continuation, run:
 

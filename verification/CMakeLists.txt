@@ -90,6 +90,7 @@ set_tests_properties(source_dead_gap_fixture_target_not_reached_valid PROPERTIES
   PASS_REGULAR_EXPRESSION
     "\"status\":\"SOURCE_DEAD_GAP_NON_CLAIM_PASS\".*\"bridge_safety\":\"accepted_non_claim\".*\"coordinate_path_obligation\":\"blocked_target_not_reached\".*\"bz_schedule_obligation\":\"blocked_schedule_only_non_claim\".*\"terminal_inventory_obligation\":\"blocked_claim_grade_terminal_inventory\".*\"claim_grade\":false")
 foreach(bad_source_dead_cert
+    dead-cert-bad-accumulator-claim
     dead-cert-bad-artifact-hash
     dead-cert-bad-digest
     dead-cert-bad-endpoint-atom-id
@@ -123,6 +124,7 @@ foreach(bad_source_dead_gap
     dead-gap-bad-claim-status
     dead-gap-bad-endpoint-atom
     dead-gap-bad-endpoint-port-tile
+    dead-gap-bad-inventory-accumulator-claim
     dead-gap-bad-inventory-obligation-claim
     dead-gap-bad-inventory-obligation-digest
     dead-gap-bad-inventory-tie
