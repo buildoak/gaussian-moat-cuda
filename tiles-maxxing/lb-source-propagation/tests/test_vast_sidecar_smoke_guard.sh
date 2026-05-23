@@ -99,6 +99,21 @@ grep -q 'NO_QUALIFYING_OFFER' "$tmp/no-offer.log"
 grep -q '^search offers ' "$VAST_MOCK_LOG"
 
 : > "$VAST_MOCK_LOG"
+cat > "$tmp/failures.tsv" <<'EOF'
+timestamp_utc=2026-05-23T00:00:00Z reason=ssh_timeout offer_id=12345 host_id=777 instance_id=90001 branch=test head=test
+EOF
+PATH="$tmp/bin:$PATH" "$guard" \
+  --failure-ledger "$tmp/failures.tsv" \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26 \
+  > "$tmp/ledger-excluded.log"
+grep -q 'QUALIFYING_OFFER id=23456 host_id=888 dph=0.31' "$tmp/ledger-excluded.log"
+grep -q "FAILURE_LEDGER $tmp/failures.tsv" "$tmp/ledger-excluded.log"
+grep -q 'EXCLUDED_OFFER_IDS 12345' "$tmp/ledger-excluded.log"
+grep -q 'EXCLUDED_HOST_IDS 777' "$tmp/ledger-excluded.log"
+
+: > "$VAST_MOCK_LOG"
 set +e
 PATH="$tmp/bin:$PATH" "$guard" \
   --execute \
@@ -128,10 +143,12 @@ grep -q '^destroy instance 90002 -y' "$VAST_MOCK_LOG"
 
 : > "$VAST_MOCK_LOG"
 create_failure_status=0
+rm -f "$tmp/create-failures.tsv"
 PATH="$tmp/bin:$PATH" VAST_MOCK_CREATE_FALSE_FIRST=1 "$guard" \
   --execute \
   --run-remote-smoke \
   --destroy-on-exit \
+  --failure-ledger "$tmp/create-failures.tsv" \
   --max-create-attempts 2 \
   --max-dph 0.37 \
   --max-budget 1.50 \
@@ -148,6 +165,8 @@ grep -q 'CREATE_REPORTED_FAILURE id=90001 offer_id=12345' "$tmp/create-failure-r
 grep -q 'RETRYING_AFTER_CREATE_FAILURE offer_id=12345 next_attempt=2' "$tmp/create-failure-retry.log"
 grep -q 'EXCLUDED_OFFER_IDS 12345' "$tmp/create-failure-retry.log"
 grep -q 'EXCLUDED_HOST_IDS 777' "$tmp/create-failure-retry.log"
+grep -q 'reason=create_reported_failure offer_id=12345 host_id=777 instance_id=90001' "$tmp/create-failures.tsv"
+grep -q 'reason=ssh_timeout offer_id=23456 host_id=888 instance_id=90002' "$tmp/create-failures.tsv"
 grep -q '^create instance 12345 ' "$VAST_MOCK_LOG"
 grep -q '^create instance 23456 ' "$VAST_MOCK_LOG"
 grep -q '^destroy instance 90001 -y' "$VAST_MOCK_LOG"

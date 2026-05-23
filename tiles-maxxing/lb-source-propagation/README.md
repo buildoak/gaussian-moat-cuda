@@ -218,6 +218,7 @@ tiles-maxxing/lb-source-propagation/scripts/vast_sidecar_smoke_guard.sh \
   --k-sq 26 \
   --offer-wait-seconds 900 \
   --offer-poll-seconds 30 \
+  --failure-ledger tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-failures.tsv \
   --max-create-attempts 3 \
   --wait-ssh-seconds 600 \
   --ssh-poll-seconds 10
@@ -230,6 +231,8 @@ deploys the current tree, runs `remote_sidecar_smoke.sh`, pulls artifacts into
 and destroys the created instance on exit.
 When `--max-create-attempts` is greater than `1`, a timed-out SSH probe destroys
 the unready instance, excludes that offer id, and tries the next capped offer.
+With `--failure-ledger`, the guard also loads prior failed `offer_id`/`host_id`
+rows as exclusions and appends new create/SSH failures for future attempts.
 
 If a Vast offer or host repeatedly creates an instance whose advertised SSH
 port never opens, exclude it on the next attempt:

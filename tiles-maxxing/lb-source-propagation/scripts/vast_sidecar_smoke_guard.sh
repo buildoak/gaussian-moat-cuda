@@ -9,6 +9,7 @@ Usage:
                               [--offer-id ID] [--remote DIR] [--pull-dir DIR]
                               [--exclude-offer-id ID]
                               [--exclude-host-id ID]
+                              [--failure-ledger PATH]
                               [--offer-wait-seconds N]
                               [--offer-poll-seconds N]
                               [--max-create-attempts N]
@@ -30,6 +31,8 @@ SSH readiness during the current campaign.
 When --execute and --max-create-attempts is greater than one, SSH timeouts
 destroy the timed-out instance when --destroy-on-exit is supplied, exclude that
 offer id, and try the next capped offer.
+When --failure-ledger is supplied, prior offer_id/host_id rows are loaded as
+exclusions and new create/SSH failures are appended for future runs.
 
 Hard defaults from the LB source-propagation goal:
   --max-dph     0.37
@@ -56,6 +59,7 @@ stop_on_ssh_timeout=0
 run_remote_smoke=0
 destroy_on_exit=0
 created_instance_id=""
+failure_ledger=""
 exclude_offer_ids=()
 exclude_host_ids=()
 
@@ -95,6 +99,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --exclude-host-id)
       exclude_host_ids+=("$2")
+      shift 2
+      ;;
+    --failure-ledger)
+      failure_ledger="$2"
       shift 2
       ;;
     --offer-wait-seconds)
@@ -219,6 +227,71 @@ join_words() {
   local IFS=" "
   printf '%s\n' "$*"
 }
+
+append_unique_id() {
+  local array_name="$1"
+  local value="$2"
+  local current
+  [[ -z "$value" ]] && return
+  case "$array_name" in
+    exclude_offer_ids)
+      for current in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
+        [[ "$current" == "$value" ]] && return
+      done
+      exclude_offer_ids+=("$value")
+      ;;
+    exclude_host_ids)
+      for current in "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}"; do
+        [[ "$current" == "$value" ]] && return
+      done
+      exclude_host_ids+=("$value")
+      ;;
+    *)
+      echo "internal error: unknown exclusion array ${array_name}" >&2
+      exit 2
+      ;;
+  esac
+}
+
+load_failure_ledger() {
+  local line field offer host
+  [[ -z "$failure_ledger" || ! -f "$failure_ledger" ]] && return
+  while IFS= read -r line; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    offer=""
+    host=""
+    for field in $line; do
+      case "$field" in
+        offer_id=*) offer="${field#offer_id=}" ;;
+        host_id=*) host="${field#host_id=}" ;;
+      esac
+    done
+    if [[ -n "$offer" ]]; then
+      require_nonnegative_integer "$offer" "--failure-ledger offer_id"
+      append_unique_id exclude_offer_ids "$offer"
+    fi
+    if [[ -n "$host" && "$host" != "unknown" ]]; then
+      require_nonnegative_integer "$host" "--failure-ledger host_id"
+      append_unique_id exclude_host_ids "$host"
+    fi
+  done < "$failure_ledger"
+}
+
+record_failure_ledger() {
+  local reason="$1"
+  [[ -z "$failure_ledger" ]] && return
+  mkdir -p "$(dirname "$failure_ledger")"
+  printf 'timestamp_utc=%s reason=%s offer_id=%s host_id=%s instance_id=%s branch=%s head=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "$reason" \
+    "${selected_offer_id:-unknown}" \
+    "${selected_host_id:-unknown}" \
+    "${created_instance_id:-unknown}" \
+    "$local_branch" \
+    "$local_head" >> "$failure_ledger"
+}
+
+load_failure_ledger
 
 exclude_offer_ids_joined="$(join_words "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}")"
 exclude_host_ids_joined="$(join_words "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}")"
@@ -390,29 +463,8 @@ selected_soft_hours=""
 selected_host_id=""
 
 add_failed_selection_exclusions() {
-  local id seen
-  seen=0
-  for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
-    if [[ "$id" == "$selected_offer_id" ]]; then
-      seen=1
-      break
-    fi
-  done
-  if [[ "$seen" -eq 0 ]]; then
-    exclude_offer_ids+=("$selected_offer_id")
-  fi
-  if [[ -n "$selected_host_id" ]]; then
-    seen=0
-    for id in "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}"; do
-      if [[ "$id" == "$selected_host_id" ]]; then
-        seen=1
-        break
-      fi
-    done
-    if [[ "$seen" -eq 0 ]]; then
-      exclude_host_ids+=("$selected_host_id")
-    fi
-  fi
+  append_unique_id exclude_offer_ids "$selected_offer_id"
+  append_unique_id exclude_host_ids "$selected_host_id"
 }
 
 select_capped_offer() {
@@ -495,6 +547,9 @@ print_offer_plan() {
   if [[ -n "$exclude_host_ids_joined" ]]; then
     echo "EXCLUDED_HOST_IDS ${exclude_host_ids_joined}"
   fi
+  if [[ -n "$failure_ledger" ]]; then
+    echo "FAILURE_LEDGER ${failure_ledger}"
+  fi
 
   one_shot_wait_ssh_seconds="$wait_ssh_seconds"
   if [[ "$one_shot_wait_ssh_seconds" == "0" ]]; then
@@ -507,6 +562,9 @@ print_offer_plan() {
     --max-create-attempts "$max_create_attempts"
     --wait-ssh-seconds "$one_shot_wait_ssh_seconds"
     --ssh-poll-seconds "$ssh_poll_seconds")
+  if [[ -n "$failure_ledger" ]]; then
+    one_shot_cmd+=(--failure-ledger "$failure_ledger")
+  fi
   for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
     one_shot_cmd+=(--exclude-offer-id "$id")
   done
@@ -590,8 +648,9 @@ while (( attempt <= max_create_attempts )); do
     if [[ "$destroy_on_exit" -eq 1 && -n "$created_instance_id" ]]; then
       echo "DESTROYING_FAILED_CREATE_INSTANCE id=${created_instance_id}" >&2
       vastai destroy instance "$created_instance_id" -y >&2 || true
-      created_instance_id=""
     fi
+    record_failure_ledger "create_reported_failure"
+    created_instance_id=""
     if (( attempt < max_create_attempts )); then
       echo "RETRYING_AFTER_CREATE_FAILURE offer_id=${selected_offer_id} next_attempt=$((attempt + 1)) host_id=${selected_host_id:-unknown}"
       add_failed_selection_exclusions
@@ -610,8 +669,9 @@ while (( attempt <= max_create_attempts )); do
       if [[ "$destroy_on_exit" -eq 1 && -n "$created_instance_id" ]]; then
         echo "DESTROYING_UNREADY_INSTANCE id=${created_instance_id}" >&2
         vastai destroy instance "$created_instance_id" -y >&2 || true
-        created_instance_id=""
       fi
+      record_failure_ledger "ssh_timeout"
+      created_instance_id=""
       if (( attempt < max_create_attempts )); then
         echo "RETRYING_AFTER_SSH_TIMEOUT offer_id=${selected_offer_id} next_attempt=$((attempt + 1)) host_id=${selected_host_id:-unknown}"
         add_failed_selection_exclusions
