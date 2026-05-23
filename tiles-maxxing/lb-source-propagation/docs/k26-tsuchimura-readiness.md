@@ -275,7 +275,10 @@ k26_source_run_commands
 ```
 
 It emits the row-0 coordinate prefix command and the repaired TileOp-port
-continuation schedule. The row-0 prefix command targets the canonical-octant
+continuation schedule. Its bundle-harness block also names
+`k26-continuation-chunks.jsonl` as required acceptance evidence for checked
+chunked runs, matching the full bundle checker's ledger validation. The row-0
+prefix command targets the canonical-octant
 representative `376039 + 943460i`; the comparison back to Tsuchimura's
 `943460 + 376039i` is by Gaussian-unit and conjugation symmetry. The
 continuation command includes `--target-a 376039 --target-b 943460` and the

@@ -251,6 +251,8 @@ require_grep '"tileop_port_first_row_index":1' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile TileOp start row"
 require_grep '"execution_protocol":.*"recommended_continuation_chunk_bands":8.*"resume_existing_supported":true' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile chunked execution protocol"
+require_grep '"execution_protocol":.*"chunk_ledger":"k26-continuation-chunks.jsonl".*"chunk_ledger_required_for_checked_bundle":true' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile chunk ledger contract"
 require_grep 'full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile runner gap"
 
@@ -274,6 +276,8 @@ require_grep '"resume_existing_supported":true' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands resume support"
 require_grep '--continuation-chunk-bands 8 --resume-existing' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands resumable bundle harness"
+require_grep '"bundle_harness":.*"chunk_ledger":"k26-continuation-chunks.jsonl".*"chunk_ledger_required_for_checked_bundle":true' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands chunk ledger contract"
 require_grep '--target-a 376039 --target-b 943460' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands target bridge flags"
 

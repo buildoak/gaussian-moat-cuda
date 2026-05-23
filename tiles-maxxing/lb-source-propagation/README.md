@@ -446,8 +446,9 @@ That accepts the schedule evidence only; it is not `SOURCE_ORIGIN_K26` or
 shape: exact coordinate prefix for row `0`, then TileOp-port continuation for
 rows `1..123` from an origin-prefix manifest and witness. It also records the
 next concrete implementation gap: the TileOp-port runner can consume explicit
-variable boundaries through the bundle harness, but no accepted full K26 source
-run has completed that schedule yet.
+variable boundaries through the bundle harness, and checked chunked execution
+must include `k26-continuation-chunks.jsonl` as the validated chunk ledger, but
+no accepted full K26 source run has completed that schedule yet.
 
 ## Integration Boundary
 

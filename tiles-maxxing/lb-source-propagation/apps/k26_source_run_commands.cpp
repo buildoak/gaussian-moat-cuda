@@ -214,6 +214,8 @@ int main() {
             << "\"recommended_continuation_chunk_bands\":"
             << kRecommendedChunkBands
             << ",\"resume_existing_supported\":true,"
+            << "\"chunk_ledger\":\"k26-continuation-chunks.jsonl\","
+            << "\"chunk_ledger_required_for_checked_bundle\":true,"
             << "\"timeout_seconds\":1200,"
             << "\"command\":";
   emit_json_string(bundle_command);

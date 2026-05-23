@@ -117,6 +117,7 @@ int main() {
       "run exact coordinate prefix for row 0 and emit carry manifest plus prefix witness at radius 8192",
       "continue rows 1..123 with source_tileop_port_runner using the repaired variable boundary schedule",
       "run paid continuation through run_k26_full_source_bundle.sh with bounded chunks and --resume-existing retry support",
+      "produce k26-continuation-chunks.jsonl for chunked runs and require the full bundle checker to validate contiguous schedule coverage plus carry-manifest chaining",
       "seed continuation only from the origin-prefix carry manifest and prefix witness",
       "reject any TileOp overflow row",
       "bind repaired BZ schedule digest/evidence into profile metadata",
@@ -168,6 +169,8 @@ int main() {
             << "\"recommended_continuation_chunk_bands\":8,"
             << "\"resume_existing_supported\":true,"
             << "\"resume_existing_flag\":\"--resume-existing\","
+            << "\"chunk_ledger\":\"k26-continuation-chunks.jsonl\","
+            << "\"chunk_ledger_required_for_checked_bundle\":true,"
             << "\"timeout_status_prefix\":\"K26_FULL_RUN_BUNDLE_BLOCKED_\"},";
   emit_string_array("runner_requirements", kRunnerRequirements,
                     sizeof(kRunnerRequirements) /
