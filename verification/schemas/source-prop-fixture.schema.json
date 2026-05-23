@@ -105,7 +105,7 @@
       },
       "then": {
         "properties": {
-          "bands": { "minItems": 5, "maxItems": 10 }
+          "bands": { "minItems": 5, "maxItems": 20 }
         }
       }
     }

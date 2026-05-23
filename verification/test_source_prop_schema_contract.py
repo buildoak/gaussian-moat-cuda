@@ -28,7 +28,7 @@ def load_json(path: Path) -> dict:
 
 
 class SourcePropSchemaContractTest(unittest.TestCase):
-    def test_schema_pins_composed_band_count_guard_to_five_through_ten_bands(
+    def test_schema_pins_composed_band_count_guard_to_five_through_twenty_bands(
         self,
     ) -> None:
         schema = load_json(SCHEMA_PATH)
@@ -50,7 +50,7 @@ class SourcePropSchemaContractTest(unittest.TestCase):
 
         band_rule = matching_rules[0]["then"]["properties"]["bands"]
         self.assertEqual(band_rule["minItems"], 5)
-        self.assertEqual(band_rule["maxItems"], 10)
+        self.assertEqual(band_rule["maxItems"], 20)
 
     def test_composed_band_count_guard_fixtures_cover_lower_and_upper_gate(
         self,
@@ -58,6 +58,7 @@ class SourcePropSchemaContractTest(unittest.TestCase):
         expected_counts = {
             "composed-vs-big-equivalence.json": 5,
             "composed-ten-vs-big-equivalence.json": 10,
+            "composed-twenty-vs-big-equivalence.json": 20,
         }
         for name, band_count in expected_counts.items():
             with self.subTest(fixture=name):

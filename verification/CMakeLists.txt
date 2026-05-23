@@ -48,6 +48,7 @@ add_test(NAME no_campaign_includes
 
 foreach(source_prop_case
     composed-ten-vs-big-equivalence
+    composed-twenty-vs-big-equivalence
     composed-vs-big-equivalence
     false-weld
     k32-carry-width-minimum

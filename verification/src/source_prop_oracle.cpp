@@ -634,9 +634,9 @@ void validate_fixture(const Fixture& fixture) {
   }
 
   if (fixture.guards.contains("composed_band_count_guard")) {
-    if (fixture.bands.size() < 5 || fixture.bands.size() > 10) {
+    if (fixture.bands.size() < 5 || fixture.bands.size() > 20) {
       throw std::runtime_error(
-          "composed_band_count_guard requires 5 to 10 stitched bands");
+          "composed_band_count_guard requires 5 to 20 stitched bands");
     }
   }
 
