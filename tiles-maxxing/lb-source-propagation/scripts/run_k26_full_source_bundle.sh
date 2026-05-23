@@ -25,13 +25,15 @@ Artifacts written under OUT_DIR:
   k26-continuation-progress.jsonl
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
-  k26-source-dead-gap.json
+  k26-source-dead-gap.json, when the continuation reaches terminal source death
   k26-full-run-artifacts.sha256
   status.txt
 
 If --cert-in is supplied, it is copied to k26-source-dead-cert.json and the
-bundle checker is run. Without a cert, the script stops after the continuation
-with K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING.
+bundle checker is run. Without terminal source death, the script stops after
+the continuation with K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE. With
+terminal source death but no cert, it writes the source-dead gap and stops with
+K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING.
 USAGE
 }
 
@@ -278,6 +280,12 @@ json_number_value() {
   sed -nE "s/.*\"${field}\":([0-9]+).*/\\1/p" "$path" | head -n 1
 }
 
+json_bool_value() {
+  local path="$1"
+  local field="$2"
+  sed -nE "s/.*\"${field}\":(true|false).*/\\1/p" "$path" | head -n 1
+}
+
 json_array_value() {
   local path="$1"
   local field="$2"
@@ -431,6 +439,18 @@ run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
     --manifest-in "$out_dir/k26-prefix-manifest.txt" \
     --prefix-witness-in "$out_dir/k26-prefix-witness.txt" \
     --progress-out "$out_dir/k26-continuation-progress.jsonl"
+
+continuation_terminal_dead="$(
+  json_bool_value "$out_dir/k26-continuation-result.json" terminal_source_dead
+)"
+require_extracted "$continuation_terminal_dead" "TERMINAL_SOURCE_DEAD"
+if [[ "$continuation_terminal_dead" != "true" ]]; then
+  write_artifact_manifest
+  write_status "K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE"
+  echo "K26 full-run prefix and continuation artifacts were produced, but source carry still survives at R_final." >&2
+  echo "This is not a SOURCE_DEAD_CERT state; extend the terminal radius or inspect the live-source continuation." >&2
+  exit 3
+fi
 
 write_source_dead_gap
 check_source_dead_gap

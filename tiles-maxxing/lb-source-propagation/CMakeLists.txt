@@ -167,7 +167,7 @@ add_test(NAME k26_execution_plan
   COMMAND k26_execution_plan)
 set_tests_properties(k26_execution_plan PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 25/25"
+    "\"schema\":\"lb_source_k26_execution_plan_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"max_dph_usd\":0.37.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"repaired_boundary_count\":3.*\"max_abs_boundary_shift\":1.*\"band_count\":124.*\"last_band_width\":8029.*\"index\":123.*\"r_outer\":1015645.*local sidecar ctest 26/26"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_bz_schedule_check
@@ -285,7 +285,7 @@ add_test(NAME source_tileop_port_runner_smoke
     --seed-inner-flags)
 set_tests_properties(source_tileop_port_runner_smoke PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"port_atoms\":[1-9][0-9]*.*\"seam_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"manifest_written\":false"
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"port_atoms\":[1-9][0-9]*.*\"seam_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_carry_atoms\":[1-9][0-9]*.*\"manifest_written\":false"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_schedule_smoke
@@ -297,7 +297,7 @@ add_test(NAME source_tileop_port_runner_schedule_smoke
     --seed-inner-flags)
 set_tests_properties(source_tileop_port_runner_schedule_smoke PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"schedule_min_width\":127.*\"schedule_max_width\":137.*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"accepted\":true.*\"terminal_source_dead\":true"
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"schedule_min_width\":127.*\"schedule_max_width\":137.*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_carry_atoms\":[1-9][0-9]*"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_manifest_smoke
@@ -310,7 +310,7 @@ add_test(NAME source_tileop_port_runner_manifest_smoke
 set_tests_properties(source_tileop_port_runner_manifest_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"unbridged_coordinate_carry_atoms\":[0-9][0-9]*.*\"bridged_port_carry_atoms\":[1-9][0-9]*.*\"bridge_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"source_inventory_count\":[1-9][0-9]*.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\".*\"max_source_norm_sq\":[1-9][0-9]*.*\"manifest_written\":false"
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"unbridged_coordinate_carry_atoms\":[0-9][0-9]*.*\"bridged_port_carry_atoms\":[1-9][0-9]*.*\"bridge_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_carry_atoms\":[1-9][0-9]*.*\"source_inventory_count\":[1-9][0-9]*.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\".*\"max_source_norm_sq\":[1-9][0-9]*.*\"manifest_written\":false"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_target_smoke
@@ -325,7 +325,7 @@ add_test(NAME source_tileop_port_runner_target_smoke
 set_tests_properties(source_tileop_port_runner_target_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"target\":\\{\"enabled\":true,\"a\":0,\"b\":251,\"norm_sq\":63001,\"seen\":true,\"port_atoms\":[1-9][0-9]*,\"bridge_edges\":[1-9][0-9]*,\"source_reached\":true,\"path_provenance\":\"mixed_coordinate_port_atom_chain_non_claim\",\"atom_path_length\":[1-9][0-9]*,\"atom_path\":\\[[0-9,-]+\\]\\}.*\"accepted\":true.*\"terminal_source_dead\":true"
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"target\":\\{\"enabled\":true,\"a\":0,\"b\":251,\"norm_sq\":63001,\"seen\":true,\"port_atoms\":[1-9][0-9]*,\"bridge_edges\":[1-9][0-9]*,\"source_reached\":true,\"path_provenance\":\"mixed_coordinate_port_atom_chain_non_claim\",\"atom_path_length\":[1-9][0-9]*,\"atom_path\":\\[[0-9,-]+\\]\\}.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_manifest_full_bridge_reject
@@ -344,7 +344,7 @@ add_test(NAME source_tileop_port_runner_manifest_schedule_smoke
 set_tests_properties(source_tileop_port_runner_manifest_schedule_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\""
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\""
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 

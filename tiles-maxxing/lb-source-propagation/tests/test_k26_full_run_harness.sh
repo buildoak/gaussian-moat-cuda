@@ -152,6 +152,51 @@ grep -q 'timeout_seconds=1' "$timeout_out/status.txt"
 grep -q 'K26_CONTINUATION timed out after 1s' \
   /tmp/k26-harness-timeout.err
 
+live_build="$tmp/live-build"
+cp -R "$build_dir" "$live_build"
+cat > "$live_build/source_tileop_port_runner" <<'SH'
+#!/usr/bin/env bash
+progress=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --progress-out)
+      progress="$2"; shift 2 ;;
+    *)
+      shift ;;
+  esac
+done
+[[ -n "$progress" ]] && echo '{"schema":"lb_source_tileop_port_progress_v1","accepted":true}' > "$progress"
+cat <<'JSON'
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"source_unbridged_unsafe_candidate_atoms":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1]}
+JSON
+SH
+chmod +x "$live_build/source_tileop_port_runner"
+live_out="$tmp/live-out"
+if "$harness" \
+    --build-dir "$live_build" \
+    --out-dir "$live_out" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    >/tmp/k26-harness-live.out \
+    2>/tmp/k26-harness-live.err; then
+  echo "harness accepted a live-source K26 continuation as source-dead" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE' \
+  "$live_out/status.txt"
+grep -q 'source carry still survives at R_final' \
+  /tmp/k26-harness-live.err
+test -f "$live_out/k26-continuation-result.json"
+test -f "$live_out/k26-full-run-artifacts.sha256"
+if [[ -f "$live_out/k26-source-dead-gap.json" ]]; then
+  echo "live-source blocker unexpectedly wrote source-dead gap" >&2
+  exit 1
+fi
+if grep -q 'k26-source-dead-gap.json' \
+    "$live_out/k26-full-run-artifacts.sha256"; then
+  echo "live-source manifest unexpectedly included source-dead gap" >&2
+  exit 1
+fi
+
 blocked_out="$tmp/blocked"
 if "$harness" \
     --build-dir "$build_dir" \

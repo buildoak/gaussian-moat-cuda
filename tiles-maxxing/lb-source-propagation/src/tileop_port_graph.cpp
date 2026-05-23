@@ -181,7 +181,11 @@ TileOpPortGraphResult make_tileop_port_band(
         const bool source =
             input.seed_inner_flags && campaign::bit_test(op.inner_flags,
                                                          port.label);
-        result.band.atoms.push_back({port.id, atom_norm, source});
+        result.band.atoms.push_back(
+            {.id = port.id,
+             .norm_sq = atom_norm,
+             .certified_source = source,
+             .allow_outer_overshoot_carry = true});
         ++result.port_atoms;
 
         auto [it, inserted] = first_port_by_label.emplace(port.label, port.id);

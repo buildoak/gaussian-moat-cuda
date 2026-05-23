@@ -327,13 +327,15 @@ remaining certificate obligations. `bridge_safety` records the
 `source_unbridged_unsafe_candidate_atoms == 0` bridge condition.
 `coordinate_path_obligation` records why the observed target evidence is not a
 coordinate Gaussian-prime source path. For a reached diagnostic target, the
-blocker is the mixed coordinate/TileOp-port atom chain. For the current local
-K26 run, the target is not reached before the source component dies, so the
-blocker is `SOURCE_DEAD_CERT_TARGET_NOT_REACHED`. `terminal_inventory_obligation`
-records that the observed inventory is still summary-digest non-claim evidence
-and must be promoted to claim-grade terminal inventory provenance. The gap
-artifact also binds the repaired K26 BZ schedule digest as schedule-only,
-non-claim evidence.
+blocker is the mixed coordinate/TileOp-port atom chain. For a terminal
+diagnostic where the target was not reached, the blocker is
+`SOURCE_DEAD_CERT_TARGET_NOT_REACHED`. If source carry is still live at the
+requested terminal radius, the harness stops earlier with
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE` and does not write a
+source-dead gap. `terminal_inventory_obligation` records that the observed
+inventory is still summary-digest non-claim evidence and must be promoted to
+claim-grade terminal inventory provenance. The gap artifact also binds the
+repaired K26 BZ schedule digest as schedule-only, non-claim evidence.
 When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
 checker before stopping on the missing cert, and mirrors the checker status
@@ -349,20 +351,21 @@ after expensive continuation stages (`manifest_read`, `prefix_witness_read`,
 `grid_build`, `tileop_build`, `port_graph`, `target_bridge`,
 `manifest_bridge`, and `source_process`) as well as completed-band rows. A
 timeout can therefore identify the active phase even when no continuation band
-has finished yet. The current local K26 bundle completes the prefix row in
-about 25 seconds and the first continuation band `8192 -> 16384` in about 32
-seconds on 12 local worker threads. That continuation reports
-`terminal_source_dead=true`, `target.seen=false`, `target.source_reached=false`,
-`source_inventory_count=2022302`, and
-`source_unbridged_unsafe_candidate_atoms=0`, then stops as the diagnostic
-non-claim blocker `SOURCE_DEAD_CERT_TARGET_NOT_REACHED`. The TileOp build loop
-is parallelized only inside this sidecar runner with standard C++ worker
+has finished yet. The current local K26 two-band probe completes
+`8192 -> 16384` in about 31 seconds and `16384 -> 24576` in about 16 seconds on
+12 local worker threads after enabling overhanging TileOp port support carry.
+It reports `terminal_source_dead=false`, `has_source_carry=true`, and
+`source_carry_atoms=2337` at `R=24576`. This corrected an earlier false
+terminal diagnostic at `R=16384`; the previous
+`SOURCE_DEAD_CERT_TARGET_NOT_REACHED` artifact remains a valid gap shape, but
+it is no longer the current local K26 continuation result. The TileOp build
+loop is parallelized only inside this sidecar runner with standard C++ worker
 threads, preserving the deterministic output order and reporting
 `tileop_worker_threads` in progress/final JSON. Use `--tileop-threads N` to pin
 the worker count, or `--tileop-threads 0` for hardware auto. This does not
 alter the underlying TileOp implementation or any existing campaign verdict
-semantics. The target-not-reached evidence is diagnostic runtime evidence, not
-a `SOURCE_ORIGIN_K26` claim.
+semantics. Live-source continuation evidence is diagnostic runtime evidence,
+not a `SOURCE_ORIGIN_K26` claim.
 If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
 the hash manifest, and runs the full bundle checker with the supplied
 `--source-dead-checker`.

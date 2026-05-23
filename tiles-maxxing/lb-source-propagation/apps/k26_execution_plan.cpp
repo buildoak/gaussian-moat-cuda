@@ -146,16 +146,16 @@ int main() {
       lb_source::k26_bz::repaired_schedule_digest_hex(nominal, repaired);
 
   constexpr const char* kPreRunGates[] = {
-      "local sidecar ctest 25/25",
-      "local independent verification ctest 72/72",
-      "remote 4090 smoke with sidecar ctest 25/25 and verification ctest 72/72",
+      "local sidecar ctest 26/26",
+      "local independent verification ctest 73/73",
+      "remote 4090 smoke with sidecar ctest 26/26 and verification ctest 73/73",
       "accepted K26 repaired BZ schedule evidence for every source/origin proof row",
       "accepted coordinate-to-port seam bridge theorem or diagnostic label",
       "accepted terminal inventory count/digest/max-norm handling at 14.5B scale"};
   constexpr const char* kCurrentBlockers[] = {
       "remote 4090 smoke has not passed on current head under the active price cap",
-      "full-run K26 bundle harness is wired but has not produced accepted artifacts",
-      "source_tileop_port_runner can consume explicit variable boundaries, but the repaired K26 schedule has not completed under budget",
+      "full-run K26 bundle harness is wired but currently times out locally before the repaired schedule completes",
+      "source_tileop_port_runner can consume explicit variable boundaries and keeps K26 source carry live through early continuation bands, but the repaired K26 schedule has not completed under budget",
       "K26 repaired BZ schedule is bound into a draft run profile but not yet an executed full-run profile",
       "coordinate-to-port seam bridge remains diagnostic",
       "TileOp-port target reachability currently has mixed atom-chain provenance, not coordinate source-path provenance",

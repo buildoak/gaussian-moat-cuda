@@ -70,8 +70,9 @@ bool lexicographic_component_less(const std::vector<AtomId>& a,
 }
 
 bool in_final_carry_window(std::uint64_t norm_sq, std::uint64_t outer_radius,
-                           std::uint64_t carry_width) {
-  if (norm_sq > outer_radius * outer_radius) {
+                           std::uint64_t carry_width,
+                           bool allow_outer_overshoot) {
+  if (!allow_outer_overshoot && norm_sq > outer_radius * outer_radius) {
     return false;
   }
   const std::uint64_t inner_radius =
@@ -812,7 +813,7 @@ ProcessResult process_band(const BandInput& band,
       const auto existing = index_by_id.find(atom.id);
       if (existing == index_by_id.end()) {
         const std::size_t idx = all_atoms.size();
-        all_atoms.push_back({atom.id, atom.norm_sq, false});
+        all_atoms.push_back({atom.id, atom.norm_sq, false, false});
         index_by_id.emplace(atom.id, idx);
       } else if (all_atoms[existing->second].norm_sq != atom.norm_sq) {
         return reject(RejectReason::kMalformed,
@@ -942,8 +943,9 @@ ProcessResult process_band(const BandInput& band,
     norm_by_id.emplace(all_atoms[i].id, all_atoms[i].norm_sq);
     const std::size_t root = dsu.find(i);
     inventory_by_root[root].push_back(all_atoms[i].id);
-    if (in_final_carry_window(all_atoms[i].norm_sq, band.outer_radius,
-                              carry_width)) {
+    if (in_final_carry_window(
+            all_atoms[i].norm_sq, band.outer_radius, carry_width,
+            all_atoms[i].allow_outer_overshoot_carry)) {
       carry_by_root[root].push_back(all_atoms[i].id);
     }
   }

@@ -91,6 +91,17 @@ partition plus source bits preserves exactly what the prefix proved.
 The implementation also carries `component_inventory` so terminal death can
 report the retired source component after non-carry atoms have been compacted.
 
+For coordinate atoms the carry predicate is the literal final guard
+`[R - ceil(sqrt(K)), R]`. TileOp port atoms are abstract tile-support atoms,
+not point primes. Their stable identity is the TileOp `(tile, face, ordinal)`,
+and their stable radial support may overshoot the current band's `R` when the
+same tile/port is needed to overlap the next independently tiled band. The
+sidecar therefore allows TileOp port atoms, and only those abstract support
+atoms, to remain carry-eligible when their stable support norm is above
+`R^2` but still above the lower guard threshold. This preserves stable port
+identity across independently built bands without weakening coordinate-source
+terminal death.
+
 ## Lemma 3: No-Rewire
 
 When the next band is processed, the incoming separator components may be wired
@@ -132,6 +143,12 @@ source-connected component intersects the final carry window
 `[R - ceil(sqrt(K)), R]`. If there is no such source carry component, no future
 prime outside radius `R` can be adjacent to the retired source component,
 because every allowed edge has length at most `sqrt(K)`.
+
+For TileOp-port continuation, "intersects the final carry window" is evaluated
+through the abstract support rule above: a source-connected TileOp port with
+stable tile support beyond `R` is still live evidence for the next band, not
+proof of terminal death. Treating such an overhanging port as dead would create
+a false terminal certificate at a band boundary.
 
 For a coordinate-prefix to TileOp-port continuation, an unbridged coordinate
 carry atom needs one more distinction:

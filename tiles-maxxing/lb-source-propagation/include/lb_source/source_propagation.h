@@ -33,6 +33,7 @@ struct BandAtom {
   AtomId id = 0;
   std::uint64_t norm_sq = 0;
   bool certified_source = false;
+  bool allow_outer_overshoot_carry = false;
 };
 
 struct BandInput {

@@ -174,6 +174,34 @@ void test_port_graph_reaches_adjacent_tile() {
       result.outgoing, port_id(0, 1, campaign::Face::O, 0)));
 }
 
+void test_port_graph_carries_outer_support_overshoot() {
+  campaign::TileOp lower{};
+  add_port(lower, campaign::Face::I, 1);
+  add_port(lower, campaign::Face::O, 1);
+  campaign::bit_set(lower.inner_flags, 1);
+
+  campaign::TileOp upper{};
+  add_port(upper, campaign::Face::I, 2);
+  add_port(upper, campaign::Face::O, 2);
+
+  const lb_source::TileOpPortGraphResult graph =
+      lb_source::make_tileop_port_band({
+          .k_sq = campaign::k_sq_value,
+          .outer_radius = 512,
+          .coords = {coord(0, 0), coord(0, 1)},
+          .tileops = {lower, upper},
+          .seed_inner_flags = true,
+      });
+  CHECK_TRUE(graph.accepted());
+
+  const lb_source::ProcessResult result =
+      lb_source::process_band(graph.band, std::nullopt);
+  CHECK_TRUE(result.accepted());
+  CHECK_TRUE(!result.terminal_source_dead);
+  CHECK_TRUE(component_has_source(
+      result.outgoing, port_id(0, 1, campaign::Face::O, 0)));
+}
+
 void test_port_graph_rejects_port_count_mismatch() {
   campaign::TileOp lower{};
   add_port(lower, campaign::Face::O, 1);
@@ -283,6 +311,8 @@ void run(const char* name, void (*fn)()) {
 int main() {
   run("port_graph_reaches_adjacent_tile",
       test_port_graph_reaches_adjacent_tile);
+  run("port_graph_carries_outer_support_overshoot",
+      test_port_graph_carries_outer_support_overshoot);
   run("port_graph_rejects_port_count_mismatch",
       test_port_graph_rejects_port_count_mismatch);
   run("port_graph_overflow_forces_source_reject",
