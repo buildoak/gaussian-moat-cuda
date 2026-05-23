@@ -293,6 +293,7 @@ cd /workspace/gaussian-moat-cuda
 tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh \
   --repo /workspace/gaussian-moat-cuda \
   --build-dir /tmp/gm-lbsp-remote-k26 \
+  --verify-build-dir /tmp/gm-lbsp-remote-k26-verify \
   --out-dir /workspace/lb-source-k26-timing-probe \
   --chunk-bands 1 \
   --timeout-seconds 1200 \
@@ -300,13 +301,16 @@ tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh \
   --tileop-threads 0
 ```
 
-This builds the sidecar with `-DK_SQ=26`, runs the chunked K26 bundle harness,
-keeps resume artifacts, and records runtime-budget diagnostics. The remote
-timing default uses one-band chunks so the per-chunk budget gate can stop a
-bad paid host after the first completed continuation band. A
-`K26_FULL_RUN_BUNDLE_BLOCKED_*` status is acceptable timing evidence for this
-probe. It is not a `SOURCE_DEAD_CERT`, not a sqrt(26) reproduction, and not a
-moat result.
+This builds the sidecar with `-DK_SQ=26`, builds the independent
+`source_dead_gap_check` and `source_dead_cert_check` verifier binaries, passes
+those checker paths into the chunked K26 bundle harness, keeps resume
+artifacts, and records runtime-budget diagnostics. The remote timing default
+uses one-band chunks so the per-chunk budget gate can stop a bad paid host
+after the first completed continuation band. A `K26_FULL_RUN_BUNDLE_BLOCKED_*`
+status is acceptable timing evidence for this probe. If the run reaches a
+terminal or target condition, this path exercises the auto-generated
+`SUMMARY_ONLY_NON_CLAIM` source-death summary contract, but it is still not a
+`SOURCE_DEAD_CERT`, not a sqrt(26) reproduction, and not a moat result.
 
 The full-run bundle gate is:
 
@@ -480,6 +484,10 @@ without `--cert-in`, the bundle harness generates
 prefix witness plus full coordinate-port expansion paths, then runs the full
 bundle checker. This is the default checked path for naming the next K26
 blocker, not an accepted source-death certificate.
+The remote K26 timing probe builds the verifier binaries in a separate
+verification build directory and passes both checker paths automatically, so a
+paid timing or terminal probe cannot silently fall back to the unchecked
+missing-certificate path.
 If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
 the hash manifest, and runs the full bundle checker with the supplied
 `--source-dead-checker`.

@@ -201,6 +201,10 @@ add_test(NAME vast_sidecar_smoke_guard
     ${CMAKE_CURRENT_SOURCE_DIR}/scripts/vast_sidecar_smoke_guard.sh)
 set_tests_properties(vast_sidecar_smoke_guard PROPERTIES
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/../..)
+add_test(NAME remote_k26_timing_probe
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_remote_k26_timing_probe.sh
+    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/remote_k26_timing_probe.sh)
 add_test(NAME k26_full_run_bundle_checker
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_k26_full_run_bundle_checker.sh

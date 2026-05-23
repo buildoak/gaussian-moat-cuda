@@ -642,6 +642,14 @@ before launching the next chunk.
 Remote timing probes therefore default to `--chunk-bands 1`, while the full
 bundle command contract can still use larger chunks such as `8` for resumable
 execution when the runtime profile is already known to be acceptable.
+The remote timing probe also builds the independent `source_dead_gap_check`
+and `source_dead_cert_check` verifier binaries in its own verification build
+directory, then passes both paths into the bundle harness. That means a paid
+one-band, resumed, terminal, or target-reaching probe exercises the same
+auto-generated `SUMMARY_ONLY_NON_CLAIM` source-death summary contract as the
+local checked bundle path, instead of stopping at the older unchecked
+missing-certificate blocker. This still remains diagnostic unless a future
+artifact satisfies the full `SOURCE_DEAD_CERT` checker.
 
 ## Stop Conditions
 

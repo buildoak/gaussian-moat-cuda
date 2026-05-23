@@ -4,7 +4,8 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  remote_k26_timing_probe.sh [--repo DIR] [--build-dir DIR] [--out-dir DIR]
+  remote_k26_timing_probe.sh [--repo DIR] [--build-dir DIR]
+                             [--verify-build-dir DIR] [--out-dir DIR]
                              [--chunk-bands N]
                              [--timeout-seconds N]
                              [--max-runtime-seconds N]
@@ -12,8 +13,9 @@ Usage:
 
 Run a bounded, non-claim sqrt(26) source/origin timing probe on a remote host.
 This performs no Vast API actions. It builds the LB source-propagation sidecar
-with -DK_SQ=26, runs the chunked K26 bundle harness with resume support, records
-runtime-budget diagnostics, and preserves all artifacts under OUT_DIR.
+with -DK_SQ=26, builds the independent source-dead verifier checkers, runs the
+chunked K26 bundle harness with resume support, records runtime-budget
+diagnostics, and preserves all artifacts under OUT_DIR.
 
 Expected nonzero harness blockers such as continuation timeout, runtime limit,
 source still live, missing source-dead cert, or target not reached are accepted
@@ -23,6 +25,7 @@ not claim a moat result.
 Defaults:
   --repo                current working directory
   --build-dir           /tmp/gm-lbsp-remote-k26
+  --verify-build-dir    /tmp/gm-lbsp-remote-k26-verify
   --out-dir             /workspace/lb-source-k26-timing-probe
   --chunk-bands         1
   --timeout-seconds     1200
@@ -33,6 +36,7 @@ USAGE
 
 repo_dir="$(pwd)"
 build_dir="/tmp/gm-lbsp-remote-k26"
+verify_build_dir="/tmp/gm-lbsp-remote-k26-verify"
 out_dir="/workspace/lb-source-k26-timing-probe"
 chunk_bands="1"
 timeout_seconds="1200"
@@ -47,6 +51,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --build-dir)
       build_dir="$2"
+      shift 2
+      ;;
+    --verify-build-dir)
+      verify_build_dir="$2"
       shift 2
       ;;
     --out-dir)
@@ -110,6 +118,11 @@ if [[ ! -f "$sidecar_dir/CMakeLists.txt" ]]; then
   echo "sidecar CMakeLists.txt not found at $sidecar_dir" >&2
   exit 2
 fi
+verification_dir="$repo_dir/verification"
+if [[ ! -f "$verification_dir/CMakeLists.txt" ]]; then
+  echo "verification CMakeLists.txt not found at $verification_dir" >&2
+  exit 2
+fi
 
 mkdir -p "$out_dir"
 
@@ -117,6 +130,8 @@ mkdir -p "$out_dir"
   echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "hostname=$(hostname)"
   echo "repo=$repo_dir"
+  echo "sidecar_build_dir=$build_dir"
+  echo "verification_build_dir=$verify_build_dir"
   echo "commit=$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null || echo unknown)"
   echo "branch=$(git -C "$repo_dir" branch --show-current 2>/dev/null || echo unknown)"
   echo "k_sq=26"
@@ -138,6 +153,19 @@ cmake -S "$sidecar_dir" -B "$build_dir" -DK_SQ=26 \
 cmake --build "$build_dir" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)" \
   | tee "$out_dir/cmake-build.log"
 
+cmake -S "$verification_dir" -B "$verify_build_dir" \
+  | tee "$out_dir/verification-cmake-configure.log"
+cmake --build "$verify_build_dir" --target source_dead_gap_check source_dead_cert_check \
+  -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)" \
+  | tee "$out_dir/verification-cmake-build.log"
+
+source_dead_gap_checker="$verify_build_dir/source_dead_gap_check"
+source_dead_checker="$verify_build_dir/source_dead_cert_check"
+if [[ ! -x "$source_dead_gap_checker" || ! -x "$source_dead_checker" ]]; then
+  echo "source-dead verifier checkers were not built under $verify_build_dir" >&2
+  exit 1
+fi
+
 set +e
 "$sidecar_dir/scripts/run_k26_full_source_bundle.sh" \
   --build-dir "$build_dir" \
@@ -147,6 +175,8 @@ set +e
   --timeout-seconds "$timeout_seconds" \
   --max-runtime-seconds "$max_runtime_seconds" \
   --tileop-threads "$tileop_threads" \
+  --source-dead-gap-checker "$source_dead_gap_checker" \
+  --source-dead-checker "$source_dead_checker" \
   > "$out_dir/k26-bundle-harness.log" \
   2> "$out_dir/k26-bundle-harness.err"
 harness_status="$?"
