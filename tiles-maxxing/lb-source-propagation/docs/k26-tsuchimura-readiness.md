@@ -583,6 +583,21 @@ window, so no deploy or remote smoke ran. Because the attempt used
 `--destroy-on-exit`, the guard destroyed the unready instance. A final
 `vastai show instances --raw` returned `[]`.
 
+After recording the SSH-timeout attempt at local head `73c6417`, a guarded
+retry excluded host `53663` and enabled
+`tiles-maxxing/lb-source-propagation/artifacts/vast-k26-failures.ledger`.
+It selected RTX 4090 offer `28429701` on host `1647` at `$0.3347/hr`, inside
+the cap, created instance `37461974`, waited for SSH readiness, deployed the
+current tree, and ran the one-shot remote smoke. The smoke passed and
+`--destroy-on-exit` destroyed the instance. Pulled artifacts under
+`tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull/` record
+`deployed_local_head=73c6417`, `REMOTE_SIDECAR_SMOKE_PASS`, sidecar CTest
+`28/28`, independent verification CTest `86/86`, and
+`REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS`. A final `vastai show instances --raw`
+returned `[]`. This satisfies the Phase 1 remote build/smoke gate for the
+auto-summary certificate contract, but remains non-claim: it is not a
+sqrt(26) source/origin run and not a moat result.
+
 After any partial continuation, run:
 
 ```bash
