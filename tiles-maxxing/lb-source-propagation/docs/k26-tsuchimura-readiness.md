@@ -658,6 +658,12 @@ auto-generated `SUMMARY_ONLY_NON_CLAIM` source-death summary contract as the
 local checked bundle path, instead of stopping at the older unchecked
 missing-certificate blocker. This still remains diagnostic unless a future
 artifact satisfies the full `SOURCE_DEAD_CERT` checker.
+Pulled timing-probe artifacts must pass
+`check_remote_k26_timing_artifacts.sh`, which verifies deployed-source
+provenance, checker wiring, runtime-budget diagnostics for any progress rows,
+and non-claim status. The Vast guard invokes this checker automatically for
+`--run-k26-timing-probe`, so future paid timing pulls are accepted by an
+artifact contract rather than by status-file presence alone.
 
 ## Stop Conditions
 

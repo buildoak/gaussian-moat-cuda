@@ -311,6 +311,19 @@ status is acceptable timing evidence for this probe. If the run reaches a
 terminal or target condition, this path exercises the auto-generated
 `SUMMARY_ONLY_NON_CLAIM` source-death summary contract, but it is still not a
 `SOURCE_DEAD_CERT`, not a sqrt(26) reproduction, and not a moat result.
+After pulling timing artifacts from a rented host, validate them with:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/check_remote_k26_timing_artifacts.sh \
+  tiles-maxxing/lb-source-propagation/artifacts/vast-k26-timing-pull \
+  --expect-head <local-head> \
+  --expect-branch ttc/lb-source-propagation
+```
+
+The Vast guard runs this checker automatically for `--run-k26-timing-probe`.
+It requires deployed-source provenance, source-dead checker wiring, runtime
+budget diagnostics when progress exists, non-claim status, and no claim-pass
+tokens in the pulled artifacts.
 
 The full-run bundle gate is:
 

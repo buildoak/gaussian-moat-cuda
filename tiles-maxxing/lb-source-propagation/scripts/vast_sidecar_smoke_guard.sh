@@ -535,23 +535,11 @@ run_remote_k26_timing_probe_gate() {
   "${ssh_cmd[@]}" "cd /workspace/lb-source-k26-timing-probe && tar -czf - ." |
     tar -xzf - -C "$pull_dir"
 
-  if [[ ! -f "$pull_dir/remote-k26-timing-probe-status.txt" ]]; then
-    echo "missing pulled remote K26 timing probe status" >&2
-    exit 1
-  fi
-  if [[ ! -f "$pull_dir/status.txt" ]]; then
-    echo "missing pulled K26 bundle status" >&2
-    exit 1
-  fi
-  if ! grep -q '^REMOTE_K26_TIMING_PROBE_PASS$' \
-      "$pull_dir/remote-k26-timing-probe-status.txt"; then
-    echo "remote K26 timing probe status did not pass" >&2
-    exit 1
-  fi
-  if ! grep -Eq '^K26_FULL_RUN_BUNDLE_(BLOCKED_|PASS)' "$pull_dir/status.txt"; then
-    echo "unexpected K26 bundle status in pulled timing probe" >&2
-    exit 1
-  fi
+  echo "CHECKING_REMOTE_K26_TIMING_ARTIFACTS id=${instance_id}"
+  tiles-maxxing/lb-source-propagation/scripts/check_remote_k26_timing_artifacts.sh \
+    "$pull_dir" \
+    --expect-head "$local_head" \
+    --expect-branch "$local_branch"
   echo "REMOTE_K26_TIMING_PROBE_PASS id=${instance_id} pull_dir=${pull_dir}"
 }
 
@@ -764,8 +752,7 @@ PULL:
   \$SSH_CMD "cd /workspace/lb-source-k26-timing-probe && tar -czf - ." | tar -xzf - -C ${pull_dir}
 
 ACCEPTANCE_CHECK:
-  grep -q '^REMOTE_K26_TIMING_PROBE_PASS$' ${pull_dir}/remote-k26-timing-probe-status.txt
-  grep -Eq '^K26_FULL_RUN_BUNDLE_(BLOCKED_|PASS)' ${pull_dir}/status.txt
+  tiles-maxxing/lb-source-propagation/scripts/check_remote_k26_timing_artifacts.sh ${pull_dir} --expect-head ${local_head} --expect-branch ${local_branch}
 
 ONE_SHOT_REMOTE_K26_TIMING_PROBE:
   $(shell_join "${one_shot_cmd[@]}")

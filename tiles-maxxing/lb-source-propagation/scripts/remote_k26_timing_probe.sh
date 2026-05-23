@@ -166,8 +166,8 @@ if [[ ! -x "$source_dead_gap_checker" || ! -x "$source_dead_checker" ]]; then
   exit 1
 fi
 
-set +e
-"$sidecar_dir/scripts/run_k26_full_source_bundle.sh" \
+bundle_cmd=(
+  "$sidecar_dir/scripts/run_k26_full_source_bundle.sh"
   --build-dir "$build_dir" \
   --out-dir "$out_dir" \
   --continuation-chunk-bands "$chunk_bands" \
@@ -176,7 +176,13 @@ set +e
   --max-runtime-seconds "$max_runtime_seconds" \
   --tileop-threads "$tileop_threads" \
   --source-dead-gap-checker "$source_dead_gap_checker" \
-  --source-dead-checker "$source_dead_checker" \
+  --source-dead-checker "$source_dead_checker"
+)
+printf '%q ' "${bundle_cmd[@]}" > "$out_dir/k26-full-run-args.txt"
+printf '\n' >> "$out_dir/k26-full-run-args.txt"
+
+set +e
+"${bundle_cmd[@]}" \
   > "$out_dir/k26-bundle-harness.log" \
   2> "$out_dir/k26-bundle-harness.err"
 harness_status="$?"

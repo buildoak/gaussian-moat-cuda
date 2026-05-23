@@ -195,6 +195,10 @@ add_test(NAME remote_smoke_artifact_checker
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_remote_smoke_artifact_checker.sh
     ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_remote_smoke_artifacts.sh)
+add_test(NAME remote_k26_timing_artifact_checker
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_remote_k26_timing_artifact_checker.sh
+    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_remote_k26_timing_artifacts.sh)
 add_test(NAME vast_sidecar_smoke_guard
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_vast_sidecar_smoke_guard.sh
