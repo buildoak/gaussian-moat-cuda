@@ -379,7 +379,8 @@ requested terminal radius, the harness stops earlier with
 source-dead gap. `terminal_inventory_obligation` records that the observed
 inventory is still summary-digest non-claim evidence and must be promoted to
 claim-grade terminal inventory provenance. The gap artifact also binds the
-repaired K26 BZ schedule digest as schedule-only, non-claim evidence.
+prefix manifest, prefix witness, and repaired K26 BZ schedule digest as
+schedule-only, non-claim evidence.
 When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
 checker before stopping on either a target-not-reached gap or the missing cert,

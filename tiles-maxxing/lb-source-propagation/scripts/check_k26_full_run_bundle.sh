@@ -569,6 +569,10 @@ require_grep '"proof_status":"DIAGNOSTIC_NON_CLAIM"' "$gap" \
   "K26 source-dead gap non-claim status"
 require_grep '"blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"' "$gap" \
   "K26 source-dead gap blocker"
+require_grep '"prefix_manifest_artifact":.*"name":"k26-prefix-manifest.txt".*"sha256":"[0-9a-f]{64}"' "$gap" \
+  "K26 source-dead gap prefix manifest binding"
+require_grep '"prefix_witness_artifact":.*"name":"k26-prefix-witness.txt".*"sha256":"[0-9a-f]{64}"' "$gap" \
+  "K26 source-dead gap prefix witness binding"
 require_grep '"continuation_artifact":.*"name":"k26-continuation-result.json".*"sha256":"[0-9a-f]{64}"' "$gap" \
   "K26 source-dead gap continuation binding"
 require_grep '"bz_evidence":.*"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE".*"accepted_for_schedule":true.*"accepted_for_claim":false' "$gap" \
@@ -599,9 +603,35 @@ require_grep '"missing_for_source_dead_cert":.*verifier' "$gap" \
 actual_continuation_digest="$(
   shasum -a 256 "$continuation" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
 )"
+actual_prefix_manifest_digest="$(
+  shasum -a 256 "$out_dir/k26-prefix-manifest.txt" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
+)"
+actual_prefix_witness_digest="$(
+  shasum -a 256 "$out_dir/k26-prefix-witness.txt" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
+)"
+gap_prefix_manifest_name="$(
+  json_object_string_value "$gap" prefix_manifest_artifact name
+)"
+gap_prefix_manifest_digest="$(
+  json_object_string_value "$gap" prefix_manifest_artifact sha256
+)"
+gap_prefix_witness_name="$(
+  json_object_string_value "$gap" prefix_witness_artifact name
+)"
+gap_prefix_witness_digest="$(
+  json_object_string_value "$gap" prefix_witness_artifact sha256
+)"
 gap_continuation_digest="$(
   json_object_string_value "$gap" continuation_artifact sha256
 )"
+require_equal "k26-prefix-manifest.txt" "$gap_prefix_manifest_name" \
+  "K26 gap prefix manifest artifact name binding"
+require_equal "$actual_prefix_manifest_digest" "$gap_prefix_manifest_digest" \
+  "K26 gap prefix manifest hash binding"
+require_equal "k26-prefix-witness.txt" "$gap_prefix_witness_name" \
+  "K26 gap prefix witness artifact name binding"
+require_equal "$actual_prefix_witness_digest" "$gap_prefix_witness_digest" \
+  "K26 gap prefix witness hash binding"
 if [[ -z "$gap_continuation_digest" ]]; then
   echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON string field continuation_artifact.sha256 ($gap)" >&2
   exit 1

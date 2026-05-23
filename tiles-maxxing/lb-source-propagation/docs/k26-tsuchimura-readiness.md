@@ -143,12 +143,13 @@ but no cert is supplied, it stops with
 finishes with live source carry instead of terminal death, the harness stops
 with `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE` because there is no
 source-dead gap to certify. The gap artifact binds the continuation artifact
-and records the exact remaining certificate obligations: bridge safety,
-target/coordinate path, terminal inventory, and repaired K26 BZ schedule
-evidence. For chunked runs it also binds `k26-continuation-chunks.jsonl` by
-SHA-256, so the gap report carries the checked continuation ledger identity.
-It separately binds `k26-continuation-chunk-000.json` when chunking is used,
-because coordinate-to-port bridge safety is a row-0 seam obligation while the
+plus the prefix manifest and prefix witness, and records the exact remaining
+certificate obligations: bridge safety, target/coordinate path, terminal
+inventory, and repaired K26 BZ schedule evidence. For chunked runs it also
+binds `k26-continuation-chunks.jsonl` by SHA-256, so the gap report carries the
+checked continuation ledger identity. It separately binds
+`k26-continuation-chunk-000.json` when chunking is used, because
+coordinate-to-port bridge safety is a row-0 seam obligation while the
 terminal/path/inventory fields are final-continuation obligations.
 The bridge obligation can pass as diagnostic evidence when every
 source-connected carry atom either bridges, has no legal next-band candidate,

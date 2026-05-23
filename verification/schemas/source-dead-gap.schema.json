@@ -13,6 +13,8 @@
     "k_sq",
     "terminal_radius",
     "target",
+    "prefix_manifest_artifact",
+    "prefix_witness_artifact",
     "continuation_artifact",
     "bz_evidence",
     "bridge_safety",
@@ -52,6 +54,24 @@
       "required": ["name", "sha256"],
       "properties": {
         "name": { "const": "k26-continuation-result.json" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "prefix_manifest_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": { "const": "k26-prefix-manifest.txt" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "prefix_witness_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": { "const": "k26-prefix-witness.txt" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },

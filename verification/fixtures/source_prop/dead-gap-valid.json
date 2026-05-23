@@ -18,6 +18,14 @@
       "norm_sq": 1031522101121
     }
   },
+  "prefix_manifest_artifact": {
+    "name": "k26-prefix-manifest.txt",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "prefix_witness_artifact": {
+    "name": "k26-prefix-witness.txt",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
   "continuation_artifact": {
     "name": "k26-continuation-result.json",
     "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -60,7 +68,9 @@
     "digest_algorithm": "sha256:lb_source_inventory_v1",
     "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     "max_norm_sq": 1031522101121,
-    "max_norm_atom_ids": [1615075207964004]
+    "max_norm_atom_ids": [
+      1615075207964004
+    ]
   },
   "terminal_source_inventory_accumulator": {
     "mode": "summary_digest_only_non_claim",
@@ -71,7 +81,9 @@
     "digest_algorithm": "sha256:lb_source_inventory_v1",
     "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     "max_norm_sq": 1031522101121,
-    "max_norm_atom_ids": [1615075207964004]
+    "max_norm_atom_ids": [
+      1615075207964004
+    ]
   },
   "terminal_inventory_obligation": {
     "required_mode": "claim_grade_terminal_inventory",

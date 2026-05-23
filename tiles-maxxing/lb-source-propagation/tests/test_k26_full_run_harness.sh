@@ -558,6 +558,10 @@ grep -q 'k26-continuation-chunks.jsonl' \
   "$chunked_out/k26-full-run-artifacts.sha256"
 grep -q '"terminal_source_dead":true' \
   "$chunked_out/k26-continuation-result.json"
+grep -q '"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"[0-9a-f]\{64\}"' \
+  "$chunked_out/k26-source-dead-gap.json"
+grep -q '"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"[0-9a-f]\{64\}"' \
+  "$chunked_out/k26-source-dead-gap.json"
 grep -q '"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"[0-9a-f]\{64\}"' \
   "$chunked_out/k26-source-dead-gap.json"
 grep -q '"bridge_source_artifact":{"name":"k26-continuation-chunk-000.json","sha256":"[0-9a-f]\{64\}"' \
@@ -730,6 +734,10 @@ grep -q '"chunk_id":"000","action":"executed"' \
   "$checked_chunked_out/k26-continuation-chunks.jsonl"
 grep -q 'k26-continuation-chunks.jsonl' \
   "$checked_chunked_out/k26-full-run-artifacts.sha256"
+grep -q '"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"[0-9a-f]\{64\}"' \
+  "$checked_chunked_out/k26-source-dead-gap.json"
+grep -q '"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"[0-9a-f]\{64\}"' \
+  "$checked_chunked_out/k26-source-dead-gap.json"
 grep -q '"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"[0-9a-f]\{64\}"' \
   "$checked_chunked_out/k26-source-dead-gap.json"
 grep -q '"bridge_source_artifact":{"name":"k26-continuation-chunk-000.json","sha256":"[0-9a-f]\{64\}"' \

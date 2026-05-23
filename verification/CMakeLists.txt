@@ -132,6 +132,7 @@ foreach(bad_source_dead_gap
     dead-gap-bad-missing-list-omits-terminal-inventory
     dead-gap-bad-path-obligation-claim
     dead-gap-bad-path-obligation-count
+    dead-gap-bad-prefix-witness-hash
     dead-gap-bad-port-atom)
   add_test(NAME source_dead_gap_fixture_${bad_source_dead_gap}_reject
     COMMAND source_dead_gap_check

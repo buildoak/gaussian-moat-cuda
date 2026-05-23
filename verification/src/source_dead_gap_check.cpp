@@ -167,6 +167,19 @@ void require_point(const nlohmann::json& object, const char* field,
   }
 }
 
+void require_artifact(const nlohmann::json& object, const char* field,
+                      std::string_view expected_name) {
+  const nlohmann::json& artifact = require_object(object, field);
+  if (require_string(artifact, "name") != expected_name) {
+    throw std::runtime_error(std::string("unexpected artifact name for ") +
+                             field);
+  }
+  if (!sha256_hex(require_string(artifact, "sha256"))) {
+    throw std::runtime_error(std::string("artifact hash is not sha256 hex for ") +
+                             field);
+  }
+}
+
 std::vector<std::int64_t> require_i64_array(const nlohmann::json& object,
                                             const char* field) {
   const nlohmann::json& raw = require_array(object, field);
@@ -264,14 +277,12 @@ std::string verify_gap(const nlohmann::json& gap) {
   require_point(target, "tsuchimura_endpoint", kEndpointB, kEndpointA);
   require_point(target, "canonical_octant_endpoint", kEndpointA, kEndpointB);
 
-  const nlohmann::json& continuation =
-      require_object(gap, "continuation_artifact");
-  if (require_string(continuation, "name") != "k26-continuation-result.json") {
-    throw std::runtime_error("unexpected continuation artifact name");
-  }
-  if (!sha256_hex(require_string(continuation, "sha256"))) {
-    throw std::runtime_error("continuation artifact hash is not sha256 hex");
-  }
+  require_artifact(gap, "prefix_manifest_artifact",
+                   "k26-prefix-manifest.txt");
+  require_artifact(gap, "prefix_witness_artifact",
+                   "k26-prefix-witness.txt");
+  require_artifact(gap, "continuation_artifact",
+                   "k26-continuation-result.json");
   if (const auto chunk_ledger_it = gap.find("chunk_ledger_artifact");
       chunk_ledger_it != gap.end()) {
     if (!chunk_ledger_it->is_object()) {

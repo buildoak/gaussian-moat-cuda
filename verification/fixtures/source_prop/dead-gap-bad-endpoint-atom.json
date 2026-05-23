@@ -7,8 +7,24 @@
   "k_sq": 26,
   "terminal_radius": 1015645,
   "target": {
-    "tsuchimura_endpoint": {"a": 943460, "b": 376039, "norm_sq": 1031522101121},
-    "canonical_octant_endpoint": {"a": 376039, "b": 943460, "norm_sq": 1031522101121}
+    "tsuchimura_endpoint": {
+      "a": 943460,
+      "b": 376039,
+      "norm_sq": 1031522101121
+    },
+    "canonical_octant_endpoint": {
+      "a": 376039,
+      "b": 943460,
+      "norm_sq": 1031522101121
+    }
+  },
+  "prefix_manifest_artifact": {
+    "name": "k26-prefix-manifest.txt",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "prefix_witness_artifact": {
+    "name": "k26-prefix-witness.txt",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   },
   "continuation_artifact": {
     "name": "k26-continuation-result.json",
@@ -23,7 +39,11 @@
   },
   "target_path_provenance": "mixed_coordinate_port_atom_chain_non_claim",
   "target_atom_path_length": 3,
-  "target_atom_path": [1615075207963900, -25220051735553, 1615075207964003],
+  "target_atom_path": [
+    1615075207963900,
+    -25220051735553,
+    1615075207964003
+  ],
   "bridge_safety": {
     "seam_bridge_policy": "diagnostic_allow_unbridged",
     "source_coordinate_carry_atoms_with_next_band_candidates": 1426,
@@ -48,7 +68,9 @@
     "digest_algorithm": "sha256:lb_source_inventory_v1",
     "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     "max_norm_sq": 1031522101121,
-    "max_norm_atom_ids": [1615075207964004]
+    "max_norm_atom_ids": [
+      1615075207964004
+    ]
   },
   "terminal_inventory_obligation": {
     "required_mode": "claim_grade_terminal_inventory",
