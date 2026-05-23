@@ -97,7 +97,11 @@ if `endpoint_atom_id` is not the stable coordinate atom id
 if `metadata.artifact_hash` is not exactly the SHA-256 hash of
 `k26-continuation-result.json`, or if the independent
 `source_dead_cert_check` does not accept a listed source-dead draft. The
-`k26-source-dead-gap.json` layer also machine-checks explicit obligation
+independent cert checker also rejects a cert whose endpoint still lies in the
+conservative terminal guard shell
+`R_final - ceil(sqrt(K)) <= |p| <= R_final`; this makes
+`negative_guard_pass` a checked geometric condition, not just a boolean field.
+The `k26-source-dead-gap.json` layer also machine-checks explicit obligation
 objects: `bridge_safety` must show
 `source_unbridged_unsafe_candidate_atoms=0`; `coordinate_path_obligation`
 must record why the observed target evidence is not

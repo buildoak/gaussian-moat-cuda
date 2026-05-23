@@ -12,7 +12,7 @@
     "artifact_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   },
   "k_sq": 36,
-  "terminal_radius": 10,
+  "terminal_radius": 20,
   "negative_guard_pass": true,
   "endpoint": { "a": 7, "b": 2, "norm_sq": 53 },
   "endpoint_atom_id": 30064771074,

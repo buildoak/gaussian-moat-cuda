@@ -261,6 +261,14 @@ std::uint64_t floor_sqrt_u64(std::uint64_t n) {
   return lo;
 }
 
+std::uint64_t ceil_sqrt_u64(std::uint64_t n) {
+  const std::uint64_t root = floor_sqrt_u64(n);
+  if (root * root == n) {
+    return root;
+  }
+  return root + 1;
+}
+
 bool is_gaussian_prime_norm(std::uint64_t n) {
   if (n == 2) return true;
   if (is_prime_u64(n)) return (n & 3ULL) == 1ULL;
@@ -631,6 +639,18 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   if (static_cast<unsigned __int128>(endpoint.norm_sq) >
       static_cast<unsigned __int128>(terminal_radius) * terminal_radius) {
     throw std::runtime_error("endpoint lies outside terminal radius");
+  }
+  const std::uint64_t guard_width = ceil_sqrt_u64(k_sq);
+  if (terminal_radius <= guard_width) {
+    throw std::runtime_error(
+        "terminal radius is too small for negative guard");
+  }
+  const std::uint64_t guard_inner_radius = terminal_radius - guard_width;
+  if (static_cast<unsigned __int128>(endpoint.norm_sq) >=
+      static_cast<unsigned __int128>(guard_inner_radius) *
+          guard_inner_radius) {
+    throw std::runtime_error(
+        "endpoint lies inside conservative terminal guard shell");
   }
   const std::int64_t endpoint_atom_id = coordinate_atom_id_for_point(endpoint);
   if (require_i64(cert, "endpoint_atom_id") != endpoint_atom_id) {
