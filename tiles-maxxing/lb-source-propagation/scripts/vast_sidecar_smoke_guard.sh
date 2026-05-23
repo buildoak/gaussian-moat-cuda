@@ -62,6 +62,7 @@ created_instance_id=""
 failure_ledger=""
 exclude_offer_ids=()
 exclude_host_ids=()
+ledger_extra_fields=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -286,14 +287,16 @@ record_failure_ledger() {
   local reason="$1"
   [[ -z "$failure_ledger" ]] && return
   mkdir -p "$(dirname "$failure_ledger")"
-  printf 'timestamp_utc=%s reason=%s offer_id=%s host_id=%s instance_id=%s branch=%s head=%s\n' \
+  printf 'timestamp_utc=%s reason=%s offer_id=%s host_id=%s instance_id=%s branch=%s head=%s%s\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     "$reason" \
     "${selected_offer_id:-unknown}" \
     "${selected_host_id:-unknown}" \
     "${created_instance_id:-unknown}" \
     "$local_branch" \
-    "$local_head" >> "$failure_ledger"
+    "$local_head" \
+    "${ledger_extra_fields:+ ${ledger_extra_fields}}" >> "$failure_ledger"
+  ledger_extra_fields=""
 }
 
 load_failure_ledger
@@ -461,6 +464,7 @@ run_remote_smoke_gate() {
 }
 
 filter="gpu_name=RTX_4090 cuda_vers>=12.0 disk_space>=40 num_gpus=1 dph<=${max_dph} reliability>=0.95"
+market_filter="gpu_name=RTX_4090 cuda_vers>=12.0 disk_space>=40 num_gpus=1 reliability>=0.95"
 selected_offer_id=""
 selected_offer_json=""
 selected_offer_dph=""
@@ -509,6 +513,54 @@ print(json.dumps(filtered))
   if [[ -z "$offers" || "$offers" == "[]" ]]; then
     echo "NO_QUALIFYING_OFFER"
     echo "No RTX 4090 offer satisfied max_dph=${max_dph}; no rental attempted."
+    set +e
+    market_snapshot="$(
+      vastai search offers "$market_filter" -o 'dph' --raw 2>/dev/null |
+        EXCLUDE_OFFER_IDS="$exclude_offer_ids_joined" \
+        EXCLUDE_HOST_IDS="$exclude_host_ids_joined" \
+        MAX_DPH="$max_dph" \
+        python3 -c '
+import json
+import os
+import sys
+
+offer_ids = {int(x) for x in os.environ.get("EXCLUDE_OFFER_IDS", "").split() if x}
+host_ids = {int(x) for x in os.environ.get("EXCLUDE_HOST_IDS", "").split() if x}
+cap = float(os.environ["MAX_DPH"])
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+
+filtered = [
+    item for item in data
+    if int(item.get("id", -1)) not in offer_ids
+    and int(item.get("host_id", -1)) not in host_ids
+    and item.get("dph_total") is not None
+]
+if not filtered:
+    print("nearest_offer_id=unknown nearest_host_id=unknown nearest_dph=unknown nearest_over_cap_by=unknown")
+    raise SystemExit(0)
+
+nearest = min(filtered, key=lambda item: float(item["dph_total"]))
+dph = float(nearest["dph_total"])
+print(
+    "nearest_offer_id={} nearest_host_id={} nearest_dph={:.4f} nearest_over_cap_by={:.4f}".format(
+        nearest.get("id", "unknown"),
+        nearest.get("host_id", "unknown"),
+        dph,
+        max(0.0, dph - cap),
+    )
+)
+'
+    )"
+    market_snapshot_status="$?"
+    set -e
+    if [[ "$market_snapshot_status" == "0" && -n "$market_snapshot" ]]; then
+      echo "NO_QUALIFYING_OFFER_MARKET ${market_snapshot}"
+      ledger_extra_fields="$market_snapshot"
+    fi
     record_failure_ledger "no_qualifying_offer"
     return 3
   fi

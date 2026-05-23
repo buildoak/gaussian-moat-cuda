@@ -18,6 +18,10 @@ echo "$*" >> "$VAST_MOCK_LOG"
 if [[ "$1" == "search" && "$2" == "offers" ]]; then
   if [[ "${VAST_MOCK_NO_OFFERS:-0}" == "1" ]]; then
     echo '[]'
+  elif [[ "${VAST_MOCK_CAPPED_EMPTY_BROAD_OFFERS:-0}" == "1" && "$*" == *"dph<="* ]]; then
+    echo '[]'
+  elif [[ "${VAST_MOCK_CAPPED_EMPTY_BROAD_OFFERS:-0}" == "1" ]]; then
+    echo '[{"id":34567,"dph_total":0.43,"host_id":999},{"id":45678,"dph_total":0.51,"host_id":111}]'
   else
     echo '[{"id":12345,"dph_total":0.29,"host_id":777},{"id":23456,"dph_total":0.31,"host_id":888}]'
   fi
@@ -111,6 +115,24 @@ if PATH="$tmp/bin:$PATH" VAST_MOCK_NO_OFFERS=1 "$guard" \
 fi
 grep -q 'NO_QUALIFYING_OFFER' "$tmp/no-offer.log"
 grep -q '^search offers ' "$VAST_MOCK_LOG"
+
+: > "$VAST_MOCK_LOG"
+rm -f "$tmp/no-offer-market.tsv"
+if PATH="$tmp/bin:$PATH" VAST_MOCK_CAPPED_EMPTY_BROAD_OFFERS=1 "$guard" \
+    --failure-ledger "$tmp/no-offer-market.tsv" \
+    --max-dph 0.37 \
+    --max-budget 1.50 \
+    --k-sq 26 \
+    > "$tmp/no-offer-market.log" 2>&1; then
+  echo "guard accepted an over-cap market as qualifying" >&2
+  exit 1
+fi
+grep -q 'NO_QUALIFYING_OFFER_MARKET nearest_offer_id=34567 nearest_host_id=999 nearest_dph=0.4300 nearest_over_cap_by=0.0600' \
+  "$tmp/no-offer-market.log"
+grep -q 'nearest_offer_id=34567 nearest_host_id=999 nearest_dph=0.4300 nearest_over_cap_by=0.0600' \
+  "$tmp/no-offer-market.tsv"
+grep -q 'reason=no_qualifying_offer offer_id=unknown host_id=unknown instance_id=unknown' \
+  "$tmp/no-offer-market.tsv"
 
 : > "$VAST_MOCK_LOG"
 rm -f "$tmp/no-offer-failures.tsv"

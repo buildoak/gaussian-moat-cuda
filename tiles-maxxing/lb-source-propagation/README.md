@@ -233,6 +233,10 @@ When `--max-create-attempts` is greater than `1`, a timed-out SSH probe destroys
 the unready instance, excludes that offer id, and tries the next capped offer.
 With `--failure-ledger`, the guard also loads prior failed `offer_id`/`host_id`
 rows as exclusions and appends new create/SSH failures for future attempts.
+When no capped offer exists, the guard performs a second no-rent market scan
+without the `dph <= 0.37` predicate and records the nearest RTX 4090 offer in
+both stdout and the failure ledger. This distinguishes an empty market from an
+over-cap market while preserving the no-rental budget rule.
 
 If a Vast offer or host repeatedly creates an instance whose advertised SSH
 port never opens, exclude it on the next attempt:
