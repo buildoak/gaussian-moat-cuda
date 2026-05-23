@@ -132,6 +132,18 @@ grep -q -- '--timeout-seconds must be a nonnegative integer' \
 
 if "$harness" \
     --build-dir "$build_dir" \
+    --out-dir "$tmp/bad-runtime" \
+    --max-runtime-seconds nope \
+    >/tmp/k26-harness-bad-runtime.out \
+    2>/tmp/k26-harness-bad-runtime.err; then
+  echo "harness accepted nonnumeric max runtime" >&2
+  exit 1
+fi
+grep -q -- '--max-runtime-seconds must be a nonnegative integer' \
+  /tmp/k26-harness-bad-runtime.err
+
+if "$harness" \
+    --build-dir "$build_dir" \
     --out-dir "$tmp/bad-chunk" \
     --continuation-chunk-bands nope \
     >/tmp/k26-harness-bad-chunk.out \
@@ -182,6 +194,31 @@ grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_TIMEOUT' \
 grep -q 'timeout_seconds=1' "$timeout_out/status.txt"
 grep -q 'K26_CONTINUATION timed out after 1s' \
   /tmp/k26-harness-timeout.err
+
+runtime_limit_build="$tmp/runtime-limit-build"
+cp -R "$build_dir" "$runtime_limit_build"
+cat > "$runtime_limit_build/source_tileop_port_runner" <<'SH'
+#!/usr/bin/env bash
+sleep 3
+echo '{"schema":"should_not_finish"}'
+SH
+chmod +x "$runtime_limit_build/source_tileop_port_runner"
+runtime_limit_out="$tmp/runtime-limit-out"
+if "$harness" \
+    --build-dir "$runtime_limit_build" \
+    --out-dir "$runtime_limit_out" \
+    --max-runtime-seconds 2 \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    >/tmp/k26-harness-runtime-limit.out \
+    2>/tmp/k26-harness-runtime-limit.err; then
+  echo "harness accepted a K26 continuation past total runtime limit" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_RUNTIME_LIMIT' \
+  "$runtime_limit_out/status.txt"
+grep -q 'max_runtime_seconds=2' "$runtime_limit_out/status.txt"
+grep -Eq 'K26_CONTINUATION (exceeded K26 bundle max runtime|not started because max runtime) 2s' \
+  /tmp/k26-harness-runtime-limit.err
 
 live_build="$tmp/live-build"
 cp -R "$build_dir" "$live_build"

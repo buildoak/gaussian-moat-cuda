@@ -122,7 +122,8 @@ run_k26_full_source_bundle.sh \
   --out-dir OUT_DIR \
   --continuation-chunk-bands 8 \
   --resume-existing \
-  --timeout-seconds 1200
+  --timeout-seconds 1200 \
+  --max-runtime-seconds 14000
 ```
 
 It writes the command, BZ, profile, prefix, and continuation artifacts using
@@ -212,10 +213,12 @@ With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/progress/continuation/gap artifacts before the
 checker runs.
 This keeps a paid sqrt(26) attempt reproducible without relaxing the
-`SOURCE_DEAD_CERT` logic. `--timeout-seconds` should be set for paid runs so a
-slow prefix or continuation exits with an explicit timeout status before the
-runtime budget is exceeded. If the supplied cert is only a summary accumulator
-non-claim, the harness writes
+`SOURCE_DEAD_CERT` logic. `--timeout-seconds` should be set for paid runs as a
+per-command kill switch, and `--max-runtime-seconds` should be set as the
+whole-bundle wall-clock budget guard. At the campaign cap of `$0.37/hr` and
+`$1.50` total, `14000` seconds leaves a small shutdown margin while preserving
+resume artifacts. If the supplied cert is only a summary accumulator non-claim,
+the harness writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM` to
 `status.txt` and exits nonzero.
 
@@ -335,7 +338,10 @@ terminal inventory are missing.
 A bounded local bundle harness run with `--timeout-seconds 120` now stops with
 `K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_TIMEOUT` while building band
 `40960 -> 49152`; by then bands through `32768 -> 40960` have completed with
-live source carry. The current runner and bundle harness can checkpoint and
+live source carry. Paid attempts should additionally pass
+`--max-runtime-seconds 14000`, which stops the whole bundle with a
+`K26_FULL_RUN_BUNDLE_BLOCKED_*_RUNTIME_LIMIT` status before the `$1.50` budget
+can be exhausted. The current runner and bundle harness can checkpoint and
 resume TileOp-port separator state, but no full repaired K26 chunked run has
 completed under the active runtime/budget gate yet. The current local blocker
 is therefore runtime/budget, not the earlier target-not-reached terminal

@@ -7,6 +7,7 @@ Usage:
   run_k26_full_source_bundle.sh --build-dir DIR --out-dir DIR
                                 [--max-atoms N]
                                 [--timeout-seconds N]
+                                [--max-runtime-seconds N]
                                 [--continuation-chunk-bands N]
                                 [--resume-existing]
                                 [--cert-in PATH]
@@ -48,6 +49,7 @@ build_dir=""
 out_dir=""
 max_atoms="50000000"
 timeout_seconds="0"
+max_runtime_seconds="0"
 continuation_chunk_bands="0"
 resume_existing="0"
 cert_in=""
@@ -70,6 +72,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --timeout-seconds)
       timeout_seconds="$2"
+      shift 2
+      ;;
+    --max-runtime-seconds)
+      max_runtime_seconds="$2"
       shift 2
       ;;
     --continuation-chunk-bands)
@@ -136,6 +142,10 @@ if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "--timeout-seconds must be a nonnegative integer" >&2
   exit 2
 fi
+if [[ ! "$max_runtime_seconds" =~ ^[0-9]+$ ]]; then
+  echo "--max-runtime-seconds must be a nonnegative integer" >&2
+  exit 2
+fi
 if [[ ! "$continuation_chunk_bands" =~ ^[0-9]+$ ]]; then
   echo "--continuation-chunk-bands must be a nonnegative integer" >&2
   exit 2
@@ -163,6 +173,7 @@ require_k26_cmake_cache() {
 require_k26_cmake_cache
 
 mkdir -p "$out_dir"
+run_start_seconds="$SECONDS"
 
 status_file="$out_dir/status.txt"
 artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
@@ -177,6 +188,8 @@ write_status() {
     echo "out_dir=$out_dir"
     echo "max_atoms=$max_atoms"
     echo "timeout_seconds=$timeout_seconds"
+    echo "max_runtime_seconds=$max_runtime_seconds"
+    echo "elapsed_seconds=$((SECONDS - run_start_seconds))"
     echo "continuation_chunk_bands=$continuation_chunk_bands"
     echo "resume_existing=$resume_existing"
     echo "non_claim=this is an executed bundle harness, not a source-dead acceptance"
@@ -267,14 +280,32 @@ run_json() {
   local output="$2"
   shift 2
   local stderr_file="$output.stderr"
-  local status
+  local status effective_timeout timeout_kind remaining_seconds
   echo "RUN $label: $*" >> "$out_dir/run.log"
+  effective_timeout="0"
+  timeout_kind="none"
+  if [[ "$max_runtime_seconds" != "0" ]]; then
+    remaining_seconds="$((run_start_seconds + max_runtime_seconds - SECONDS))"
+    if (( remaining_seconds <= 0 )); then
+      write_status "K26_FULL_RUN_BUNDLE_BLOCKED_${label}_RUNTIME_LIMIT"
+      echo "$label not started because max runtime ${max_runtime_seconds}s is exhausted" >&2
+      exit 124
+    fi
+    effective_timeout="$remaining_seconds"
+    timeout_kind="runtime"
+  fi
+  if [[ "$timeout_seconds" != "0" &&
+        ( "$effective_timeout" == "0" ||
+          "$timeout_seconds" -lt "$effective_timeout" ) ]]; then
+    effective_timeout="$timeout_seconds"
+    timeout_kind="timeout"
+  fi
   set +e
-  if [[ "$timeout_seconds" == "0" ]]; then
+  if [[ "$effective_timeout" == "0" ]]; then
     "$@" > "$output" 2> "$stderr_file"
     status="$?"
   else
-    python3 - "$timeout_seconds" "$output" "$stderr_file" "$@" <<'PY'
+    python3 - "$effective_timeout" "$output" "$stderr_file" "$@" <<'PY'
 import subprocess
 import sys
 
@@ -297,8 +328,13 @@ PY
   fi
   set -e
   if [[ "$status" == "124" ]]; then
-    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_${label}_TIMEOUT"
-    echo "$label timed out after ${timeout_seconds}s" >&2
+    if [[ "$timeout_kind" == "runtime" ]]; then
+      write_status "K26_FULL_RUN_BUNDLE_BLOCKED_${label}_RUNTIME_LIMIT"
+      echo "$label exceeded K26 bundle max runtime ${max_runtime_seconds}s" >&2
+    else
+      write_status "K26_FULL_RUN_BUNDLE_BLOCKED_${label}_TIMEOUT"
+      echo "$label timed out after ${timeout_seconds}s" >&2
+    fi
     exit 124
   fi
   if [[ "$status" != "0" ]]; then

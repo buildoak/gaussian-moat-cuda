@@ -312,6 +312,7 @@ tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
   --continuation-chunk-bands 8 \
   --resume-existing \
   --timeout-seconds 1200 \
+  --max-runtime-seconds 14000 \
   --source-dead-gap-checker /path/to/source_dead_gap_check
 ```
 
@@ -356,10 +357,12 @@ It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
 prefix-progress, continuation, continuation-progress, manifest, witness, gap,
 and any supplied cert artifacts by SHA-256.
-Use `--timeout-seconds` on paid runs so prefix or continuation work stops with
-a status-level timeout blocker instead of silently exceeding the runtime
-budget. `source_tileop_port_runner --progress-out` writes phase rows before and
-after expensive continuation stages (`manifest_read`, `prefix_witness_read`,
+Use `--timeout-seconds` on paid runs as a per-command kill switch, and
+`--max-runtime-seconds` as the whole-bundle wall-clock budget guard. At the
+campaign cap of `$0.37/hr` and `$1.50` total, `14000` seconds leaves a small
+shutdown margin while preserving resume artifacts. `source_tileop_port_runner
+--progress-out` writes phase rows before and after expensive continuation
+stages (`manifest_read`, `prefix_witness_read`,
 `grid_build`, `tileop_build`, `port_graph`, `target_bridge`,
 `manifest_bridge`, and `source_process`) as well as completed-band rows. A
 timeout can therefore identify the active phase even when no continuation band

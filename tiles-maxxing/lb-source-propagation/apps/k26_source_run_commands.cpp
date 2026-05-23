@@ -162,7 +162,8 @@ int main() {
   const std::string bundle_command =
       "run_k26_full_source_bundle.sh --build-dir BUILD_DIR --out-dir OUT_DIR "
       "--continuation-chunk-bands 8 --resume-existing "
-      "--timeout-seconds 1200 --source-dead-gap-checker "
+      "--timeout-seconds 1200 --max-runtime-seconds 14000 "
+      "--source-dead-gap-checker "
       "source_dead_gap_check";
   const std::string checked_bundle_command =
       bundle_command +
@@ -223,6 +224,7 @@ int main() {
             << "\"source_dead_gap_checker\":\"source_dead_gap_check\","
             << "\"source_dead_checker\":\"source_dead_cert_check\","
             << "\"timeout_seconds\":1200,"
+            << "\"max_runtime_seconds\":14000,"
             << "\"command\":";
   emit_json_string(bundle_command);
   std::cout << ",\"checked_bundle_command\":";
