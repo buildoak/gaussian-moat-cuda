@@ -285,6 +285,26 @@ After pulling Vast artifacts, run the same checker with `--expect-head` and
 The sqrt(26) readiness guard lives in
 `docs/k26-tsuchimura-readiness.md`.
 
+For a bounded remote timing probe after smoke has passed, run the non-claim
+probe script on the rented host:
+
+```bash
+cd /workspace/gaussian-moat-cuda
+tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh \
+  --repo /workspace/gaussian-moat-cuda \
+  --build-dir /tmp/gm-lbsp-remote-k26 \
+  --out-dir /workspace/lb-source-k26-timing-probe \
+  --chunk-bands 8 \
+  --timeout-seconds 1200 \
+  --max-runtime-seconds 14000
+```
+
+This builds the sidecar with `-DK_SQ=26`, runs the chunked K26 bundle harness,
+keeps resume artifacts, and records runtime-budget diagnostics. A
+`K26_FULL_RUN_BUNDLE_BLOCKED_*` status is acceptable timing evidence for this
+probe. It is not a `SOURCE_DEAD_CERT`, not a sqrt(26) reproduction, and not a
+moat result.
+
 The full-run bundle gate is:
 
 ```bash

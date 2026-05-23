@@ -77,6 +77,24 @@ if grep -q '^create instance ' "$VAST_MOCK_LOG"; then
 fi
 
 : > "$VAST_MOCK_LOG"
+PATH="$tmp/bin:$PATH" "$guard" \
+  --run-k26-timing-probe \
+  --destroy-on-exit \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26 \
+  > "$tmp/dry-run-k26-timing.log"
+grep -q 'QUALIFYING_OFFER id=12345 host_id=777 dph=0.29' \
+  "$tmp/dry-run-k26-timing.log"
+grep -q 'REMOTE_K26_TIMING_PROBE:' "$tmp/dry-run-k26-timing.log"
+grep -q -- '--run-k26-timing-probe' "$tmp/dry-run-k26-timing.log"
+grep -q 'DRY_RUN_ONLY' "$tmp/dry-run-k26-timing.log"
+if grep -q '^create instance ' "$VAST_MOCK_LOG"; then
+  echo "K26 timing dry-run unexpectedly created a Vast instance" >&2
+  exit 1
+fi
+
+: > "$VAST_MOCK_LOG"
 mkdir -p "$tmp/non-git-source"
 (
   cd "$tmp/non-git-source"

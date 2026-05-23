@@ -15,14 +15,18 @@ Usage:
                               [--max-create-attempts N]
                               [--wait-ssh-seconds N] [--ssh-poll-seconds N]
                               [--stop-on-ssh-timeout]
-                              [--run-remote-smoke] [--destroy-on-exit]
+                              [--run-remote-smoke]
+                              [--run-k26-timing-probe]
+                              [--destroy-on-exit]
 
 Dry-run by default. Searches for a single RTX 4090 offer, enforces the price
 cap, and prints the exact create/deploy/smoke/pull commands. With --execute it
 creates the instance only by default. Add --run-remote-smoke to make the script
 wait for SSH, deploy the current tree, run remote_sidecar_smoke.sh, pull
-artifacts, and run the local artifact acceptance checker. Add --destroy-on-exit
-to destroy the created instance after success or failure.
+artifacts, and run the local artifact acceptance checker. Add
+--run-k26-timing-probe instead to run remote_k26_timing_probe.sh and pull its
+non-claim timing artifacts. Add --destroy-on-exit to destroy the created
+instance after success or failure.
 
 Optional offer polling handles transient market races, and optional SSH
 readiness polling can stop or destroy a newly-created instance when SSH never
@@ -57,6 +61,7 @@ wait_ssh_seconds="0"
 ssh_poll_seconds="10"
 stop_on_ssh_timeout=0
 run_remote_smoke=0
+run_k26_timing_probe=0
 destroy_on_exit=0
 created_instance_id=""
 failure_ledger=""
@@ -132,6 +137,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --run-remote-smoke)
       run_remote_smoke=1
+      shift
+      ;;
+    --run-k26-timing-probe)
+      run_k26_timing_probe=1
       shift
       ;;
     --destroy-on-exit)
@@ -215,7 +224,14 @@ if [[ "$execute" -eq 1 && "$max_create_attempts" != "1" && "$destroy_on_exit" -n
   echo "--max-create-attempts greater than 1 requires --destroy-on-exit when executing" >&2
   exit 2
 fi
+if [[ "$run_remote_smoke" -eq 1 && "$run_k26_timing_probe" -eq 1 ]]; then
+  echo "--run-remote-smoke and --run-k26-timing-probe are mutually exclusive" >&2
+  exit 2
+fi
 if [[ "$run_remote_smoke" -eq 1 && "$wait_ssh_seconds" == "0" ]]; then
+  wait_ssh_seconds="600"
+fi
+if [[ "$run_k26_timing_probe" -eq 1 && "$wait_ssh_seconds" == "0" ]]; then
   wait_ssh_seconds="600"
 fi
 
@@ -463,6 +479,64 @@ run_remote_smoke_gate() {
   echo "REMOTE_VAST_SMOKE_PASS id=${instance_id} pull_dir=${pull_dir}"
 }
 
+run_remote_k26_timing_probe_gate() {
+  local instance_id="$1"
+  local host port ssh_cmd
+  read -r host port < <(require_ssh_endpoint "$instance_id")
+  ssh_cmd=(ssh -o StrictHostKeyChecking=accept-new -p "$port" "root@${host}")
+
+  rm -rf "$pull_dir"
+  mkdir -p "$pull_dir"
+
+  echo "DEPLOYING_SOURCE id=${instance_id} host=${host} port=${port}"
+  "${ssh_cmd[@]}" "rm -rf ${remote_dir} && mkdir -p ${remote_dir}"
+  tar \
+    --exclude '.git' \
+    --exclude 'build*/' \
+    --exclude '**/build*/' \
+    --exclude '**/artifacts/' \
+    --exclude '**/results/' \
+    --exclude '**/profiles/' \
+    --exclude '**/runs/' \
+    --exclude '**/tmp/' \
+    --exclude '**/*.bin' \
+    --exclude '**/*.log' \
+    -czf - . |
+    "${ssh_cmd[@]}" "tar -xzf - -C ${remote_dir}"
+
+  printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" \
+      "$local_head" "$local_branch" |
+    "${ssh_cmd[@]}" \
+      "mkdir -p /workspace/lb-source-k26-timing-probe && cat > /workspace/lb-source-k26-timing-probe/deployed_source.txt"
+
+  echo "RUNNING_REMOTE_K26_TIMING_PROBE id=${instance_id}"
+  "${ssh_cmd[@]}" \
+    "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh --repo ${remote_dir} --out-dir /workspace/lb-source-k26-timing-probe"
+
+  echo "PULLING_REMOTE_K26_TIMING_ARTIFACTS id=${instance_id}"
+  "${ssh_cmd[@]}" "cd /workspace/lb-source-k26-timing-probe && tar -czf - ." |
+    tar -xzf - -C "$pull_dir"
+
+  if [[ ! -f "$pull_dir/remote-k26-timing-probe-status.txt" ]]; then
+    echo "missing pulled remote K26 timing probe status" >&2
+    exit 1
+  fi
+  if [[ ! -f "$pull_dir/status.txt" ]]; then
+    echo "missing pulled K26 bundle status" >&2
+    exit 1
+  fi
+  if ! grep -q '^REMOTE_K26_TIMING_PROBE_PASS$' \
+      "$pull_dir/remote-k26-timing-probe-status.txt"; then
+    echo "remote K26 timing probe status did not pass" >&2
+    exit 1
+  fi
+  if ! grep -Eq '^K26_FULL_RUN_BUNDLE_(BLOCKED_|PASS)' "$pull_dir/status.txt"; then
+    echo "unexpected K26 bundle status in pulled timing probe" >&2
+    exit 1
+  fi
+  echo "REMOTE_K26_TIMING_PROBE_PASS id=${instance_id} pull_dir=${pull_dir}"
+}
+
 filter="gpu_name=RTX_4090 cuda_vers>=12.0 disk_space>=40 num_gpus=1 dph<=${max_dph} reliability>=0.95"
 market_filter="gpu_name=RTX_4090 cuda_vers>=12.0 disk_space>=40 num_gpus=1 reliability>=0.95"
 selected_offer_id=""
@@ -613,13 +687,18 @@ print_offer_plan() {
   if [[ "$one_shot_wait_ssh_seconds" == "0" ]]; then
     one_shot_wait_ssh_seconds="600"
   fi
-  one_shot_cmd=("$0" --execute --run-remote-smoke --destroy-on-exit
+  one_shot_cmd=("$0" --execute --destroy-on-exit
     --max-dph "$max_dph" --max-budget "$max_budget" --k-sq "$k_sq"
     --offer-wait-seconds "$offer_wait_seconds"
     --offer-poll-seconds "$offer_poll_seconds"
     --max-create-attempts "$max_create_attempts"
     --wait-ssh-seconds "$one_shot_wait_ssh_seconds"
     --ssh-poll-seconds "$ssh_poll_seconds")
+  if [[ "$run_k26_timing_probe" -eq 1 ]]; then
+    one_shot_cmd+=(--run-k26-timing-probe)
+  else
+    one_shot_cmd+=(--run-remote-smoke)
+  fi
   if [[ -n "$failure_ledger" ]]; then
     one_shot_cmd+=(--failure-ledger "$failure_ledger")
   fi
@@ -649,6 +728,28 @@ After instance is ready, set:
 DEPLOY:
   \$SSH_CMD "rm -rf ${remote_dir} && mkdir -p ${remote_dir}"
   tar --exclude '.git' --exclude 'build*/' --exclude '**/build*/' --exclude '**/artifacts/' --exclude '**/results/' --exclude '**/profiles/' --exclude '**/runs/' --exclude '**/tmp/' --exclude '**/*.bin' --exclude '**/*.log' -czf - . | \$SSH_CMD "tar -xzf - -C ${remote_dir}"
+EOF
+
+  if [[ "$run_k26_timing_probe" -eq 1 ]]; then
+    cat <<EOF
+  printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" "\$LOCAL_HEAD" "\$LOCAL_BRANCH" | \$SSH_CMD "mkdir -p /workspace/lb-source-k26-timing-probe && cat > /workspace/lb-source-k26-timing-probe/deployed_source.txt"
+
+REMOTE_K26_TIMING_PROBE:
+  \$SSH_CMD "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh --repo ${remote_dir} --out-dir /workspace/lb-source-k26-timing-probe"
+
+PULL:
+  mkdir -p ${pull_dir}
+  \$SSH_CMD "cd /workspace/lb-source-k26-timing-probe && tar -czf - ." | tar -xzf - -C ${pull_dir}
+
+ACCEPTANCE_CHECK:
+  grep -q '^REMOTE_K26_TIMING_PROBE_PASS$' ${pull_dir}/remote-k26-timing-probe-status.txt
+  grep -Eq '^K26_FULL_RUN_BUNDLE_(BLOCKED_|PASS)' ${pull_dir}/status.txt
+
+ONE_SHOT_REMOTE_K26_TIMING_PROBE:
+  $(shell_join "${one_shot_cmd[@]}")
+EOF
+  else
+    cat <<EOF
   printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" "\$LOCAL_HEAD" "\$LOCAL_BRANCH" | \$SSH_CMD "mkdir -p /workspace/lb-source-remote-smoke && cat > /workspace/lb-source-remote-smoke/deployed_source.txt"
 
 REMOTE_SMOKE:
@@ -664,6 +765,7 @@ ACCEPTANCE_CHECK:
 ONE_SHOT_REMOTE_SMOKE:
   $(shell_join "${one_shot_cmd[@]}")
 EOF
+  fi
 }
 
 create_cmd=()
@@ -742,6 +844,10 @@ while (( attempt <= max_create_attempts )); do
 
   if [[ "$run_remote_smoke" -eq 1 ]]; then
     run_remote_smoke_gate "$created_instance_id"
+    exit 0
+  fi
+  if [[ "$run_k26_timing_probe" -eq 1 ]]; then
+    run_remote_k26_timing_probe_gate "$created_instance_id"
     exit 0
   fi
 
