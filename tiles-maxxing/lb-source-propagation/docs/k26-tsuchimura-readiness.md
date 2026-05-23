@@ -365,6 +365,22 @@ full local K26 continuation is not accepted under the current runtime gate; a
 paid or larger-machine attempt must keep the same runtime checker active and
 stop if the later-radius projection remains over budget.
 
+A bounded 2026-05-23 Vast RTX 4090 timing probe at commit `3483137` ran under
+the price gate on instance `37436093` at about `$0.355/hr`, pulled artifacts to
+`tiles-maxxing/lb-source-propagation/artifacts/vast-k26-timing-pull`, and
+destroyed the instance after exit. The probe built the K26 sidecar but timed
+out inside `K26_CONTINUATION_CHUNK_000` with
+`K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_000_TIMEOUT`. It completed
+six continuation bands through `R=57344`, all with
+`tileop_overflows_total=0`, live source carry, and target not seen. The
+tail-conservative runtime checker rejected the run:
+`completed_band_count=6`, cumulative projection `20575s`, latest-band tail
+projection `28229s`, effective projection `28229s`, and budget margin
+`-14229s` against the `14000s` cap. This confirms the current cheap 4090 Vast
+shape is not a viable full K26 CPU TileOp continuation path; it is timing
+evidence only, not a `SOURCE_DEAD_CERT`, not a sqrt(26) reproduction, and not a
+moat result.
+
 After any partial continuation, run:
 
 ```bash
