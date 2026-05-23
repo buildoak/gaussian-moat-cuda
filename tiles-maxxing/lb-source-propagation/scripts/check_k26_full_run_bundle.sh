@@ -616,6 +616,8 @@ require_grep '"bz_evidence":.*"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE".*"
   "K26 source-dead gap BZ evidence flags"
 require_grep '"bz_evidence":.*"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1".*"schedule_digest_hex":"[0-9a-f]{64}"' "$gap" \
   "K26 source-dead gap BZ digest"
+require_grep '"bz_schedule_obligation":.*"required_status":"claim_grade_bz_schedule".*"observed_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE".*"accepted_for_schedule":true.*"accepted_for_claim":false.*"claim_grade_bz_accepted":false' "$gap" \
+  "K26 source-dead gap BZ schedule obligation"
 require_grep '"bridge_safety":.*"seam_bridge_policy":"diagnostic_allow_unbridged"' "$gap" \
   "K26 source-dead gap bridge policy"
 require_grep '"bridge_safety":.*"source_coordinate_carry_atoms_with_next_band_candidates":[0-9]+' "$gap" \
@@ -714,6 +716,11 @@ fi
 gap_bz_digest="$(require_json_string_value "$gap" schedule_digest_hex)"
 require_equal "$bz_digest" "$gap_bz_digest" \
   "K26 gap BZ digest binding"
+gap_bz_obligation_digest="$(
+  json_object_string_value "$gap" bz_schedule_obligation observed_schedule_digest_hex
+)"
+require_equal "$bz_digest" "$gap_bz_obligation_digest" \
+  "K26 gap BZ obligation digest binding"
 continuation_bridge_policy="$(
   require_json_string_value "$continuation" seam_bridge_policy
 )"

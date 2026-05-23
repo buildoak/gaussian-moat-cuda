@@ -121,6 +121,7 @@ foreach(bad_source_dead_gap
     dead-gap-bad-bridge-unsafe
     dead-gap-bad-bz-digest
     dead-gap-bad-bz-evidence
+    dead-gap-bad-bz-obligation-digest
     dead-gap-bad-claim-status
     dead-gap-bad-endpoint-atom
     dead-gap-bad-endpoint-port-tile

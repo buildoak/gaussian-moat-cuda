@@ -17,6 +17,7 @@
     "prefix_witness_artifact",
     "continuation_artifact",
     "bz_evidence",
+    "bz_schedule_obligation",
     "bridge_safety",
     "target_path_provenance",
     "target_atom_path_length",
@@ -114,6 +115,32 @@
         "schedule_digest_hex": {
           "const": "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"
         }
+      }
+    },
+    "bz_schedule_obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_status",
+        "observed_status",
+        "observed_schedule_digest_algorithm",
+        "observed_schedule_digest_hex",
+        "accepted_for_schedule",
+        "accepted_for_claim",
+        "claim_grade_bz_accepted"
+      ],
+      "properties": {
+        "required_status": { "const": "claim_grade_bz_schedule" },
+        "observed_status": { "const": "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE" },
+        "observed_schedule_digest_algorithm": {
+          "const": "sha256:lb_source_k26_repaired_bz_schedule_v1"
+        },
+        "observed_schedule_digest_hex": {
+          "const": "7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"
+        },
+        "accepted_for_schedule": { "const": true },
+        "accepted_for_claim": { "const": false },
+        "claim_grade_bz_accepted": { "const": false }
       }
     },
     "bridge_safety": {

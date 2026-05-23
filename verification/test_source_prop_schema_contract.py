@@ -193,6 +193,22 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             bridge_safety["required"],
         )
 
+    def test_source_dead_gap_schema_requires_bz_schedule_obligation(self) -> None:
+        schema = load_json(DEAD_GAP_SCHEMA_PATH)
+        self.assertIn("bz_schedule_obligation", schema["required"])
+        obligation = schema["properties"]["bz_schedule_obligation"]
+        self.assertEqual(
+            obligation["properties"]["required_status"]["const"],
+            "claim_grade_bz_schedule",
+        )
+        self.assertEqual(
+            obligation["properties"]["observed_status"]["const"],
+            "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE",
+        )
+        self.assertFalse(
+            obligation["properties"]["claim_grade_bz_accepted"]["const"],
+        )
+
     def test_source_dead_gap_schema_allows_non_claim_accumulator_binding(self) -> None:
         schema = load_json(DEAD_GAP_SCHEMA_PATH)
         self.assertNotIn("terminal_source_inventory_accumulator", schema["required"])

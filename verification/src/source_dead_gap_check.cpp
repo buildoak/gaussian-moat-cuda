@@ -321,6 +321,34 @@ std::string verify_gap(const nlohmann::json& gap) {
     throw std::runtime_error("BZ schedule digest does not match K26 repaired schedule");
   }
 
+  const nlohmann::json& bz_obligation =
+      require_object(gap, "bz_schedule_obligation");
+  if (require_string(bz_obligation, "required_status") !=
+      "claim_grade_bz_schedule") {
+    throw std::runtime_error("BZ schedule obligation has wrong required status");
+  }
+  if (require_string(bz_obligation, "observed_status") !=
+      require_string(bz_evidence, "status")) {
+    throw std::runtime_error("BZ schedule obligation status binding mismatch");
+  }
+  if (require_string(bz_obligation, "observed_schedule_digest_algorithm") !=
+      require_string(bz_evidence, "schedule_digest_algorithm")) {
+    throw std::runtime_error(
+        "BZ schedule obligation digest algorithm binding mismatch");
+  }
+  if (require_string(bz_obligation, "observed_schedule_digest_hex") !=
+      bz_digest_hex) {
+    throw std::runtime_error("BZ schedule obligation digest binding mismatch");
+  }
+  if (!require_bool(bz_obligation, "accepted_for_schedule")) {
+    throw std::runtime_error("BZ schedule obligation lost schedule acceptance");
+  }
+  if (require_bool(bz_obligation, "accepted_for_claim") ||
+      require_bool(bz_obligation, "claim_grade_bz_accepted")) {
+    throw std::runtime_error(
+        "BZ schedule obligation must remain non-claim until accepted");
+  }
+
   const nlohmann::json& bridge_safety =
       require_object(gap, "bridge_safety");
   if (require_string(bridge_safety, "seam_bridge_policy") !=

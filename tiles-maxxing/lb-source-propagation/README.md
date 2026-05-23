@@ -380,7 +380,9 @@ source-dead gap. `terminal_inventory_obligation` records that the observed
 inventory is still summary-digest non-claim evidence and must be promoted to
 claim-grade terminal inventory provenance. The gap artifact also binds the
 prefix manifest, prefix witness, and repaired K26 BZ schedule digest as
-schedule-only, non-claim evidence. When the mixed target atom chain is present,
+schedule-only, non-claim evidence. `bz_schedule_obligation` makes that BZ
+status explicit: accepted for this schedule, not accepted for a source claim
+until a claim-grade BZ gate exists. When the mixed target atom chain is present,
 `coordinate_path_obligation` also binds its first coordinate atom to a target
 row in `k26-prefix-witness.txt`; the remaining path blocker is the missing
 coordinate expansion of TileOp-port edges. `target_bridge_obligation` mirrors

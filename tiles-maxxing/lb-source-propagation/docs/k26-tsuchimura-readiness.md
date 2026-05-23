@@ -145,11 +145,14 @@ with `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE` because there is no
 source-dead gap to certify. The gap artifact binds the continuation artifact
 plus the prefix manifest and prefix witness, and records the exact remaining
 certificate obligations: bridge safety, target/coordinate path, terminal
-inventory, and repaired K26 BZ schedule evidence. When the mixed target atom
-chain is present, the gap also requires the first coordinate atom to be a target
-row in `k26-prefix-witness.txt`; the origin-prefix side is then bound, while
-the TileOp-port edges still need coordinate expansion before any
-`SOURCE_DEAD_CERT` claim. The same gap records a `target_bridge_obligation`
+inventory, and repaired K26 BZ schedule evidence. `bz_schedule_obligation`
+binds the repaired K26 BZ digest as schedule-accepted but source-claim
+non-accepted, which keeps non-square BZ evidence out of `SOURCE_DEAD_CERT`
+until the cert layer has a claim-grade BZ gate. When the mixed target atom chain
+is present, the gap also requires the first coordinate atom to be a target row
+in `k26-prefix-witness.txt`; the origin-prefix side is then bound, while the
+TileOp-port edges still need coordinate expansion before any `SOURCE_DEAD_CERT`
+claim. The same gap records a `target_bridge_obligation`
 that mirrors whether the canonical endpoint was seen, bridged to TileOp ports,
 and source-reached. For chunked runs it also binds
 `k26-continuation-chunks.jsonl` by SHA-256, so the gap report carries the

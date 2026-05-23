@@ -480,6 +480,8 @@ grep -q '"bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepte
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"' \
   "$blocked_out/k26-source-dead-gap.json"
+grep -q '"bz_schedule_obligation":{"required_status":"claim_grade_bz_schedule","observed_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","observed_schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","observed_schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","accepted_for_schedule":true,"accepted_for_claim":false,"claim_grade_bz_accepted":false}' \
+  "$blocked_out/k26-source-dead-gap.json"
 grep -q '"bridge_safety":{"seam_bridge_policy":"diagnostic_allow_unbridged","source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369' \
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"source_unbridged_unsafe_candidate_atoms":0' \
@@ -578,6 +580,8 @@ grep -q '"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"
 grep -q '"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"[0-9a-f]\{64\}"' \
   "$chunked_out/k26-source-dead-gap.json"
 grep -q '"target_bridge_obligation":{"endpoint_atom_id":1615075207964004,"observed_target_seen":true,"observed_target_source_reached":true,"observed_target_port_atoms":9,"observed_target_bridge_edges":9,"endpoint_bridge_accepted":true}' \
+  "$chunked_out/k26-source-dead-gap.json"
+grep -q '"bz_schedule_obligation":{"required_status":"claim_grade_bz_schedule","observed_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","observed_schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","observed_schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","accepted_for_schedule":true,"accepted_for_claim":false,"claim_grade_bz_accepted":false}' \
   "$chunked_out/k26-source-dead-gap.json"
 grep -q '"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"[0-9a-f]\{64\}"' \
   "$chunked_out/k26-source-dead-gap.json"
