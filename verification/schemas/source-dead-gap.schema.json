@@ -64,6 +64,15 @@
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
+    "bridge_source_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": { "const": "k26-continuation-chunk-000.json" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
     "bz_evidence": {
       "type": "object",
       "additionalProperties": false,
@@ -91,6 +100,7 @@
       "additionalProperties": false,
       "required": [
         "seam_bridge_policy",
+        "source_coordinate_carry_atoms_with_next_band_candidates",
         "source_bridged_coordinate_carry_atoms",
         "source_unbridged_coordinate_carry_atoms",
         "source_unbridged_without_next_band_candidates",
@@ -101,6 +111,10 @@
       ],
       "properties": {
         "seam_bridge_policy": { "const": "diagnostic_allow_unbridged" },
+        "source_coordinate_carry_atoms_with_next_band_candidates": {
+          "type": "integer",
+          "minimum": 0
+        },
         "source_bridged_coordinate_carry_atoms": {
           "type": "integer",
           "minimum": 0

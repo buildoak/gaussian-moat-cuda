@@ -264,6 +264,11 @@ std::string verify_gap(const nlohmann::json& gap) {
   }
   const std::uint64_t source_unbridged =
       require_u64(bridge_safety, "source_unbridged_coordinate_carry_atoms");
+  const std::uint64_t source_with_next_candidates =
+      require_u64(bridge_safety,
+                  "source_coordinate_carry_atoms_with_next_band_candidates");
+  const std::uint64_t source_bridged =
+      require_u64(bridge_safety, "source_bridged_coordinate_carry_atoms");
   const std::uint64_t source_without_candidates =
       require_u64(bridge_safety, "source_unbridged_without_next_band_candidates");
   const std::uint64_t source_with_candidates =
@@ -272,10 +277,13 @@ std::string verify_gap(const nlohmann::json& gap) {
       require_u64(bridge_safety, "source_unbridged_dead_end_candidate_atoms");
   const std::uint64_t source_unsafe =
       require_u64(bridge_safety, "source_unbridged_unsafe_candidate_atoms");
-  (void)require_u64(bridge_safety, "source_bridged_coordinate_carry_atoms");
   (void)require_u64(bridge_safety, "source_bridge_rejected_candidate_atoms");
   if (source_unbridged != source_without_candidates + source_with_candidates) {
     throw std::runtime_error("bridge safety source unbridged counts do not add up");
+  }
+  if (source_with_next_candidates != source_bridged + source_with_candidates) {
+    throw std::runtime_error(
+        "bridge safety source candidate total does not add up");
   }
   if (source_with_candidates != source_dead_end + source_unsafe) {
     throw std::runtime_error("bridge safety source candidate counts do not add up");

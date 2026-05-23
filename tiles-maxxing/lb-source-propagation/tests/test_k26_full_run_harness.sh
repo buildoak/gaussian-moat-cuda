@@ -89,12 +89,12 @@ done
 if [[ -n "$manifest" ]]; then
   echo "port-manifest-${r_final}" > "$manifest"
   cat <<JSON
-{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":${r_final},"schedule_mode":"explicit_radii","schedule_boundary_count":3,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1],"manifest_written":true}
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":${r_final},"schedule_mode":"explicit_radii","schedule_boundary_count":3,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1],"manifest_written":true}
 JSON
   exit 0
 fi
 cat <<'JSON'
-{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true,"path_provenance":"mixed_coordinate_port_atom_chain_non_claim","atom_path_length":3,"atom_path":[1615075207963900,-25220051735553,1615075207964004]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615075207964004]}
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true,"path_provenance":"mixed_coordinate_port_atom_chain_non_claim","atom_path_length":3,"atom_path":[1615075207963900,-25220051735553,1615075207964004]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615075207964004]}
 JSON
 SH
 
@@ -280,7 +280,7 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$progress" ]] && echo '{"schema":"lb_source_tileop_port_progress_v1","accepted":true}' > "$progress"
 cat <<'JSON'
-{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":2022302,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"7463f2808ab896cd47b740719c3d8df5e321c1f978bf8b232ab3f48858b7901f","max_source_norm_sq":279511040,"max_source_norm_atom_ids":[-463856527362]}
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":2022302,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"7463f2808ab896cd47b740719c3d8df5e321c1f978bf8b232ab3f48858b7901f","max_source_norm_sq":279511040,"max_source_norm_atom_ids":[-463856527362]}
 JSON
 SH
 chmod +x "$target_not_reached_build/source_tileop_port_runner"
@@ -362,7 +362,7 @@ grep -q '"bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepte
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"' \
   "$blocked_out/k26-source-dead-gap.json"
-grep -q '"bridge_safety":{"seam_bridge_policy":"diagnostic_allow_unbridged","source_bridged_coordinate_carry_atoms":1369' \
+grep -q '"bridge_safety":{"seam_bridge_policy":"diagnostic_allow_unbridged","source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369' \
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"source_unbridged_unsafe_candidate_atoms":0' \
   "$blocked_out/k26-source-dead-gap.json"
@@ -420,6 +420,8 @@ grep -q 'k26-continuation-chunks.jsonl' \
 grep -q '"terminal_source_dead":true' \
   "$chunked_out/k26-continuation-result.json"
 grep -q '"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"[0-9a-f]\{64\}"' \
+  "$chunked_out/k26-source-dead-gap.json"
+grep -q '"bridge_source_artifact":{"name":"k26-continuation-chunk-000.json","sha256":"[0-9a-f]\{64\}"' \
   "$chunked_out/k26-source-dead-gap.json"
 
 resume_out="$tmp/resume-existing"
@@ -580,6 +582,8 @@ grep -q '"chunk_id":"000","action":"executed"' \
 grep -q 'k26-continuation-chunks.jsonl' \
   "$checked_chunked_out/k26-full-run-artifacts.sha256"
 grep -q '"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"[0-9a-f]\{64\}"' \
+  "$checked_chunked_out/k26-source-dead-gap.json"
+grep -q '"bridge_source_artifact":{"name":"k26-continuation-chunk-000.json","sha256":"[0-9a-f]\{64\}"' \
   "$checked_chunked_out/k26-source-dead-gap.json"
 
 bad_ledger_out="$tmp/bad-ledger"

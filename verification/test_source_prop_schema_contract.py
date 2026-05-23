@@ -174,6 +174,25 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             "^[0-9a-f]{64}$",
         )
 
+    def test_source_dead_gap_schema_allows_chunk_bridge_source_binding(self) -> None:
+        schema = load_json(DEAD_GAP_SCHEMA_PATH)
+        self.assertNotIn("bridge_source_artifact", schema["required"])
+        bridge_source = schema["properties"]["bridge_source_artifact"]
+        self.assertEqual(
+            bridge_source["properties"]["name"]["const"],
+            "k26-continuation-chunk-000.json",
+        )
+        self.assertEqual(
+            bridge_source["properties"]["sha256"]["pattern"],
+            "^[0-9a-f]{64}$",
+        )
+
+        bridge_safety = schema["properties"]["bridge_safety"]
+        self.assertIn(
+            "source_coordinate_carry_atoms_with_next_band_candidates",
+            bridge_safety["required"],
+        )
+
     def test_source_dead_cert_schema_pins_hash_shape_and_k26_endpoint(self) -> None:
         schema = load_json(DEAD_CERT_SCHEMA_PATH)
         self.assertEqual(

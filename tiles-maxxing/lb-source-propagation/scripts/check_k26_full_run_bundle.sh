@@ -198,6 +198,7 @@ prefix_progress="$out_dir/k26-prefix-progress.jsonl"
 continuation="$out_dir/k26-continuation-result.json"
 continuation_progress="$out_dir/k26-continuation-progress.jsonl"
 chunk_ledger="$out_dir/k26-continuation-chunks.jsonl"
+bridge_source="$continuation"
 prefix_manifest="$out_dir/k26-prefix-manifest.txt"
 prefix_witness="$out_dir/k26-prefix-witness.txt"
 gap="$out_dir/k26-source-dead-gap.json"
@@ -234,6 +235,9 @@ require_manifest_hash "$continuation" k26-continuation-result.json
 require_manifest_hash "$continuation_progress" k26-continuation-progress.jsonl
 if [[ -f "$chunk_ledger" ]]; then
   require_manifest_hash "$chunk_ledger" k26-continuation-chunks.jsonl
+  bridge_source="$out_dir/k26-continuation-chunk-000.json"
+  require_file "$bridge_source"
+  require_manifest_hash "$bridge_source" k26-continuation-chunk-000.json
 fi
 require_manifest_hash "$prefix_manifest" k26-prefix-manifest.txt
 require_manifest_hash "$prefix_witness" k26-prefix-witness.txt
@@ -561,6 +565,8 @@ require_grep '"bz_evidence":.*"schedule_digest_algorithm":"sha256:lb_source_k26_
   "K26 source-dead gap BZ digest"
 require_grep '"bridge_safety":.*"seam_bridge_policy":"diagnostic_allow_unbridged"' "$gap" \
   "K26 source-dead gap bridge policy"
+require_grep '"bridge_safety":.*"source_coordinate_carry_atoms_with_next_band_candidates":[0-9]+' "$gap" \
+  "K26 source-dead gap source candidate bridge count"
 require_grep '"bridge_safety":.*"source_unbridged_unsafe_candidate_atoms":0' "$gap" \
   "K26 source-dead gap unsafe bridge stop condition"
 require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' "$gap" \
@@ -593,8 +599,13 @@ require_equal "$actual_continuation_digest" "$gap_continuation_digest" \
 if [[ -f "$chunk_ledger" ]]; then
   require_grep '"chunk_ledger_artifact":.*"name":"k26-continuation-chunks.jsonl".*"sha256":"[0-9a-f]{64}"' \
     "$gap" "K26 source-dead gap chunk ledger binding"
+  require_grep '"bridge_source_artifact":.*"name":"k26-continuation-chunk-000.json".*"sha256":"[0-9a-f]{64}"' \
+    "$gap" "K26 source-dead gap bridge source binding"
   actual_chunk_ledger_digest="$(
     shasum -a 256 "$chunk_ledger" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
+  )"
+  actual_bridge_source_digest="$(
+    shasum -a 256 "$bridge_source" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
   )"
   gap_chunk_ledger_name="$(
     json_object_string_value "$gap" chunk_ledger_artifact name
@@ -602,10 +613,20 @@ if [[ -f "$chunk_ledger" ]]; then
   gap_chunk_ledger_digest="$(
     json_object_string_value "$gap" chunk_ledger_artifact sha256
   )"
+  gap_bridge_source_name="$(
+    json_object_string_value "$gap" bridge_source_artifact name
+  )"
+  gap_bridge_source_digest="$(
+    json_object_string_value "$gap" bridge_source_artifact sha256
+  )"
   require_equal "k26-continuation-chunks.jsonl" "$gap_chunk_ledger_name" \
     "K26 gap chunk ledger artifact name binding"
   require_equal "$actual_chunk_ledger_digest" "$gap_chunk_ledger_digest" \
     "K26 gap chunk ledger hash binding"
+  require_equal "k26-continuation-chunk-000.json" "$gap_bridge_source_name" \
+    "K26 gap bridge source artifact name binding"
+  require_equal "$actual_bridge_source_digest" "$gap_bridge_source_digest" \
+    "K26 gap bridge source hash binding"
 fi
 gap_bz_digest="$(require_json_string_value "$gap" schedule_digest_hex)"
 require_equal "$bz_digest" "$gap_bz_digest" \
@@ -617,6 +638,7 @@ gap_bridge_policy="$(require_json_string_value "$gap" seam_bridge_policy)"
 require_equal "$continuation_bridge_policy" "$gap_bridge_policy" \
   "K26 gap bridge policy binding"
 for bridge_field in \
+    source_coordinate_carry_atoms_with_next_band_candidates \
     source_bridged_coordinate_carry_atoms \
     source_unbridged_coordinate_carry_atoms \
     source_unbridged_without_next_band_candidates \
@@ -624,7 +646,7 @@ for bridge_field in \
     source_unbridged_dead_end_candidate_atoms \
     source_unbridged_unsafe_candidate_atoms \
     source_bridge_rejected_candidate_atoms; do
-  continuation_bridge_value="$(require_json_number_value "$continuation" "$bridge_field")"
+  continuation_bridge_value="$(require_json_number_value "$bridge_source" "$bridge_field")"
   gap_bridge_value="$(require_json_number_value "$gap" "$bridge_field")"
   require_equal "$continuation_bridge_value" "$gap_bridge_value" \
     "K26 gap bridge ${bridge_field} binding"

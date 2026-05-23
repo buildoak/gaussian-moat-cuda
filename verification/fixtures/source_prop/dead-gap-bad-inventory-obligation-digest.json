@@ -38,6 +38,7 @@
   ],
   "bridge_safety": {
     "seam_bridge_policy": "diagnostic_allow_unbridged",
+    "source_coordinate_carry_atoms_with_next_band_candidates": 1426,
     "source_bridged_coordinate_carry_atoms": 1369,
     "source_unbridged_coordinate_carry_atoms": 1211,
     "source_unbridged_without_next_band_candidates": 1154,

@@ -30,7 +30,7 @@ write_ctest_log() {
 }
 
 write_ctest_log "$tmp/ctest.log" 27
-write_ctest_log "$tmp/verification-ctest.log" 77
+write_ctest_log "$tmp/verification-ctest.log" 78
 
 cat > "$tmp/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
@@ -104,7 +104,7 @@ grep -q "REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS" "$tmp/provenance-pass.log"
 bad_ctest="$tmp/bad-ctest"
 mkdir "$bad_ctest"
 cp "$tmp"/* "$bad_ctest"/ 2>/dev/null || true
-perl -0pi -e 's/100% tests passed, 0 tests failed out of 77/100% tests passed, 0 tests failed out of 76/' \
+perl -0pi -e 's/100% tests passed, 0 tests failed out of 78/100% tests passed, 0 tests failed out of 77/' \
   "$bad_ctest/verification-ctest.log"
 if "$checker" "$bad_ctest" > "$tmp/bad-ctest.log" 2>&1; then
   echo "checker accepted verification CTest log with mismatched row count" >&2

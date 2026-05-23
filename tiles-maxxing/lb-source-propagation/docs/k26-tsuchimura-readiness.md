@@ -144,6 +144,9 @@ and records the exact remaining certificate obligations: bridge safety,
 target/coordinate path, terminal inventory, and repaired K26 BZ schedule
 evidence. For chunked runs it also binds `k26-continuation-chunks.jsonl` by
 SHA-256, so the gap report carries the checked continuation ledger identity.
+It separately binds `k26-continuation-chunk-000.json` when chunking is used,
+because coordinate-to-port bridge safety is a row-0 seam obligation while the
+terminal/path/inventory fields are final-continuation obligations.
 The bridge obligation can pass as diagnostic evidence when every
 source-connected carry atom either bridges, has no legal next-band candidate,
 or has only dead-end candidates; the target/coordinate path obligation remains

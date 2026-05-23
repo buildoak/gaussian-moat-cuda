@@ -34,7 +34,7 @@ ctest --test-dir verification/build --output-on-failure
 | `tile_sample_check` | Independent production tile-sample checker. |
 | `span_cert_check` | Independent Gaussian-prime coordinate path checker. |
 | `source_dead_cert_check` | Independent draft checker for positive source path, negative-guard metadata, listed terminal inventory consistency, and explicit summary-only non-claim inventory contracts. |
-| `source_dead_gap_check` | Independent non-claim checker for the K26 gap artifact: mixed coordinate/port target path provenance, terminal inventory summary, continuation artifact hash, and repaired BZ schedule digest binding. |
+| `source_dead_gap_check` | Independent non-claim checker for the K26 gap artifact: mixed coordinate/port target path provenance, terminal inventory summary, continuation artifact hash, chunked bridge-source binding, and repaired BZ schedule digest binding. |
 | `postflight_check` | Compact bundle checker for profile coherence, sample audit, and SPANNING cert status. |
 | `stats/normalize_sweep_rows.py` | Normalizes profiles and post-flight reports into sweep rows. |
 | `stats/summarize_stats.py` | Quick shell summary for `stats_v2` profiles/rows. |
