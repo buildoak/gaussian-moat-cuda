@@ -60,6 +60,18 @@ write_manifest() {
     printf '%s  %s\n' "$digest" "$name" \
       >> "$dir/k26-full-run-artifacts.sha256"
   done
+  while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    name="${path#$dir/}"
+    digest="$(shasum -a 256 "$path" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+    printf '%s  %s\n' "$digest" "$name" \
+      >> "$dir/k26-full-run-artifacts.sha256"
+  done < <(find "$dir" -maxdepth 1 -type f \
+    \( -name 'k26-continuation-chunks.jsonl' \
+       -o -name 'k26-continuation-chunk-*.json' \
+       -o -name 'k26-continuation-chunk-*.manifest.txt' \
+       -o -name 'k26-continuation-chunk-*.progress.jsonl' \) \
+    -print | LC_ALL=C sort)
 }
 
 write_bundle() {
@@ -88,11 +100,27 @@ JSON
 JSONL
   local continuation_digest
   continuation_digest="$(shasum -a 256 "$dir/k26-continuation-result.json" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+  cat > "$dir/k26-continuation-chunk-000.json" <<'JSON'
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7}
+JSON
+  echo '{"schema":"lb_source_tileop_port_progress_v1","accepted":true}' \
+    > "$dir/k26-continuation-chunk-000.progress.jsonl"
+  echo 'chunk-000-manifest' > "$dir/k26-continuation-chunk-000.manifest.txt"
+  cp "$dir/k26-continuation-result.json" \
+    "$dir/k26-continuation-chunk-001.json"
+  echo '{"schema":"lb_source_tileop_port_progress_v1","accepted":true}' \
+    > "$dir/k26-continuation-chunk-001.progress.jsonl"
+  cat > "$dir/k26-continuation-chunks.jsonl" <<'JSONL'
+{"schema":"lb_source_k26_continuation_chunk_v1","chunk_index":0,"chunk_id":"000","action":"executed","schedule_segment_start":0,"schedule_segment_end":2,"schedule_segment_count":2,"r_start":8192,"r_final":475135,"schedule_radii_csv":"8192,122879,475135","input_manifest":"k26-prefix-manifest.txt","output_manifest":"k26-continuation-chunk-000.manifest.txt","result":"k26-continuation-chunk-000.json","progress":"k26-continuation-chunk-000.progress.jsonl","final_chunk":false,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7}
+{"schema":"lb_source_k26_continuation_chunk_v1","chunk_index":1,"chunk_id":"001","action":"executed","schedule_segment_start":2,"schedule_segment_end":4,"schedule_segment_count":2,"r_start":475135,"r_final":1015645,"schedule_radii_csv":"475135,622591,1015645","input_manifest":"k26-continuation-chunk-000.manifest.txt","output_manifest":"","result":"k26-continuation-chunk-001.json","progress":"k26-continuation-chunk-001.progress.jsonl","final_chunk":true,"terminal_source_dead":true,"has_source_carry":false,"source_carry_atoms":null}
+JSONL
+  local chunk_ledger_digest
+  chunk_ledger_digest="$(shasum -a 256 "$dir/k26-continuation-chunks.jsonl" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
   cat > "$dir/k26-source-dead-cert.json" <<JSON
 {"schema":"lb_source_dead_cert_draft_v1","certificate_id":"k26-source-dead-cert-draft","profile_id":"k26-source-run-profile","metadata":{"source_mode":"ORIGIN_SOURCE","source_id":"omega","geometry_id":"SOURCE_ORIGIN_K26","commit_id":"abc123","build_id":"remote-test","bz_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","artifact_hash":"sha256:$continuation_digest"},"k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"endpoint_atom_id":1615075207964004,"source_path_provenance":"coordinate_gaussian_prime_path","source_path":[{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]}}
 JSON
   cat > "$dir/k26-source-dead-gap.json" <<JSON
-{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"},"bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"},"bridge_safety":{"seam_bridge_policy":"diagnostic_allow_unbridged","source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72},"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim","target_atom_path_length":3,"target_atom_path":[1615075207963900,-25220051735553,1615075207964004],"coordinate_path_obligation":{"required_provenance":"coordinate_gaussian_prime_path","observed_provenance":"mixed_coordinate_port_atom_chain_non_claim","observed_coordinate_atom_count":2,"observed_port_atom_count":1,"per_port_coordinate_expansion":"missing","claim_grade_path_accepted":false},"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]},"terminal_inventory_obligation":{"required_mode":"claim_grade_terminal_inventory","observed_mode":"summary_digest_only_non_claim","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"observed_count":14542615005,"observed_digest_algorithm":"sha256:lb_source_inventory_v1","observed_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","observed_max_norm_sq":1031522101121},"missing_for_source_dead_cert":["coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"]}
+{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"},"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"$chunk_ledger_digest"},"bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"},"bridge_safety":{"seam_bridge_policy":"diagnostic_allow_unbridged","source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72},"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim","target_atom_path_length":3,"target_atom_path":[1615075207963900,-25220051735553,1615075207964004],"coordinate_path_obligation":{"required_provenance":"coordinate_gaussian_prime_path","observed_provenance":"mixed_coordinate_port_atom_chain_non_claim","observed_coordinate_atom_count":2,"observed_port_atom_count":1,"per_port_coordinate_expansion":"missing","claim_grade_path_accepted":false},"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]},"terminal_inventory_obligation":{"required_mode":"claim_grade_terminal_inventory","observed_mode":"summary_digest_only_non_claim","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"observed_count":14542615005,"observed_digest_algorithm":"sha256:lb_source_inventory_v1","observed_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","observed_max_norm_sq":1031522101121},"missing_for_source_dead_cert":["coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"]}
 JSON
   echo 'manifest' > "$dir/k26-prefix-manifest.txt"
   echo 'witness' > "$dir/k26-prefix-witness.txt"
@@ -113,6 +141,21 @@ grep -q 'missing required --source-dead-gap-checker' \
   --source-dead-gap-checker "$fake_source_dead_gap_checker" \
   > "$tmp/good.log"
 grep -q 'K26_FULL_RUN_BUNDLE_DRAFT_PASS' "$tmp/good.log"
+
+bad_chunk_ledger="$tmp/bad-chunk-ledger"
+write_bundle "$bad_chunk_ledger"
+perl -0pi -e 's/"schedule_segment_start":2/"schedule_segment_start":3/' \
+  "$bad_chunk_ledger/k26-continuation-chunks.jsonl"
+write_manifest "$bad_chunk_ledger"
+if "$checker" "$bad_chunk_ledger" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-chunk-ledger.log" 2>&1; then
+  echo "checker accepted malformed chunk ledger in its own fixture" >&2
+  exit 1
+fi
+grep -Eq 'K26 chunk ledger|K26 gap chunk ledger hash binding' \
+  "$tmp/bad-chunk-ledger.log"
 
 summary_nonclaim="$tmp/summary-nonclaim"
 write_bundle "$summary_nonclaim"
@@ -366,6 +409,8 @@ bad_source_candidate_bridge="$tmp/bad-source-candidate-bridge"
 write_bundle "$bad_source_candidate_bridge"
 perl -0pi -e 's/"source_unbridged_unsafe_candidate_atoms":0/"source_unbridged_unsafe_candidate_atoms":1/' \
   "$bad_source_candidate_bridge/k26-continuation-result.json"
+cp "$bad_source_candidate_bridge/k26-continuation-result.json" \
+  "$bad_source_candidate_bridge/k26-continuation-chunk-001.json"
 if "$checker" "$bad_source_candidate_bridge" \
     --source-dead-checker "$fake_source_dead_checker" \
     --source-dead-gap-checker "$fake_source_dead_gap_checker" \
