@@ -431,6 +431,11 @@ runtime optimization only; it does not yet prove that the full K26 continuation
 fits the paid budget gate, so another paid timing probe still requires the same
 one-band default, price cap, and runtime checker.
 
+A guarded paid retry was attempted after this optimization at local head
+`6f94b31`, but no RTX 4090 offer satisfied the active `$0.37/hr` cap. The
+guard refused to rent; the nearest observed qualifying-market offer was about
+`$0.4000/hr`, `0.0300/hr` over cap. No Vast instance was created.
+
 After any partial continuation, run:
 
 ```bash
