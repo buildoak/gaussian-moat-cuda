@@ -7,6 +7,7 @@ Usage:
   run_k26_full_source_bundle.sh --build-dir DIR --out-dir DIR
                                 [--max-atoms N]
                                 [--timeout-seconds N]
+                                [--continuation-chunk-bands N]
                                 [--cert-in PATH]
                                 [--source-dead-gap-checker PATH]
                                 [--source-dead-checker PATH]
@@ -23,6 +24,8 @@ Artifacts written under OUT_DIR:
   k26-prefix-progress.jsonl
   k26-continuation-result.json
   k26-continuation-progress.jsonl
+  k26-continuation-chunk-*.json and k26-continuation-chunk-*.manifest.txt,
+    when --continuation-chunk-bands is supplied
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
   k26-source-dead-gap.json, when the continuation reaches terminal source death
@@ -41,6 +44,7 @@ build_dir=""
 out_dir=""
 max_atoms="50000000"
 timeout_seconds="0"
+continuation_chunk_bands="0"
 cert_in=""
 source_dead_gap_checker=""
 source_dead_checker=""
@@ -61,6 +65,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --timeout-seconds)
       timeout_seconds="$2"
+      shift 2
+      ;;
+    --continuation-chunk-bands)
+      continuation_chunk_bands="$2"
       shift 2
       ;;
     --cert-in)
@@ -119,6 +127,10 @@ if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "--timeout-seconds must be a nonnegative integer" >&2
   exit 2
 fi
+if [[ ! "$continuation_chunk_bands" =~ ^[0-9]+$ ]]; then
+  echo "--continuation-chunk-bands must be a nonnegative integer" >&2
+  exit 2
+fi
 
 require_k26_cmake_cache() {
   local cache="$build_dir/CMakeCache.txt"
@@ -155,6 +167,7 @@ write_status() {
     echo "out_dir=$out_dir"
     echo "max_atoms=$max_atoms"
     echo "timeout_seconds=$timeout_seconds"
+    echo "continuation_chunk_bands=$continuation_chunk_bands"
     echo "non_claim=this is an executed bundle harness, not a source-dead acceptance"
     if [[ -f "$out_dir/k26-source-dead-gap-check.log" ]]; then
       sed -nE 's/.*"status":"([^"]+)".*/source_dead_gap_check_status=\1/p' \
@@ -220,6 +233,21 @@ write_artifact_manifest() {
     fi
     printf '%s  %s\n' "$digest" "$name" >> "$artifact_manifest"
   done
+  while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    name="${path#$out_dir/}"
+    digest="$(shasum -a 256 "$path" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+    if [[ -z "$digest" ]]; then
+      write_status "K26_FULL_RUN_BUNDLE_BLOCKED_HASH_FAILED"
+      echo "could not hash artifact: $path" >&2
+      exit 1
+    fi
+    printf '%s  %s\n' "$digest" "$name" >> "$artifact_manifest"
+  done < <(find "$out_dir" -maxdepth 1 -type f \
+    \( -name 'k26-continuation-chunk-*.json' \
+       -o -name 'k26-continuation-chunk-*.manifest.txt' \
+       -o -name 'k26-continuation-chunk-*.progress.jsonl' \) \
+    -print | LC_ALL=C sort)
 }
 
 run_json() {
@@ -290,6 +318,127 @@ json_array_value() {
   local path="$1"
   local field="$2"
   sed -nE "s/.*\"${field}\":(\[[0-9, -]*\]).*/\\1/p" "$path" | head -n 1
+}
+
+join_csv_range() {
+  local begin="$1"
+  local end="$2"
+  local out="" i
+  for ((i = begin; i <= end; ++i)); do
+    if [[ -n "$out" ]]; then
+      out+=","
+    fi
+    out+="${radii[$i]}"
+  done
+  printf '%s\n' "$out"
+}
+
+append_file_if_exists() {
+  local src="$1"
+  local dst="$2"
+  if [[ -f "$src" ]]; then
+    cat "$src" >> "$dst"
+  fi
+}
+
+run_k26_continuation() {
+  if [[ "$continuation_chunk_bands" == "0" ]]; then
+    run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
+      "$build_dir/source_tileop_port_runner" \
+        --r-start 8192 \
+        --r-final 1015645 \
+        --band-width 8192 \
+        --schedule-radii "$schedule_csv" \
+        --max-atoms "$max_atoms" \
+        --target-a 376039 \
+        --target-b 943460 \
+        --manifest-in "$out_dir/k26-prefix-manifest.txt" \
+        --prefix-witness-in "$out_dir/k26-prefix-witness.txt" \
+        --progress-out "$out_dir/k26-continuation-progress.jsonl"
+    return
+  fi
+
+  local radii=()
+  IFS=',' read -r -a radii <<< "$schedule_csv"
+  local boundary_count="${#radii[@]}"
+  if [[ "$boundary_count" -lt 2 ]]; then
+    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_CHUNK_SCHEDULE_MALFORMED"
+    echo "chunked continuation requires at least two schedule radii" >&2
+    exit 1
+  fi
+
+  local segment_count=$((boundary_count - 1))
+  local chunk_size="$continuation_chunk_bands"
+  if (( chunk_size < 1 )); then
+    echo "--continuation-chunk-bands must be positive when chunking is enabled" >&2
+    exit 2
+  fi
+
+  : > "$out_dir/k26-continuation-progress.jsonl"
+  local chunk_start=0
+  local chunk_index=0
+  local manifest_in="$out_dir/k26-prefix-manifest.txt"
+  local chunk_id chunk_end chunk_r_start chunk_r_final chunk_csv
+  local chunk_json chunk_progress chunk_manifest
+  local terminal_dead has_live_source
+  while (( chunk_start < segment_count )); do
+    chunk_end=$((chunk_start + chunk_size))
+    if (( chunk_end > segment_count )); then
+      chunk_end="$segment_count"
+    fi
+    chunk_r_start="${radii[$chunk_start]}"
+    chunk_r_final="${radii[$chunk_end]}"
+    chunk_csv="$(join_csv_range "$chunk_start" "$chunk_end")"
+    chunk_id="$(printf '%03d' "$chunk_index")"
+    chunk_json="$out_dir/k26-continuation-chunk-${chunk_id}.json"
+    chunk_progress="$out_dir/k26-continuation-chunk-${chunk_id}.progress.jsonl"
+    chunk_manifest="$out_dir/k26-continuation-chunk-${chunk_id}.manifest.txt"
+
+    local args=(
+      "$build_dir/source_tileop_port_runner"
+      --r-start "$chunk_r_start"
+      --r-final "$chunk_r_final"
+      --band-width 8192
+      --schedule-radii "$chunk_csv"
+      --max-atoms "$max_atoms"
+      --target-a 376039
+      --target-b 943460
+      --manifest-in "$manifest_in"
+      --progress-out "$chunk_progress"
+    )
+    if (( chunk_index == 0 )); then
+      args+=(--prefix-witness-in "$out_dir/k26-prefix-witness.txt")
+    fi
+    if (( chunk_end < segment_count )); then
+      args+=(--manifest-out "$chunk_manifest")
+    fi
+
+    run_json "K26_CONTINUATION_CHUNK_${chunk_id}" "$chunk_json" "${args[@]}"
+    append_file_if_exists "$chunk_progress" "$out_dir/k26-continuation-progress.jsonl"
+
+    terminal_dead="$(json_bool_value "$chunk_json" terminal_source_dead)"
+    require_extracted "$terminal_dead" "CHUNK_${chunk_id}_TERMINAL_SOURCE_DEAD"
+    if (( chunk_end < segment_count )); then
+      has_live_source="$(json_bool_value "$chunk_json" has_source_carry)"
+      require_extracted "$has_live_source" "CHUNK_${chunk_id}_HAS_SOURCE_CARRY"
+      if [[ "$terminal_dead" == "true" || "$has_live_source" != "true" ]]; then
+        write_status "K26_FULL_RUN_BUNDLE_BLOCKED_CHUNK_${chunk_id}_NOT_RESUMABLE"
+        echo "K26 continuation chunk ${chunk_id} did not leave live source carry for resume" >&2
+        exit 1
+      fi
+      if [[ ! -f "$chunk_manifest" ]]; then
+        write_status "K26_FULL_RUN_BUNDLE_BLOCKED_CHUNK_${chunk_id}_MANIFEST_MISSING"
+        echo "K26 continuation chunk ${chunk_id} did not write resume manifest" >&2
+        exit 1
+      fi
+      manifest_in="$chunk_manifest"
+    else
+      cp "$chunk_json" "$out_dir/k26-continuation-result.json"
+    fi
+
+    chunk_start="$chunk_end"
+    chunk_index=$((chunk_index + 1))
+  done
 }
 
 atom_path_kind_counts() {
@@ -427,18 +576,7 @@ run_json K26_PREFIX "$out_dir/k26-prefix-result.json" \
     --prefix-witness-out "$out_dir/k26-prefix-witness.txt" \
     --progress-out "$out_dir/k26-prefix-progress.jsonl"
 
-run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
-  "$build_dir/source_tileop_port_runner" \
-    --r-start 8192 \
-    --r-final 1015645 \
-    --band-width 8192 \
-    --schedule-radii "$schedule_csv" \
-    --max-atoms "$max_atoms" \
-    --target-a 376039 \
-    --target-b 943460 \
-    --manifest-in "$out_dir/k26-prefix-manifest.txt" \
-    --prefix-witness-in "$out_dir/k26-prefix-witness.txt" \
-    --progress-out "$out_dir/k26-continuation-progress.jsonl"
+run_k26_continuation
 
 continuation_terminal_dead="$(
   json_bool_value "$out_dir/k26-continuation-result.json" terminal_source_dead

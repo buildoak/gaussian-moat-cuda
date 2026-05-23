@@ -305,6 +305,7 @@ The paid/full-run harness is:
 tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
   --build-dir /tmp/gm-lbsp-remote-smoke \
   --out-dir /workspace/k26-full-source-bundle \
+  --continuation-chunk-bands 8 \
   --timeout-seconds 1200 \
   --source-dead-gap-checker /path/to/source_dead_gap_check
 ```
@@ -364,6 +365,11 @@ and resume from the written port carry manifest. A K26-scale probe verified
 that full two-band continuation through `R=24576` and a one-band checkpoint at
 `R=16384` plus resumed second band produce byte-identical final carry
 manifests, with `source_carry_atoms=2337` and `source_inventory_count=2107474`.
+The bundle harness exposes this as `--continuation-chunk-bands N`: it splits
+the repaired continuation schedule into bounded chunks, concatenates chunk
+progress into the canonical continuation progress JSONL, preserves
+`k26-continuation-result.json` as the final chunk result, and hashes chunk
+artifacts in the bundle manifest.
 The TileOp build loop is parallelized only inside this sidecar runner with
 standard C++ worker threads, preserving the deterministic output order and
 reporting

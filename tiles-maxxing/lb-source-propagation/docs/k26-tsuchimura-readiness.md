@@ -120,6 +120,7 @@ The executable harness for producing the bundle shape is:
 run_k26_full_source_bundle.sh \
   --build-dir BUILD_DIR \
   --out-dir OUT_DIR \
+  --continuation-chunk-bands 8 \
   --timeout-seconds 1200
 ```
 
@@ -179,6 +180,15 @@ reporting
 optimization and does not change production TileOp semantics. Neither progress
 artifact nor live-source continuation evidence relaxes the `SOURCE_DEAD_CERT`
 gate.
+The bundle harness exposes the same resumability with
+`--continuation-chunk-bands N`: it splits the repaired continuation schedule
+into bounded chunks, uses the origin-prefix coordinate manifest only for the
+first chunk, resumes later chunks from TileOp-port carry manifests,
+concatenates chunk progress into `k26-continuation-progress.jsonl`, and copies
+the final chunk output to `k26-continuation-result.json` for the existing
+bundle checker. Chunk artifacts are also hashed in
+`k26-full-run-artifacts.sha256`. This is an execution-resilience protocol, not
+a certificate relaxation.
 With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/progress/continuation/gap artifacts before the
 checker runs.
@@ -301,11 +311,11 @@ terminal inventory are missing.
 A bounded local bundle harness run with `--timeout-seconds 120` now stops with
 `K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_TIMEOUT` while building band
 `40960 -> 49152`; by then bands through `32768 -> 40960` have completed with
-live source carry. The current runner can checkpoint and resume TileOp-port
-separator state, but the bundle harness still needs an accepted chunked
-execution plan before this becomes the default paid-run protocol. The current
-local blocker is therefore runtime/budget, not the earlier target-not-reached
-terminal diagnostic.
+live source carry. The current runner and bundle harness can checkpoint and
+resume TileOp-port separator state, but no full repaired K26 chunked run has
+completed under the active runtime/budget gate yet. The current local blocker
+is therefore runtime/budget, not the earlier target-not-reached terminal
+diagnostic.
 
 ## Stop Conditions
 

@@ -69,8 +69,14 @@ if [[ "$*" != *"--target-a 376039 --target-b 943460"* ]]; then
   exit 1
 fi
 progress=""
+manifest=""
+r_final="1015645"
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --r-final)
+      r_final="$2"; shift 2 ;;
+    --manifest-out)
+      manifest="$2"; shift 2 ;;
     --progress-out)
       progress="$2"; shift 2 ;;
     *)
@@ -78,6 +84,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$progress" ]] && echo '{"schema":"lb_source_tileop_port_progress_v1","accepted":true}' > "$progress"
+if [[ -n "$manifest" ]]; then
+  echo "port-manifest-${r_final}" > "$manifest"
+  cat <<JSON
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":${r_final},"schedule_mode":"explicit_radii","schedule_boundary_count":3,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1],"manifest_written":true}
+JSON
+  exit 0
+fi
 cat <<'JSON'
 {"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true,"path_provenance":"mixed_coordinate_port_atom_chain_non_claim","atom_path_length":3,"atom_path":[1615075207963900,-25220051735553,1615075207964004]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615075207964004]}
 JSON
@@ -110,6 +123,18 @@ if "$harness" \
 fi
 grep -q -- '--timeout-seconds must be a nonnegative integer' \
   /tmp/k26-harness-bad-timeout.err
+
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$tmp/bad-chunk" \
+    --continuation-chunk-bands nope \
+    >/tmp/k26-harness-bad-chunk.out \
+    2>/tmp/k26-harness-bad-chunk.err; then
+  echo "harness accepted nonnumeric chunk size" >&2
+  exit 1
+fi
+grep -q -- '--continuation-chunk-bands must be a nonnegative integer' \
+  /tmp/k26-harness-bad-chunk.err
 
 bad_cache_build="$tmp/bad-cache-build"
 cp -R "$build_dir" "$bad_cache_build"
@@ -263,6 +288,35 @@ if grep -q 'k26-source-dead-cert.json' \
   echo "blocked partial manifest unexpectedly included missing cert" >&2
   exit 1
 fi
+
+chunked_out="$tmp/chunked"
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$chunked_out" \
+    --continuation-chunk-bands 2 \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    >/tmp/k26-harness-chunked.out 2>/tmp/k26-harness-chunked.err; then
+  echo "harness accepted a chunked run without k26-source-dead-cert.json" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING' \
+  "$chunked_out/status.txt"
+grep -q 'continuation_chunk_bands=2' "$chunked_out/status.txt"
+test -f "$chunked_out/k26-continuation-result.json"
+test -f "$chunked_out/k26-continuation-progress.jsonl"
+test -f "$chunked_out/k26-continuation-chunk-000.json"
+test -f "$chunked_out/k26-continuation-chunk-000.progress.jsonl"
+test -f "$chunked_out/k26-continuation-chunk-000.manifest.txt"
+test -f "$chunked_out/k26-continuation-chunk-001.json"
+test -f "$chunked_out/k26-continuation-chunk-001.progress.jsonl"
+grep -q 'k26-continuation-chunk-000.json' \
+  "$chunked_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-continuation-chunk-000.manifest.txt' \
+  "$chunked_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-continuation-chunk-001.json' \
+  "$chunked_out/k26-full-run-artifacts.sha256"
+grep -q '"terminal_source_dead":true' \
+  "$chunked_out/k26-continuation-result.json"
 
 cert="$tmp/k26-source-dead-cert.json"
 continuation_digest="$("$build_dir/source_tileop_port_runner" \
