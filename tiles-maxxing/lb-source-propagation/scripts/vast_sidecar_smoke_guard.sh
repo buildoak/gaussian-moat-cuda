@@ -240,6 +240,18 @@ if match:
 PY
 }
 
+parse_create_success() {
+  CREATE_OUTPUT="$1" python3 <<'PY'
+import os
+import re
+
+text = os.environ.get("CREATE_OUTPUT", "")
+match = re.search(r"['\"]success['\"]\s*:\s*(True|False|true|false)", text)
+if match:
+    print(match.group(1).lower())
+PY
+}
+
 redact_create_output() {
   CREATE_OUTPUT="$1" python3 <<'PY'
 import os
@@ -544,6 +556,22 @@ while (( attempt <= max_create_attempts )); do
     exit 5
   fi
   echo "CREATED_INSTANCE id=${created_instance_id}"
+  create_success="$(parse_create_success "$create_output")"
+  if [[ "$create_success" == "false" ]]; then
+    echo "CREATE_REPORTED_FAILURE id=${created_instance_id} offer_id=${selected_offer_id}" >&2
+    if [[ "$destroy_on_exit" -eq 1 && -n "$created_instance_id" ]]; then
+      echo "DESTROYING_FAILED_CREATE_INSTANCE id=${created_instance_id}" >&2
+      vastai destroy instance "$created_instance_id" -y >&2 || true
+      created_instance_id=""
+    fi
+    if (( attempt < max_create_attempts )); then
+      echo "RETRYING_AFTER_CREATE_FAILURE offer_id=${selected_offer_id} next_attempt=$((attempt + 1))"
+      exclude_offer_ids+=("$selected_offer_id")
+      attempt=$((attempt + 1))
+      continue
+    fi
+    exit 5
+  fi
 
   if [[ "$wait_ssh_seconds" != "0" ]]; then
     set +e

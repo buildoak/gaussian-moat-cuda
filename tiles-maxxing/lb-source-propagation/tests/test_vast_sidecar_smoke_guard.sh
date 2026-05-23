@@ -24,7 +24,9 @@ if [[ "$1" == "search" && "$2" == "offers" ]]; then
   exit 0
 fi
 if [[ "$1" == "create" && "$2" == "instance" ]]; then
-  if [[ "$3" == "12345" ]]; then
+  if [[ "${VAST_MOCK_CREATE_FALSE_FIRST:-0}" == "1" && "$3" == "12345" ]]; then
+    echo "{'success': False, 'new_contract': 90001, 'instance_api_key': 'secret-a'}"
+  elif [[ "$3" == "12345" ]]; then
     echo "{'success': True, 'new_contract': 90001, 'instance_api_key': 'secret-a'}"
   elif [[ "$3" == "23456" ]]; then
     echo "{'success': True, 'new_contract': 90002, 'instance_api_key': 'secret-b'}"
@@ -118,6 +120,32 @@ if [[ "$retry_status" != "5" ]]; then
 fi
 grep -q 'RETRYING_AFTER_SSH_TIMEOUT offer_id=12345 next_attempt=2' "$tmp/retry.log"
 grep -q 'EXCLUDED_OFFER_IDS 12345' "$tmp/retry.log"
+grep -q '^create instance 12345 ' "$VAST_MOCK_LOG"
+grep -q '^create instance 23456 ' "$VAST_MOCK_LOG"
+grep -q '^destroy instance 90001 -y' "$VAST_MOCK_LOG"
+grep -q '^destroy instance 90002 -y' "$VAST_MOCK_LOG"
+
+: > "$VAST_MOCK_LOG"
+create_failure_status=0
+PATH="$tmp/bin:$PATH" VAST_MOCK_CREATE_FALSE_FIRST=1 "$guard" \
+  --execute \
+  --run-remote-smoke \
+  --destroy-on-exit \
+  --max-create-attempts 2 \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26 \
+  --wait-ssh-seconds 1 \
+  --ssh-poll-seconds 1 \
+  > "$tmp/create-failure-retry.log" 2>&1 || create_failure_status="$?"
+if [[ "${create_failure_status:-}" != "5" ]]; then
+  echo "expected create-failure retry run to end with SSH timeout status 5, got ${create_failure_status:-0}" >&2
+  cat "$tmp/create-failure-retry.log" >&2
+  exit 1
+fi
+grep -q 'CREATE_REPORTED_FAILURE id=90001 offer_id=12345' "$tmp/create-failure-retry.log"
+grep -q 'RETRYING_AFTER_CREATE_FAILURE offer_id=12345 next_attempt=2' "$tmp/create-failure-retry.log"
+grep -q 'EXCLUDED_OFFER_IDS 12345' "$tmp/create-failure-retry.log"
 grep -q '^create instance 12345 ' "$VAST_MOCK_LOG"
 grep -q '^create instance 23456 ' "$VAST_MOCK_LOG"
 grep -q '^destroy instance 90001 -y' "$VAST_MOCK_LOG"
