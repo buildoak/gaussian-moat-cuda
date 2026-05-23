@@ -100,6 +100,7 @@ require_equal() {
 require_ctest_log() {
   local path="$1"
   local label="$2"
+  local minimum="$3"
   require_file "$path"
   local expected
   expected="$(
@@ -108,6 +109,10 @@ require_ctest_log() {
   )"
   if [[ -z "$expected" || "$expected" == "0" ]]; then
     echo "artifact check failed: missing successful ${label} CTest summary ($path)" >&2
+    exit 1
+  fi
+  if (( expected < minimum )); then
+    echo "artifact check failed: ${label} CTest summary is below Phase 1 baseline: expected at least ${minimum}, got ${expected} ($path)" >&2
     exit 1
   fi
   local count
@@ -125,8 +130,8 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" "sidecar"
-require_ctest_log "$out_dir/verification-ctest.log" "verification"
+require_ctest_log "$out_dir/ctest.log" "sidecar" 27
+require_ctest_log "$out_dir/verification-ctest.log" "verification" 75
 
 for artifact in \
   environment.txt \

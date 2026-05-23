@@ -112,6 +112,17 @@ if "$checker" "$bad_ctest" > "$tmp/bad-ctest.log" 2>&1; then
 fi
 grep -q 'artifact check failed' "$tmp/bad-ctest.log"
 
+short_ctest="$tmp/short-ctest"
+mkdir "$short_ctest"
+cp "$tmp"/* "$short_ctest"/ 2>/dev/null || true
+write_ctest_log "$short_ctest/verification-ctest.log" 74
+if "$checker" "$short_ctest" > "$tmp/short-ctest.log" 2>&1; then
+  echo "checker accepted verification CTest below Phase 1 baseline" >&2
+  exit 1
+fi
+grep -q 'verification CTest summary is below Phase 1 baseline' \
+  "$tmp/short-ctest.log"
+
 bad="$tmp/bad"
 mkdir "$bad"
 cp "$tmp"/* "$bad"/ 2>/dev/null || true
