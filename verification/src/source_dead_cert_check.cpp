@@ -769,10 +769,16 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
     }
     std::set<std::int64_t> source_path_atom_ids;
     for (const Point& path_point : source_path) {
-      source_path_atom_ids.insert(coordinate_atom_id_for_point(path_point));
+      const std::int64_t path_atom_id = coordinate_atom_id_for_point(path_point);
+      source_path_atom_ids.insert(path_atom_id);
       if (path_point.norm_sq > max_norm_sq) {
         throw std::runtime_error(
             "summary-only inventory max_norm_sq is below source_path");
+      }
+      if (path_point.norm_sq == max_norm_sq &&
+          !std::binary_search(ties.begin(), ties.end(), path_atom_id)) {
+        throw std::runtime_error(
+            "summary-only inventory max_norm_atom_ids omits max source_path atom");
       }
     }
     if (count < source_path_atom_ids.size()) {
