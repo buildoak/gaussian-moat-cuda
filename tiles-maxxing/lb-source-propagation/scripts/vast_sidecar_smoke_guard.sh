@@ -271,7 +271,7 @@ load_failure_ledger() {
         host_id=*) host="${field#host_id=}" ;;
       esac
     done
-    if [[ -n "$offer" ]]; then
+    if [[ -n "$offer" && "$offer" != "unknown" ]]; then
       require_nonnegative_integer "$offer" "--failure-ledger offer_id"
       append_unique_id exclude_offer_ids "$offer"
     fi
@@ -509,6 +509,7 @@ print(json.dumps(filtered))
   if [[ -z "$offers" || "$offers" == "[]" ]]; then
     echo "NO_QUALIFYING_OFFER"
     echo "No RTX 4090 offer satisfied max_dph=${max_dph}; no rental attempted."
+    record_failure_ledger "no_qualifying_offer"
     return 3
   fi
 

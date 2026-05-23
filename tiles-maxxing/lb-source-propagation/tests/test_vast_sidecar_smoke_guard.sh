@@ -113,6 +113,30 @@ grep -q 'NO_QUALIFYING_OFFER' "$tmp/no-offer.log"
 grep -q '^search offers ' "$VAST_MOCK_LOG"
 
 : > "$VAST_MOCK_LOG"
+rm -f "$tmp/no-offer-failures.tsv"
+if PATH="$tmp/bin:$PATH" VAST_MOCK_NO_OFFERS=1 "$guard" \
+    --failure-ledger "$tmp/no-offer-failures.tsv" \
+    --max-dph 0.37 \
+    --max-budget 1.50 \
+    --k-sq 26 \
+    > "$tmp/no-offer-ledger.log" 2>&1; then
+  echo "guard accepted an empty offer list with failure ledger" >&2
+  exit 1
+fi
+grep -q 'reason=no_qualifying_offer offer_id=unknown host_id=unknown instance_id=unknown' \
+  "$tmp/no-offer-failures.tsv"
+PATH="$tmp/bin:$PATH" "$guard" \
+  --failure-ledger "$tmp/no-offer-failures.tsv" \
+  --max-dph 0.37 \
+  --max-budget 1.50 \
+  --k-sq 26 \
+  > "$tmp/no-offer-ledger-reused.log"
+grep -q 'QUALIFYING_OFFER id=12345 host_id=777 dph=0.29' \
+  "$tmp/no-offer-ledger-reused.log"
+grep -q "FAILURE_LEDGER $tmp/no-offer-failures.tsv" \
+  "$tmp/no-offer-ledger-reused.log"
+
+: > "$VAST_MOCK_LOG"
 cat > "$tmp/failures.tsv" <<'EOF'
 timestamp_utc=2026-05-23T00:00:00Z reason=ssh_timeout offer_id=12345 host_id=777 instance_id=90001 branch=test head=test
 EOF
