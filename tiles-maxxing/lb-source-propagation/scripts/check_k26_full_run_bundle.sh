@@ -106,6 +106,14 @@ json_string_value() {
   sed -nE "s/.*\"${field}\":\"([^\"]+)\".*/\\1/p" "$path" | head -n 1
 }
 
+json_object_string_value() {
+  local path="$1"
+  local object_field="$2"
+  local field="$3"
+  sed -nE "s/.*\"${object_field}\":\{[^}]*\"${field}\":\"([^\"]+)\"[^}]*\}.*/\\1/p" \
+    "$path" | head -n 1
+}
+
 json_number_value() {
   local path="$1"
   local field="$2"
@@ -573,9 +581,32 @@ require_grep '"missing_for_source_dead_cert":.*verifier' "$gap" \
 actual_continuation_digest="$(
   shasum -a 256 "$continuation" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
 )"
-gap_continuation_digest="$(require_json_string_value "$gap" sha256)"
+gap_continuation_digest="$(
+  json_object_string_value "$gap" continuation_artifact sha256
+)"
+if [[ -z "$gap_continuation_digest" ]]; then
+  echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON string field continuation_artifact.sha256 ($gap)" >&2
+  exit 1
+fi
 require_equal "$actual_continuation_digest" "$gap_continuation_digest" \
   "K26 gap continuation hash binding"
+if [[ -f "$chunk_ledger" ]]; then
+  require_grep '"chunk_ledger_artifact":.*"name":"k26-continuation-chunks.jsonl".*"sha256":"[0-9a-f]{64}"' \
+    "$gap" "K26 source-dead gap chunk ledger binding"
+  actual_chunk_ledger_digest="$(
+    shasum -a 256 "$chunk_ledger" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
+  )"
+  gap_chunk_ledger_name="$(
+    json_object_string_value "$gap" chunk_ledger_artifact name
+  )"
+  gap_chunk_ledger_digest="$(
+    json_object_string_value "$gap" chunk_ledger_artifact sha256
+  )"
+  require_equal "k26-continuation-chunks.jsonl" "$gap_chunk_ledger_name" \
+    "K26 gap chunk ledger artifact name binding"
+  require_equal "$actual_chunk_ledger_digest" "$gap_chunk_ledger_digest" \
+    "K26 gap chunk ledger hash binding"
+fi
 gap_bz_digest="$(require_json_string_value "$gap" schedule_digest_hex)"
 require_equal "$bz_digest" "$gap_bz_digest" \
   "K26 gap BZ digest binding"

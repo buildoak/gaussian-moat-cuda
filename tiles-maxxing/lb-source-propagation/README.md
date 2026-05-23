@@ -329,7 +329,9 @@ with tile counts, port atom/edge counts, overflow totals, seam bridge counts,
 source carry/death state, and timing fields. This is also observability only.
 The harness also writes
 `k26-source-dead-gap.json`, binding the continuation artifact and naming the
-remaining certificate obligations. `bridge_safety` records the
+remaining certificate obligations. For chunked runs, the gap also binds
+`k26-continuation-chunks.jsonl` by SHA-256 so the certificate-gap report points
+to the same ledger that the bundle checker validates. `bridge_safety` records the
 `source_unbridged_unsafe_candidate_atoms == 0` bridge condition.
 `coordinate_path_obligation` records why the observed target evidence is not a
 coordinate Gaussian-prime source path. For a reached diagnostic target, the

@@ -326,6 +326,8 @@ grep -q 'k26-continuation-chunks.jsonl' \
   "$chunked_out/k26-full-run-artifacts.sha256"
 grep -q '"terminal_source_dead":true' \
   "$chunked_out/k26-continuation-result.json"
+grep -q '"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"[0-9a-f]\{64\}"' \
+  "$chunked_out/k26-source-dead-gap.json"
 
 resume_out="$tmp/resume-existing"
 mkdir -p "$resume_out"
@@ -442,6 +444,8 @@ grep -q '"chunk_id":"000","action":"executed"' \
   "$checked_chunked_out/k26-continuation-chunks.jsonl"
 grep -q 'k26-continuation-chunks.jsonl' \
   "$checked_chunked_out/k26-full-run-artifacts.sha256"
+grep -q '"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"[0-9a-f]\{64\}"' \
+  "$checked_chunked_out/k26-source-dead-gap.json"
 
 bad_ledger_out="$tmp/bad-ledger"
 cp -R "$checked_chunked_out" "$bad_ledger_out"
@@ -463,6 +467,28 @@ if "$bundle_checker" "$bad_ledger_out" \
   exit 1
 fi
 grep -q 'K26 chunk ledger' /tmp/k26-harness-bad-ledger.err
+
+bad_gap_ledger_out="$tmp/bad-gap-ledger"
+cp -R "$checked_chunked_out" "$bad_gap_ledger_out"
+perl -0pi -e 's/"chunk_ledger_artifact":\{"name":"k26-continuation-chunks\.jsonl","sha256":"[0-9a-f]{64}"/"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"0000000000000000000000000000000000000000000000000000000000000000"/' \
+  "$bad_gap_ledger_out/k26-source-dead-gap.json"
+bad_gap_digest="$(
+  shasum -a 256 "$bad_gap_ledger_out/k26-source-dead-gap.json" |
+    sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
+)"
+perl -0pi -e \
+  "s/[0-9a-f]{64}  k26-source-dead-gap\\.json/${bad_gap_digest}  k26-source-dead-gap.json/" \
+  "$bad_gap_ledger_out/k26-full-run-artifacts.sha256"
+if "$bundle_checker" "$bad_gap_ledger_out" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    >/tmp/k26-harness-bad-gap-ledger.out \
+    2>/tmp/k26-harness-bad-gap-ledger.err; then
+  echo "bundle checker accepted a source-dead gap with mismatched chunk ledger hash" >&2
+  exit 1
+fi
+grep -q 'K26 gap chunk ledger hash binding' \
+  /tmp/k26-harness-bad-gap-ledger.err
 
 summary_cert="$tmp/k26-source-dead-cert-summary-nonclaim.json"
 cp "$cert" "$summary_cert"

@@ -218,6 +218,19 @@ std::string verify_gap(const nlohmann::json& gap) {
   if (!sha256_hex(require_string(continuation, "sha256"))) {
     throw std::runtime_error("continuation artifact hash is not sha256 hex");
   }
+  if (const auto chunk_ledger_it = gap.find("chunk_ledger_artifact");
+      chunk_ledger_it != gap.end()) {
+    if (!chunk_ledger_it->is_object()) {
+      throw std::runtime_error("chunk_ledger_artifact must be object");
+    }
+    if (require_string(*chunk_ledger_it, "name") !=
+        "k26-continuation-chunks.jsonl") {
+      throw std::runtime_error("unexpected chunk ledger artifact name");
+    }
+    if (!sha256_hex(require_string(*chunk_ledger_it, "sha256"))) {
+      throw std::runtime_error("chunk ledger artifact hash is not sha256 hex");
+    }
+  }
 
   const nlohmann::json& bz_evidence = require_object(gap, "bz_evidence");
   if (require_string(bz_evidence, "status") !=
