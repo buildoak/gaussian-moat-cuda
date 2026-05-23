@@ -172,7 +172,14 @@ gate:
 tiles-maxxing/lb-source-propagation/scripts/check_phase1_diff_scope.sh
 ```
 
-The tests cover five- and ten-band composed runs versus one big band, false
+To run only the narrow pre-Vast stitching parity gate:
+
+```bash
+tiles-maxxing/lb-source-propagation/scripts/check_phase1_parity_gate.sh
+```
+
+The parity gate checks five-, ten-, and twenty-band composed runs versus one big
+band in the independent verifier. The broader local gate also covers false
 welding, source-only-carry loss, neutral partition merges, terminal inventory,
 hard overflow rejection, `K=32` carry width, associativity across band
 groupings, certified source seed application/rejection, carry-manifest

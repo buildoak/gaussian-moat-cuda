@@ -124,6 +124,14 @@ json_object_string_value() {
     "$path" | head -n 1
 }
 
+json_object_array_value() {
+  local path="$1"
+  local object_field="$2"
+  local field="$3"
+  sed -nE "s/.*\"${object_field}\":\{[^}]*\"${field}\":(\[[0-9, -]*\])[^}]*\}.*/\\1/p" \
+    "$path" | head -n 1
+}
+
 json_object_number_value() {
   local path="$1"
   local object_field="$2"
@@ -202,6 +210,19 @@ require_json_number_value() {
   printf '%s\n' "$value"
 }
 
+require_json_object_string_value() {
+  local path="$1"
+  local object_field="$2"
+  local field="$3"
+  local value
+  value="$(json_object_string_value "$path" "$object_field" "$field")"
+  if [[ -z "$value" ]]; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON string field ${object_field}.${field} ($path)" >&2
+    exit 1
+  fi
+  printf '%s\n' "$value"
+}
+
 require_json_object_number_value() {
   local path="$1"
   local object_field="$2"
@@ -210,6 +231,19 @@ require_json_object_number_value() {
   value="$(json_object_number_value "$path" "$object_field" "$field")"
   if [[ -z "$value" ]]; then
     echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON number field ${object_field}.${field} ($path)" >&2
+    exit 1
+  fi
+  printf '%s\n' "$value"
+}
+
+require_json_object_array_value() {
+  local path="$1"
+  local object_field="$2"
+  local field="$3"
+  local value
+  value="$(json_object_array_value "$path" "$object_field" "$field")"
+  if [[ -z "$value" ]]; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON array field ${object_field}.${field} ($path)" >&2
     exit 1
   fi
   printf '%s\n' "$value"
@@ -942,13 +976,21 @@ require_grep '"max_norm_atom_ids":\[[0-9]' "$cert" \
   "K26 source-dead cert max-norm tie set"
 
 continuation_inventory_count="$(require_json_number_value "$continuation" source_inventory_count)"
-cert_inventory_count="$(require_json_number_value "$cert" count)"
+cert_inventory_count="$(
+  require_json_object_number_value "$cert" terminal_source_inventory_summary count
+)"
 continuation_inventory_digest="$(require_json_string_value "$continuation" source_inventory_digest_hex)"
-cert_inventory_digest="$(require_json_string_value "$cert" digest_hex)"
+cert_inventory_digest="$(
+  require_json_object_string_value "$cert" terminal_source_inventory_summary digest_hex
+)"
 continuation_max_norm="$(require_json_number_value "$continuation" max_source_norm_sq)"
-cert_max_norm="$(require_json_number_value "$cert" max_norm_sq)"
+cert_max_norm="$(
+  require_json_object_number_value "$cert" terminal_source_inventory_summary max_norm_sq
+)"
 continuation_max_ties="$(require_json_array_value "$continuation" max_source_norm_atom_ids)"
-cert_max_ties="$(require_json_array_value "$cert" max_norm_atom_ids)"
+cert_max_ties="$(
+  require_json_object_array_value "$cert" terminal_source_inventory_summary max_norm_atom_ids
+)"
 require_equal "$continuation_inventory_count" "$cert_inventory_count" \
   "K26 cert inventory count binding"
 require_equal "$continuation_inventory_digest" "$cert_inventory_digest" \
@@ -1133,6 +1175,15 @@ if grep -q '"proof_status":"SUMMARY_ONLY_NON_CLAIM"' "$cert"; then
     "K26 summary-only cert terminal accumulator summary binding"
   require_fixed "\"max_norm_atom_ids\":${continuation_max_ties}" "$cert" \
     "K26 summary-only cert terminal accumulator max-norm tie binding"
+else
+  require_grep '"terminal_source_inventory_mode":"claim_grade_accumulator"' "$cert" \
+    "K26 claim-grade cert inventory mode"
+  require_grep '"terminal_source_inventory_accumulator":.*"mode":"claim_grade_digest_accumulator".*"provenance":"terminal_component_inventory_accumulator".*"accumulator_algorithm":"sha256:lb_source_inventory_v1".*"complete_stream_observed":true.*"canonical_order":true.*"duplicate_free":true.*"retired_component_finalized":true.*"overflow_checked":true.*"listed_inventory_present":false.*"claim_grade_inventory_accepted":true' "$cert" \
+    "K26 claim-grade cert terminal accumulator provenance"
+  require_grep "\"terminal_source_inventory_accumulator\":.*\"count\":${continuation_inventory_count}.*\"digest_hex\":\"${continuation_inventory_digest}\".*\"max_norm_sq\":${continuation_max_norm}" "$cert" \
+    "K26 claim-grade cert terminal accumulator summary binding"
+  require_fixed "\"max_norm_atom_ids\":${continuation_max_ties}" "$cert" \
+    "K26 claim-grade cert terminal accumulator max-norm tie binding"
 fi
 
 if checker_output="$("$source_dead_checker" "$cert" 2>&1)"; then
