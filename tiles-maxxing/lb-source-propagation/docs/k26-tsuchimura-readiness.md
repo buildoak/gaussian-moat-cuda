@@ -494,6 +494,12 @@ head `7d1098a`, a dry-run Vast offer probe was attempted with the same
 observed qualifying-market offer was `$0.6685/hr`, `0.2985/hr` over cap. No
 Vast instance was created.
 
+After requiring the K26 harness to copy the terminal accumulator from the
+continuation artifact at local head `157a9df`, a 120-second dry-run Vast offer
+probe was attempted with the same `$0.37/hr` and `$1.50` caps. No RTX 4090
+offer satisfied the cap; the nearest observed qualifying-market offer was
+`$0.6685/hr`, `0.2985/hr` over cap. No Vast instance was created.
+
 After any partial continuation, run:
 
 ```bash
