@@ -762,6 +762,22 @@ void append_atom_id_array(std::ostream& out,
   out << ']';
 }
 
+void append_terminal_inventory_accumulator(
+    std::ostream& out, const RunnerInventorySummary& summary) {
+  out << "{\"mode\":\"summary_digest_only_non_claim\""
+      << ",\"provenance\":\"terminal_component_inventory_accumulator\""
+      << ",\"listed_inventory_present\":false"
+      << ",\"claim_grade_inventory_accepted\":false"
+      << ",\"count\":" << summary.digest.count
+      << ",\"digest_algorithm\":\"" << summary.digest.digest_algorithm
+      << "\""
+      << ",\"digest_hex\":\"" << summary.digest.digest_hex << "\""
+      << ",\"max_norm_sq\":" << summary.max_norm_sq
+      << ",\"max_norm_atom_ids\":";
+  append_atom_id_array(out, summary.max_norm_atom_ids);
+  out << '}';
+}
+
 void append_json_string(std::ostream& out, std::string_view value) {
   out << '"';
   for (const unsigned char ch : value) {
@@ -2113,7 +2129,12 @@ int main(int argc, char** argv) {
   append_atom_id_array(std::cout, inventory_summary.max_norm_atom_ids);
   std::cout
             << ",\"manifest_written\":"
-            << (manifest_written ? "true" : "false")
+            << (manifest_written ? "true" : "false");
+  if (accepted && last.terminal_source_dead) {
+    std::cout << ",\"terminal_source_inventory_accumulator\":";
+    append_terminal_inventory_accumulator(std::cout, inventory_summary);
+  }
+  std::cout
             << ",\"non_claim\":\"TileOp-port scheduler diagnostic; not SOURCE_ORIGIN_K26 or SOURCE_DEAD_CERT\""
             << "}\n";
 
