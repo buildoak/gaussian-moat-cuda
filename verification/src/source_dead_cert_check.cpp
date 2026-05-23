@@ -617,6 +617,23 @@ void require_terminal_inventory_accumulator_shape(
   }
 }
 
+void require_claim_grade_accumulator_provenance(
+    const nlohmann::json& accumulator, const nlohmann::json& summary) {
+  if (require_string(accumulator, "accumulator_algorithm") !=
+      require_string(summary, "digest_algorithm")) {
+    throw std::runtime_error(
+        "claim-grade accumulator algorithm does not match digest algorithm");
+  }
+  for (const char* field : {"complete_stream_observed", "canonical_order",
+                            "duplicate_free", "retired_component_finalized",
+                            "overflow_checked"}) {
+    if (!require_bool(accumulator, field)) {
+      throw std::runtime_error(std::string("claim-grade accumulator ") + field +
+                               " is false");
+    }
+  }
+}
+
 bool has_i64(const std::vector<std::int64_t>& values, std::int64_t value) {
   return std::find(values.begin(), values.end(), value) != values.end();
 }
@@ -827,6 +844,9 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
     require_terminal_inventory_accumulator_shape(
         require_object(cert, "terminal_source_inventory_accumulator"),
         summary, "claim_grade_digest_accumulator", true);
+    require_claim_grade_accumulator_provenance(
+        require_object(cert, "terminal_source_inventory_accumulator"),
+        summary);
     require_summary_covers_source_path(summary, source_path, terminal_radius);
     const std::uint64_t count = require_u64(summary, "count");
     const std::uint64_t max_norm_sq = require_u64(summary, "max_norm_sq");

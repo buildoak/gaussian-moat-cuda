@@ -101,6 +101,7 @@ set_tests_properties(source_dead_gap_fixture_chunked_valid PROPERTIES
 foreach(bad_source_dead_cert
     dead-cert-bad-accumulator-claim
     dead-cert-bad-artifact-hash
+    dead-cert-bad-claim-accumulator-completeness
     dead-cert-bad-claim-accumulator-flag
     dead-cert-bad-claim-accumulator-mode
     dead-cert-bad-digest

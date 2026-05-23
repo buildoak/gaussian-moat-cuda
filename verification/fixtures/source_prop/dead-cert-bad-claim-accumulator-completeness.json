@@ -1,7 +1,7 @@
 {
   "schema": "lb_source_dead_cert_draft_v1",
-  "certificate_id": "cert-claim-accumulator-valid",
-  "profile_id": "profile-claim-accumulator-valid",
+  "certificate_id": "cert-bad-claim-accumulator-completeness",
+  "profile_id": "profile-bad-claim-accumulator-completeness",
   "metadata": {
     "source_mode": "ORIGIN_SOURCE",
     "source_id": "omega",
@@ -32,7 +32,7 @@
     "mode": "claim_grade_digest_accumulator",
     "provenance": "terminal_component_inventory_accumulator",
     "accumulator_algorithm": "sha256:lb_source_inventory_v1",
-    "complete_stream_observed": true,
+    "complete_stream_observed": false,
     "canonical_order": true,
     "duplicate_free": true,
     "retired_component_finalized": true,

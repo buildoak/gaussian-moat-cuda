@@ -196,7 +196,10 @@ themselves keep the source component alive.
 - Terminal inventory must preserve retired source components before compaction.
 - Summary-only terminal inventory accumulators are non-claim evidence. A
   claim-grade accumulator must use an explicit claim-grade mode and claim-grade
-  acceptance flag before it can substitute for a literal inventory listing.
+  acceptance flag before it can substitute for a literal inventory listing. It
+  must also attest that the terminal inventory stream was observed completely,
+  emitted in canonical order, duplicate-free, finalized for the retired source
+  component, and overflow-checked.
 - Certificates must bind seed mode, geometry, commit, build, BZ/schedule
   evidence, artifact hashes, endpoint path, and terminal inventory.
 - Static-annulus `ANY-SPAN` and `ANY-SHELL-MOAT` rows remain diagnostics for
