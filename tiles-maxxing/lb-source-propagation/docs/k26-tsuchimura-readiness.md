@@ -384,6 +384,24 @@ shape is not a viable full K26 CPU TileOp continuation path; it is timing
 evidence only, not a `SOURCE_DEAD_CERT`, not a sqrt(26) reproduction, and not a
 moat result.
 
+A follow-up bounded Vast RTX 4090 timing probe at deployed local head
+`984d2f1` pinned `--tileop-threads 6` to test whether the previous run was hurt
+by using all 32 visible hardware threads on a fractional-CPU host. The probe
+ran on instance `37439137`, pulled artifacts to
+`tiles-maxxing/lb-source-propagation/artifacts/vast-k26-timing-pull-t6`, and
+destroyed the instance after exit. It completed chunk `000`
+(`8192 -> 73728`) with live source carry (`source_carry_atoms=8362`),
+`tileop_overflows_total=0`, and target not seen, then was stopped in chunk
+`001` after the budget rejection was already clear. Pinning helped the later
+chunk-0 bands compared with the 32-thread auto run, for example
+`40960 -> 49152` improved from `195.776s` to `118.120s`, but it still did not
+meet the full-run budget gate. The manual runtime checker over the completed
+chunk emitted `K26_RUNTIME_BUDGET_REJECT` with `completed_band_count=8`,
+cumulative projection `14891s`, latest-band tail projection `23084s`,
+effective projection `23084s`, and budget margin `-9084s`. This means thread
+pinning is useful execution control, but this cheap 4090/fractional-CPU host
+class still cannot justify a full K26 continuation under the active cap.
+
 After any partial continuation, run:
 
 ```bash
