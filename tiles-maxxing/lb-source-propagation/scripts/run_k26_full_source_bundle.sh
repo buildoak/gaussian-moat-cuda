@@ -1202,6 +1202,24 @@ if accumulator.get("mode") != "summary_digest_only_non_claim":
 if accumulator.get("claim_grade_inventory_accepted") is not False:
     raise SystemExit("terminal accumulator unexpectedly claims grade")
 
+def coordinate_atom_id(point):
+    return (int(point["a"]) << 32) | int(point["b"])
+
+source_path_atoms = {coordinate_atom_id(point) for point in source_path}
+inventory_max_norm_sq = int(inventory_summary["max_norm_sq"])
+inventory_ties = {int(atom_id) for atom_id in inventory_summary["max_norm_atom_ids"]}
+for point in source_path:
+    point_norm_sq = int(point["norm_sq"])
+    point_atom_id = coordinate_atom_id(point)
+    if point_norm_sq > inventory_max_norm_sq:
+        raise SystemExit("terminal inventory summary max_norm_sq is below source_path")
+    if point_norm_sq == inventory_max_norm_sq and point_atom_id not in inventory_ties:
+        raise SystemExit(
+            "terminal inventory summary max_norm_atom_ids omits max source_path atom"
+        )
+if int(inventory_summary["count"]) < len(source_path_atoms):
+    raise SystemExit("terminal inventory summary count is smaller than source_path atom set")
+
 continuation_digest = continuation.get("_sha256")
 if continuation_digest is None:
     import hashlib
