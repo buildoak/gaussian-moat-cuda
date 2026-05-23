@@ -613,6 +613,14 @@ offer was `$0.5214/hr`, `0.1514/hr` over cap. No Vast instance was created,
 the failure ledger recorded the capped stop, and `vastai show instances --raw`
 returned `[]`.
 
+After adding the dedicated remote K26 timing artifact checker at local head
+`0704e06`, a 120-second guarded one-band timing-probe offer poll used the
+same `$0.37/hr` and `$1.50` caps and excluded host `53663`. No RTX 4090 offer
+satisfied the cap; the nearest observed qualifying-market offer was
+`$0.5085/hr`, `0.1385/hr` over cap. No Vast instance was created, the failure
+ledger recorded the capped stop, and `vastai show instances --raw` returned
+`[]`.
+
 After any partial continuation, run:
 
 ```bash
