@@ -88,5 +88,13 @@
   "missing_for_source_dead_cert": [
     "coordinate Gaussian-prime source_path from origin prefix to canonical endpoint",
     "claim-grade verifier binding the coordinate path to terminal inventory"
-  ]
+  ],
+  "target_bridge_obligation": {
+    "endpoint_atom_id": 1615075207964004,
+    "observed_target_seen": true,
+    "observed_target_source_reached": true,
+    "observed_target_port_atoms": 9,
+    "observed_target_bridge_edges": 9,
+    "endpoint_bridge_accepted": true
+  }
 }

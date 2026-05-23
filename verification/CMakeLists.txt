@@ -134,7 +134,8 @@ foreach(bad_source_dead_gap
     dead-gap-bad-path-obligation-claim
     dead-gap-bad-path-obligation-count
     dead-gap-bad-prefix-witness-hash
-    dead-gap-bad-port-atom)
+    dead-gap-bad-port-atom
+    dead-gap-bad-target-bridge-count)
   add_test(NAME source_dead_gap_fixture_${bad_source_dead_gap}_reject
     COMMAND source_dead_gap_check
       ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/${bad_source_dead_gap}.json)

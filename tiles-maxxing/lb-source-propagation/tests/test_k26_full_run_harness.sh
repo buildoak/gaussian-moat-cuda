@@ -428,6 +428,8 @@ grep -q '"target_atom_path_length":0' \
   "$target_not_reached_out/k26-source-dead-gap.json"
 grep -q '"target_atom_path":\[\]' \
   "$target_not_reached_out/k26-source-dead-gap.json"
+grep -q '"target_bridge_obligation":{"endpoint_atom_id":1615075207964004,"observed_target_seen":false,"observed_target_source_reached":false,"observed_target_port_atoms":0,"observed_target_bridge_edges":0,"endpoint_bridge_accepted":false}' \
+  "$target_not_reached_out/k26-source-dead-gap.json"
 if [[ -f "$target_not_reached_out/k26-source-dead-cert.json" ]]; then
   echo "target-not-reached blocker unexpectedly accepted/copied a cert" >&2
   exit 1
@@ -487,6 +489,8 @@ grep -q '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' 
 grep -q '"target_atom_path":\[1615075207963900,-25220051735553,1615075207964004\]' \
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"coordinate_path_obligation":{"required_provenance":"coordinate_gaussian_prime_path","observed_provenance":"mixed_coordinate_port_atom_chain_non_claim","observed_coordinate_atom_count":2,"observed_port_atom_count":1' \
+  "$blocked_out/k26-source-dead-gap.json"
+grep -q '"target_bridge_obligation":{"endpoint_atom_id":1615075207964004,"observed_target_seen":true,"observed_target_source_reached":true,"observed_target_port_atoms":9,"observed_target_bridge_edges":9,"endpoint_bridge_accepted":true}' \
   "$blocked_out/k26-source-dead-gap.json"
 grep -q '"terminal_inventory_obligation":{"required_mode":"claim_grade_terminal_inventory","observed_mode":"summary_digest_only_non_claim","listed_inventory_present":false,"claim_grade_inventory_accepted":false' \
   "$blocked_out/k26-source-dead-gap.json"
@@ -572,6 +576,8 @@ grep -q '"terminal_source_dead":true' \
 grep -q '"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"[0-9a-f]\{64\}"' \
   "$chunked_out/k26-source-dead-gap.json"
 grep -q '"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"[0-9a-f]\{64\}"' \
+  "$chunked_out/k26-source-dead-gap.json"
+grep -q '"target_bridge_obligation":{"endpoint_atom_id":1615075207964004,"observed_target_seen":true,"observed_target_source_reached":true,"observed_target_port_atoms":9,"observed_target_bridge_edges":9,"endpoint_bridge_accepted":true}' \
   "$chunked_out/k26-source-dead-gap.json"
 grep -q '"chunk_ledger_artifact":{"name":"k26-continuation-chunks.jsonl","sha256":"[0-9a-f]\{64\}"' \
   "$chunked_out/k26-source-dead-gap.json"

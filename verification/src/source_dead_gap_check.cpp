@@ -469,6 +469,39 @@ std::string verify_gap(const nlohmann::json& gap) {
     throw std::runtime_error("coordinate path obligation must not accept mixed atom chain as claim-grade");
   }
 
+  const nlohmann::json& target_bridge =
+      require_object(gap, "target_bridge_obligation");
+  if (require_i64(target_bridge, "endpoint_atom_id") != kEndpointAtomId) {
+    throw std::runtime_error("target bridge obligation endpoint atom mismatch");
+  }
+  const bool bridge_seen =
+      require_bool(target_bridge, "observed_target_seen");
+  const bool bridge_source_reached =
+      require_bool(target_bridge, "observed_target_source_reached");
+  const bool bridge_accepted =
+      require_bool(target_bridge, "endpoint_bridge_accepted");
+  const std::uint64_t target_port_atoms =
+      require_u64(target_bridge, "observed_target_port_atoms");
+  const std::uint64_t target_bridge_edges =
+      require_u64(target_bridge, "observed_target_bridge_edges");
+  if (target_not_reached) {
+    if (bridge_seen || bridge_source_reached || bridge_accepted ||
+        target_port_atoms != 0 || target_bridge_edges != 0) {
+      throw std::runtime_error(
+          "target-not-reached gap must not accept endpoint bridge");
+    }
+  } else {
+    if (!bridge_seen || !bridge_source_reached || !bridge_accepted) {
+      throw std::runtime_error("reached gap must accept endpoint bridge");
+    }
+    if (target_port_atoms == 0 || target_bridge_edges == 0) {
+      throw std::runtime_error("endpoint bridge must contain TileOp ports");
+    }
+    if (target_port_atoms != target_bridge_edges) {
+      throw std::runtime_error("endpoint bridge port/edge count mismatch");
+    }
+  }
+
   const nlohmann::json& summary =
       require_object(gap, "terminal_source_inventory_summary");
   if (has_field(gap, "terminal_source_inventory_accumulator")) {

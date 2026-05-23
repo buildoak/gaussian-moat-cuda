@@ -383,7 +383,9 @@ prefix manifest, prefix witness, and repaired K26 BZ schedule digest as
 schedule-only, non-claim evidence. When the mixed target atom chain is present,
 `coordinate_path_obligation` also binds its first coordinate atom to a target
 row in `k26-prefix-witness.txt`; the remaining path blocker is the missing
-coordinate expansion of TileOp-port edges.
+coordinate expansion of TileOp-port edges. `target_bridge_obligation` mirrors
+the continuation target bridge, so the gap also records whether the canonical
+endpoint was seen, bridged to TileOp ports, and source-reached.
 When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
 checker before stopping on either a target-not-reached gap or the missing cert,

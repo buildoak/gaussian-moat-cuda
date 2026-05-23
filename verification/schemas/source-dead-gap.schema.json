@@ -22,6 +22,7 @@
     "target_atom_path_length",
     "target_atom_path",
     "coordinate_path_obligation",
+    "target_bridge_obligation",
     "terminal_source_inventory_summary",
     "terminal_inventory_obligation",
     "missing_for_source_dead_cert"
@@ -216,6 +217,32 @@
         },
         "per_port_coordinate_expansion": { "const": "missing" },
         "claim_grade_path_accepted": { "const": false }
+      }
+    },
+    "target_bridge_obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint_atom_id",
+        "observed_target_seen",
+        "observed_target_source_reached",
+        "observed_target_port_atoms",
+        "observed_target_bridge_edges",
+        "endpoint_bridge_accepted"
+      ],
+      "properties": {
+        "endpoint_atom_id": { "const": 1615075207964004 },
+        "observed_target_seen": { "type": "boolean" },
+        "observed_target_source_reached": { "type": "boolean" },
+        "observed_target_port_atoms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_target_bridge_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "endpoint_bridge_accepted": { "type": "boolean" }
       }
     },
     "terminal_source_inventory_summary": {

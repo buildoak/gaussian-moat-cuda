@@ -124,6 +124,14 @@ json_object_string_value() {
     "$path" | head -n 1
 }
 
+json_object_number_value() {
+  local path="$1"
+  local object_field="$2"
+  local field="$3"
+  sed -nE "s/.*\"${object_field}\":\{[^}]*\"${field}\":([0-9]+)[^}]*\}.*/\\1/p" \
+    "$path" | head -n 1
+}
+
 json_number_value() {
   local path="$1"
   local field="$2"
@@ -189,6 +197,19 @@ require_json_number_value() {
   value="$(json_number_value "$path" "$field")"
   if [[ -z "$value" ]]; then
     echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON number field ${field} ($path)" >&2
+    exit 1
+  fi
+  printf '%s\n' "$value"
+}
+
+require_json_object_number_value() {
+  local path="$1"
+  local object_field="$2"
+  local field="$3"
+  local value
+  value="$(json_object_number_value "$path" "$object_field" "$field")"
+  if [[ -z "$value" ]]; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: missing JSON number field ${object_field}.${field} ($path)" >&2
     exit 1
   fi
   printf '%s\n' "$value"
@@ -607,6 +628,8 @@ require_grep '"coordinate_path_obligation":.*"required_provenance":"coordinate_g
   "K26 source-dead gap coordinate path obligation"
 require_grep '"coordinate_path_obligation":.*"origin_prefix_witness_artifact":"k26-prefix-witness.txt".*"origin_prefix_witness_target_atom_id":[0-9]+.*"origin_prefix_witness_accepted":true' "$gap" \
   "K26 source-dead gap origin-prefix witness obligation"
+require_grep '"target_bridge_obligation":.*"endpoint_atom_id":1615075207964004.*"observed_target_seen":true.*"observed_target_source_reached":true.*"observed_target_port_atoms":[1-9][0-9]*.*"observed_target_bridge_edges":[1-9][0-9]*.*"endpoint_bridge_accepted":true' "$gap" \
+  "K26 source-dead gap target bridge obligation"
 require_grep '"terminal_inventory_obligation":.*"required_mode":"claim_grade_terminal_inventory".*"observed_mode":"summary_digest_only_non_claim".*"listed_inventory_present":false.*"claim_grade_inventory_accepted":false' "$gap" \
   "K26 source-dead gap terminal inventory obligation"
 require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
@@ -747,6 +770,29 @@ require_equal "$first_coordinate_atom" "$gap_prefix_atom_id" \
   "K26 gap origin-prefix witness target atom binding"
 require_fixed "witness ${gap_prefix_atom_id} " "$out_dir/k26-prefix-witness.txt" \
   "K26 prefix witness target row binding"
+continuation_target_port_atoms="$(
+  require_json_object_number_value "$continuation" target port_atoms
+)"
+continuation_target_bridge_edges="$(
+  require_json_object_number_value "$continuation" target bridge_edges
+)"
+gap_target_port_atoms="$(
+  require_json_object_number_value "$gap" target_bridge_obligation observed_target_port_atoms
+)"
+gap_target_bridge_edges="$(
+  require_json_object_number_value "$gap" target_bridge_obligation observed_target_bridge_edges
+)"
+gap_endpoint_atom_id="$(
+  require_json_object_number_value "$gap" target_bridge_obligation endpoint_atom_id
+)"
+require_equal "1615075207964004" "$gap_endpoint_atom_id" \
+  "K26 gap target bridge endpoint atom binding"
+require_equal "$continuation_target_port_atoms" "$gap_target_port_atoms" \
+  "K26 gap target bridge port count binding"
+require_equal "$continuation_target_bridge_edges" "$gap_target_bridge_edges" \
+  "K26 gap target bridge edge count binding"
+require_equal "$gap_target_port_atoms" "$gap_target_bridge_edges" \
+  "K26 gap target bridge port-edge count consistency"
 continuation_inventory_count="$(
   require_json_number_value "$continuation" source_inventory_count
 )"

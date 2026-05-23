@@ -149,7 +149,9 @@ inventory, and repaired K26 BZ schedule evidence. When the mixed target atom
 chain is present, the gap also requires the first coordinate atom to be a target
 row in `k26-prefix-witness.txt`; the origin-prefix side is then bound, while
 the TileOp-port edges still need coordinate expansion before any
-`SOURCE_DEAD_CERT` claim. For chunked runs it also binds
+`SOURCE_DEAD_CERT` claim. The same gap records a `target_bridge_obligation`
+that mirrors whether the canonical endpoint was seen, bridged to TileOp ports,
+and source-reached. For chunked runs it also binds
 `k26-continuation-chunks.jsonl` by SHA-256, so the gap report carries the
 checked continuation ledger identity. It separately binds
 `k26-continuation-chunk-000.json` when chunking is used, because
