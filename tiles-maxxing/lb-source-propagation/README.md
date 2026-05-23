@@ -370,9 +370,10 @@ not a coordinate Gaussian-prime source path suitable for a `SOURCE_DEAD_CERT`.
 
 `k26_source_run_contract` emits the execution contract for the Tsuchimura
 comparison target. It is intentionally a non-claim artifact:
-`"executable_now": false` remains correct until a campaign-scale source runner,
-scalable terminal inventory digest, full-run K26 BZ digest binding, and
-accepted `SOURCE_DEAD_CERT` artifact exist.
+`"executable_now": false` remains correct until the bundle harness has produced
+accepted full-run artifacts, terminal inventory provenance is claim-grade, the
+full-run K26 BZ digest is bound, and an accepted `SOURCE_DEAD_CERT` artifact
+exists.
 
 `k26_execution_plan` emits the machine-checkable execution plan for the same
 target. It expands the conservative `R_final=1015645` guard into 124 radial
@@ -397,9 +398,9 @@ That accepts the schedule evidence only; it is not `SOURCE_ORIGIN_K26` or
 `k26_source_run_profile` binds the repaired schedule to the intended full-run
 shape: exact coordinate prefix for row `0`, then TileOp-port continuation for
 rows `1..123` from an origin-prefix manifest and witness. It also records the
-next concrete implementation gap: the TileOp-port runner can now consume
-explicit variable boundaries, but no full K26 source run has executed that
-schedule yet.
+next concrete implementation gap: the TileOp-port runner can consume explicit
+variable boundaries through the bundle harness, but no accepted full K26 source
+run has completed that schedule yet.
 
 ## Integration Boundary
 

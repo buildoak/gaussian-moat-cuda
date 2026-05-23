@@ -122,7 +122,7 @@ int main() {
       "emit terminal inventory summary without explicit 14.5B-member JSON expansion",
       "emit SOURCE_DEAD_CERT only after positive endpoint path and negative final guard are both verified"};
   constexpr const char* kMissingRunnerFeatures[] = {
-      "full K26 source runner has not executed the repaired variable-boundary schedule",
+      "full-run K26 bundle harness has not produced accepted artifacts for the repaired variable-boundary schedule",
       "coordinate-to-port seam bridge remains diagnostic",
       "TileOp-port target reachability has mixed coordinate/port atom-chain provenance, not a coordinate source-path witness",
       "terminal inventory has only a summary-only non-claim verifier; claim-grade full-run provenance is still missing",

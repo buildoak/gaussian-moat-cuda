@@ -154,8 +154,8 @@ int main() {
       "accepted terminal inventory count/digest/max-norm handling at 14.5B scale"};
   constexpr const char* kCurrentBlockers[] = {
       "remote 4090 smoke has not passed on current head under the active price cap",
-      "full-scale K26 source runner is not accepted",
-      "source_tileop_port_runner can consume explicit variable boundaries, but K26 has not been executed",
+      "full-run K26 bundle harness is wired but has not produced accepted artifacts",
+      "source_tileop_port_runner can consume explicit variable boundaries, but the repaired K26 schedule has not completed under budget",
       "K26 repaired BZ schedule is bound into a draft run profile but not yet an executed full-run profile",
       "coordinate-to-port seam bridge remains diagnostic",
       "TileOp-port target reachability currently has mixed atom-chain provenance, not coordinate source-path provenance",

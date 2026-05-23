@@ -181,7 +181,7 @@ add_test(NAME k26_source_run_profile
   COMMAND k26_source_run_profile)
 set_tests_properties(k26_source_run_profile PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"full K26 source runner has not executed the repaired variable-boundary schedule"
+    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"full-run K26 bundle harness has not produced accepted artifacts for the repaired variable-boundary schedule"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_source_run_commands

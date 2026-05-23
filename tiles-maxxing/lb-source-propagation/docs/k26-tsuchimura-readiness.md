@@ -171,12 +171,13 @@ It emits `lb_source_k26_run_contract_v1`, including the target endpoint,
 required evidence, and current blocking gaps. It must keep
 `"executable_now": false` until these pieces exist:
 
-- a full-scale K26 source runner that feeds the sidecar from campaign TileOps
-  using the same stable coordinate/canonical-port identity as the diagnostic
-  CPU TileOp-fed runner;
-- execution of the repaired variable-boundary schedule by the TileOp-port
-  runner. The runner now supports explicit boundaries, but no K26 full source
-  run has consumed the repaired schedule yet;
+- accepted full-run K26 bundle artifacts. The bundle harness now wires the
+  row-0 coordinate prefix into rows `1..123` of TileOp-port continuation using
+  stable coordinate/canonical-port identity, but no budgeted K26 execution has
+  completed the repaired schedule and produced accepted artifacts yet;
+- execution evidence for the repaired variable-boundary schedule. The
+  TileOp-port runner supports explicit boundaries and the harness passes the
+  repaired schedule, but the full schedule has not completed under budget yet;
 - promotion of the TileOp port-graph primitive into the full band scheduler;
   transient TileOp group labels must remain internal only. The current
   `source_tileop_port_runner` can consume an origin-prefix manifest/witness and
