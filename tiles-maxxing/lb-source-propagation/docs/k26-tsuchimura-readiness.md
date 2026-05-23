@@ -416,20 +416,26 @@ budget margin `-1151s`. This confirms that one-band remote timing probes can
 reject this host shape in about one continuation band instead of burning a
 whole eight-band chunk.
 
-After that rejection, the first sidecar-only runtime fix targets the measured
-`manifest_bridge` hotspot without changing TileOp bytes, CUDA kernels,
-certificate semantics, or final sorted bridge output. The coordinate carry
-lookup inside `source_tileop_port_runner` now uses a reserved hash table keyed
-by stable `(a,b)` coordinates and precomputes the finite K-neighborhood
-offsets once per bridge. This removes ordered-tree lookup and repeated
-distance filtering from every prime candidate in the first continuation band.
-Local verification after the change: full sidecar CTest passed `28/28`, the
-Phase 1 diff-scope guard passed, a matching-K36 progress smoke emitted
-`manifest_bridge` and `source_process` phase rows, and a local K26-compiled
-progress smoke over `248 -> 512` completed with live source carry. This is a
-runtime optimization only; it does not yet prove that the full K26 continuation
-fits the paid budget gate, so another paid timing probe still requires the same
-one-band default, price cap, and runtime checker.
+After that rejection, the first sidecar-only runtime fixes target the measured
+`manifest_bridge` and `source_process` hotspots without changing TileOp bytes,
+CUDA kernels, certificate semantics, or final sorted bridge output. The
+coordinate carry lookup inside `source_tileop_port_runner` now uses a reserved
+hash table keyed by stable `(a,b)` coordinates and precomputes the finite
+K-neighborhood offsets once per bridge. The source-propagation inventory merge
+now sorts only new per-band atoms and linearly merges already-canonical
+incoming component inventories, instead of re-sorting the full accumulated
+source inventory on every continuation band. Direct API inputs with unsorted
+incoming inventory remain accepted and canonicalized. Local verification after
+the changes: full sidecar CTest passed `28/28`, the Phase 1 diff-scope guard
+passed, a matching-K36 progress smoke emitted `manifest_bridge` and
+`source_process` phase rows, and a local K26-compiled first-continuation probe
+over `8192 -> 16384` with `--tileop-threads 6` completed with live source
+carry in `6.719s` total: `tileop_ms=3516`, `manifest_bridge=2085ms`, and
+`source_process=1104ms`. It preserved the row-0 bridge-safety counters,
+including `source_unbridged_unsafe_candidate_atoms=0`. This is runtime
+evidence only; it does not yet prove that the full K26 continuation fits the
+paid budget gate, so another paid timing probe still requires the same one-band
+default, price cap, and runtime checker.
 
 A guarded paid retry was attempted after this optimization at local head
 `6f94b31`, but no RTX 4090 offer satisfied the active `$0.37/hr` cap. The

@@ -273,6 +273,27 @@ void test_non_source_payload_later_merge_is_in_terminal_inventory() {
            (std::vector<AtomId>{1, 2, 3, 7, 8}));
 }
 
+void test_process_band_canonicalizes_unsorted_incoming_inventory() {
+  SeparatorState incoming;
+  incoming.carry_atoms = {{2, 100}, {3, 100}};
+  incoming.component_partition = {{3, 2}};
+  incoming.source_bit_per_component = {true};
+  incoming.component_inventory = {{3, 1, 2}};
+
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{4, 400, false}},
+      .edges = {{2, 4}},
+  };
+
+  const ProcessResult result = lb_source::process_band(band, incoming);
+  CHECK_TRUE(result.accepted());
+  CHECK_TRUE(component_has_source_bit(result.outgoing, {4}, true));
+  CHECK_EQ(result.outgoing.component_inventory,
+           (std::vector<std::vector<AtomId>>{{1, 2, 3, 4}}));
+}
+
 void test_overflow_reject_is_hard() {
   const BandInput band{
       .k_sq = 36,
@@ -652,6 +673,8 @@ int main() {
       test_terminal_inventory_survives_extra_bands);
   run("non_source_payload_later_merge_is_in_terminal_inventory",
       test_non_source_payload_later_merge_is_in_terminal_inventory);
+  run("process_band_canonicalizes_unsorted_incoming_inventory",
+      test_process_band_canonicalizes_unsorted_incoming_inventory);
   run("overflow_reject_is_hard", test_overflow_reject_is_hard);
   run("k32_ceil_sqrt_carry_width_is_six",
       test_k32_ceil_sqrt_carry_width_is_six);

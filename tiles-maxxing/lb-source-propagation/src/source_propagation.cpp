@@ -5,6 +5,7 @@
 #include <charconv>
 #include <iomanip>
 #include <istream>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <ostream>
@@ -78,6 +79,44 @@ bool in_final_carry_window(std::uint64_t norm_sq, std::uint64_t outer_radius,
   const std::uint64_t inner_radius =
       outer_radius > carry_width ? outer_radius - carry_width : 0;
   return norm_sq >= inner_radius * inner_radius;
+}
+
+void sort_unique_atom_ids(std::vector<AtomId>& ids) {
+  std::sort(ids.begin(), ids.end());
+  ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+}
+
+bool is_sorted_unique_atom_ids(const std::vector<AtomId>& ids) {
+  return std::adjacent_find(ids.begin(), ids.end(),
+                            [](AtomId lhs, AtomId rhs) {
+                              return lhs >= rhs;
+                            }) == ids.end();
+}
+
+void merge_inventory_payload(std::vector<AtomId>& target,
+                             const std::vector<AtomId>& source) {
+  if (target.empty()) {
+    target = source;
+    if (!is_sorted_unique_atom_ids(target)) {
+      sort_unique_atom_ids(target);
+    }
+    return;
+  }
+
+  std::vector<AtomId> sorted_source_storage;
+  const std::vector<AtomId>* sorted_source = &source;
+  if (!is_sorted_unique_atom_ids(source)) {
+    sorted_source_storage = source;
+    sort_unique_atom_ids(sorted_source_storage);
+    sorted_source = &sorted_source_storage;
+  }
+
+  std::vector<AtomId> merged;
+  merged.reserve(target.size() + sorted_source->size());
+  std::merge(target.begin(), target.end(), sorted_source->begin(),
+             sorted_source->end(), std::back_inserter(merged));
+  merged.erase(std::unique(merged.begin(), merged.end()), merged.end());
+  target = std::move(merged);
 }
 
 bool square_ge(std::uint64_t x, std::uint64_t n) {
@@ -942,12 +981,18 @@ ProcessResult process_band(const BandInput& band,
   for (std::size_t i = 0; i < all_atoms.size(); ++i) {
     norm_by_id.emplace(all_atoms[i].id, all_atoms[i].norm_sq);
     const std::size_t root = dsu.find(i);
-    inventory_by_root[root].push_back(all_atoms[i].id);
+    if (i < band.atoms.size()) {
+      inventory_by_root[root].push_back(all_atoms[i].id);
+    }
     if (in_final_carry_window(
             all_atoms[i].norm_sq, band.outer_radius, carry_width,
             all_atoms[i].allow_outer_overshoot_carry)) {
       carry_by_root[root].push_back(all_atoms[i].id);
     }
+  }
+  for (auto& [root, inventory] : inventory_by_root) {
+    (void)root;
+    sort_unique_atom_ids(inventory);
   }
   if (incoming) {
     for (std::size_t c = 0; c < incoming->component_partition.size(); ++c) {
@@ -959,13 +1004,8 @@ ProcessResult process_band(const BandInput& band,
           incoming->component_inventory.empty()
               ? incoming->component_partition[c]
               : incoming->component_inventory[c];
-      payload.insert(payload.end(), inventory.begin(), inventory.end());
+      merge_inventory_payload(payload, inventory);
     }
-  }
-  for (auto& [root, inventory] : inventory_by_root) {
-    std::sort(inventory.begin(), inventory.end());
-    inventory.erase(std::unique(inventory.begin(), inventory.end()),
-                    inventory.end());
   }
 
   ProcessResult result;
