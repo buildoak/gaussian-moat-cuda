@@ -187,9 +187,12 @@ into bounded chunks, uses the origin-prefix coordinate manifest only for the
 first chunk, resumes later chunks from TileOp-port carry manifests,
 concatenates chunk progress into `k26-continuation-progress.jsonl`, and copies
 the final chunk output to `k26-continuation-result.json` for the existing
-bundle checker. Chunk artifacts are also hashed in
-`k26-full-run-artifacts.sha256`. This is an execution-resilience protocol, not
-a certificate relaxation.
+bundle checker. It also writes `k26-continuation-chunks.jsonl`, one ledger row
+per chunk, recording the schedule slice, input/output carry manifest names,
+result/progress artifacts, whether the chunk was executed or reused, and the
+observed live/dead source state. Chunk artifacts and the chunk ledger are also
+hashed in `k26-full-run-artifacts.sha256`. This is an execution-resilience
+protocol, not a certificate relaxation.
 If a paid attempt times out after producing complete prefix or chunk artifacts,
 rerun the same command with `--resume-existing`. The harness skips the prefix
 only when `k26-prefix-result.json`, `k26-prefix-progress.jsonl`,

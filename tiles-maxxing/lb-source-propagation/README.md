@@ -370,9 +370,13 @@ The bundle harness exposes this as `--continuation-chunk-bands N`: it splits
 the repaired continuation schedule into bounded chunks, concatenates chunk
 progress into the canonical continuation progress JSONL, preserves
 `k26-continuation-result.json` as the final chunk result, and hashes chunk
-artifacts in the bundle manifest. Add `--resume-existing` after a timeout to
-reuse complete prefix artifacts and complete live-source chunks from the same
-output directory instead of restarting the paid continuation from row 0.
+artifacts in the bundle manifest. It also writes
+`k26-continuation-chunks.jsonl`, one ledger row per chunk, recording the
+schedule slice, input/output carry manifest names, result/progress artifacts,
+whether the chunk was executed or reused, and the observed live/dead source
+state. Add `--resume-existing` after a timeout to reuse complete prefix
+artifacts and complete live-source chunks from the same output directory
+instead of restarting the paid continuation from row 0.
 The TileOp build loop is parallelized only inside this sidecar runner with
 standard C++ worker threads, preserving the deterministic output order and
 reporting

@@ -304,16 +304,23 @@ grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING' \
 grep -q 'continuation_chunk_bands=2' "$chunked_out/status.txt"
 test -f "$chunked_out/k26-continuation-result.json"
 test -f "$chunked_out/k26-continuation-progress.jsonl"
+test -f "$chunked_out/k26-continuation-chunks.jsonl"
 test -f "$chunked_out/k26-continuation-chunk-000.json"
 test -f "$chunked_out/k26-continuation-chunk-000.progress.jsonl"
 test -f "$chunked_out/k26-continuation-chunk-000.manifest.txt"
 test -f "$chunked_out/k26-continuation-chunk-001.json"
 test -f "$chunked_out/k26-continuation-chunk-001.progress.jsonl"
+grep -q '"chunk_id":"000","action":"executed","schedule_segment_start":0,"schedule_segment_end":2,"schedule_segment_count":2,"r_start":8192,"r_final":475135,"schedule_radii_csv":"8192,122879,475135"' \
+  "$chunked_out/k26-continuation-chunks.jsonl"
+grep -q '"chunk_id":"001","action":"executed","schedule_segment_start":2,"schedule_segment_end":4,"schedule_segment_count":2,"r_start":475135,"r_final":1015645,"schedule_radii_csv":"475135,622591,1015645"' \
+  "$chunked_out/k26-continuation-chunks.jsonl"
 grep -q 'k26-continuation-chunk-000.json' \
   "$chunked_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-continuation-chunk-000.manifest.txt' \
   "$chunked_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-continuation-chunk-001.json' \
+  "$chunked_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-continuation-chunks.jsonl' \
   "$chunked_out/k26-full-run-artifacts.sha256"
 grep -q '"terminal_source_dead":true' \
   "$chunked_out/k26-continuation-result.json"
@@ -346,10 +353,17 @@ grep -q 'SKIP K26_CONTINUATION_CHUNK_000: existing complete chunk' \
   "$resume_out/run.log"
 grep -q 'RUN K26_CONTINUATION_CHUNK_001:' "$resume_out/run.log"
 test -f "$resume_out/k26-continuation-result.json"
+test -f "$resume_out/k26-continuation-chunks.jsonl"
 test -f "$resume_out/k26-continuation-chunk-001.json"
+grep -q '"chunk_id":"000","action":"reused"' \
+  "$resume_out/k26-continuation-chunks.jsonl"
+grep -q '"chunk_id":"001","action":"executed"' \
+  "$resume_out/k26-continuation-chunks.jsonl"
 grep -q 'k26-continuation-chunk-000.manifest.txt' \
   "$resume_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-continuation-chunk-001.json' \
+  "$resume_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-continuation-chunks.jsonl' \
   "$resume_out/k26-full-run-artifacts.sha256"
 
 cert="$tmp/k26-source-dead-cert.json"

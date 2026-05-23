@@ -25,6 +25,7 @@ Artifacts written under OUT_DIR:
   k26-prefix-progress.jsonl
   k26-continuation-result.json
   k26-continuation-progress.jsonl
+  k26-continuation-chunks.jsonl, when --continuation-chunk-bands is supplied
   k26-continuation-chunk-*.json and k26-continuation-chunk-*.manifest.txt,
     when --continuation-chunk-bands is supplied
   k26-prefix-manifest.txt
@@ -164,6 +165,7 @@ mkdir -p "$out_dir"
 status_file="$out_dir/status.txt"
 artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
 source_dead_gap="$out_dir/k26-source-dead-gap.json"
+chunk_ledger="$out_dir/k26-continuation-chunks.jsonl"
 write_status() {
   local status="$1"
   {
@@ -220,6 +222,7 @@ write_artifact_manifest() {
     k26-prefix-progress.jsonl
     k26-continuation-result.json
     k26-continuation-progress.jsonl
+    k26-continuation-chunks.jsonl
     k26-prefix-manifest.txt
     k26-prefix-witness.txt
     k26-source-dead-gap.json
@@ -321,6 +324,24 @@ json_bool_value() {
   sed -nE "s/.*\"${field}\":(true|false).*/\\1/p" "$path" | head -n 1
 }
 
+json_bool_or_null() {
+  local value="$1"
+  if [[ "$value" == "true" || "$value" == "false" ]]; then
+    printf '%s\n' "$value"
+  else
+    printf 'null\n'
+  fi
+}
+
+json_number_or_null() {
+  local value="$1"
+  if [[ "$value" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$value"
+  else
+    printf 'null\n'
+  fi
+}
+
 json_array_value() {
   local path="$1"
   local field="$2"
@@ -346,6 +367,51 @@ append_file_if_exists() {
   if [[ -f "$src" ]]; then
     cat "$src" >> "$dst"
   fi
+}
+
+artifact_basename_or_empty() {
+  local path="$1"
+  if [[ -n "$path" ]]; then
+    basename "$path"
+  fi
+}
+
+append_chunk_ledger() {
+  local chunk_id="$1"
+  local chunk_index="$2"
+  local action="$3"
+  local chunk_start="$4"
+  local chunk_end="$5"
+  local chunk_r_start="$6"
+  local chunk_r_final="$7"
+  local chunk_csv="$8"
+  local final_chunk="$9"
+  local input_manifest="${10}"
+  local output_manifest="${11}"
+  local chunk_json="${12}"
+  local chunk_progress="${13}"
+  local terminal_dead="${14}"
+  local has_live_source="${15}"
+  local source_carry_atoms="${16}"
+  local input_name output_name result_name progress_name final_bool
+  input_name="$(artifact_basename_or_empty "$input_manifest")"
+  output_name="$(artifact_basename_or_empty "$output_manifest")"
+  result_name="$(artifact_basename_or_empty "$chunk_json")"
+  progress_name="$(artifact_basename_or_empty "$chunk_progress")"
+  if [[ "$final_chunk" == "1" ]]; then
+    final_bool="true"
+  else
+    final_bool="false"
+  fi
+  terminal_dead="$(json_bool_or_null "$terminal_dead")"
+  has_live_source="$(json_bool_or_null "$has_live_source")"
+  source_carry_atoms="$(json_number_or_null "$source_carry_atoms")"
+  printf '{"schema":"lb_source_k26_continuation_chunk_v1","chunk_index":%s,"chunk_id":"%s","action":"%s","schedule_segment_start":%s,"schedule_segment_end":%s,"schedule_segment_count":%s,"r_start":%s,"r_final":%s,"schedule_radii_csv":"%s","input_manifest":"%s","output_manifest":"%s","result":"%s","progress":"%s","final_chunk":%s,"terminal_source_dead":%s,"has_source_carry":%s,"source_carry_atoms":%s}\n' \
+    "$chunk_index" "$chunk_id" "$action" "$chunk_start" "$chunk_end" \
+    "$((chunk_end - chunk_start))" "$chunk_r_start" "$chunk_r_final" \
+    "$chunk_csv" "$input_name" "$output_name" "$result_name" \
+    "$progress_name" "$final_bool" "$terminal_dead" "$has_live_source" \
+    "$source_carry_atoms" >> "$chunk_ledger"
 }
 
 prefix_resume_ready() {
@@ -412,12 +478,13 @@ run_k26_continuation() {
   fi
 
   : > "$out_dir/k26-continuation-progress.jsonl"
+  : > "$chunk_ledger"
   local chunk_start=0
   local chunk_index=0
   local manifest_in="$out_dir/k26-prefix-manifest.txt"
   local chunk_id chunk_end chunk_r_start chunk_r_final chunk_csv
   local chunk_json chunk_progress chunk_manifest
-  local terminal_dead has_live_source
+  local terminal_dead has_live_source source_carry_atoms
   while (( chunk_start < segment_count )); do
     chunk_end=$((chunk_start + chunk_size))
     if (( chunk_end > segment_count )); then
@@ -435,10 +502,19 @@ run_k26_continuation() {
       final_chunk=1
     fi
 
+    local action chunk_input_manifest chunk_output_manifest
+    action="executed"
+    chunk_input_manifest="$manifest_in"
+    chunk_output_manifest=""
+    if (( chunk_end < segment_count )); then
+      chunk_output_manifest="$chunk_manifest"
+    fi
+
     if chunk_resume_ready "$chunk_json" "$chunk_progress" "$chunk_manifest" \
         "$final_chunk"; then
       echo "SKIP K26_CONTINUATION_CHUNK_${chunk_id}: existing complete chunk" \
         >> "$out_dir/run.log"
+      action="reused"
     else
       local args=(
         "$build_dir/source_tileop_port_runner"
@@ -466,8 +542,9 @@ run_k26_continuation() {
 
     terminal_dead="$(json_bool_value "$chunk_json" terminal_source_dead)"
     require_extracted "$terminal_dead" "CHUNK_${chunk_id}_TERMINAL_SOURCE_DEAD"
+    has_live_source="$(json_bool_value "$chunk_json" has_source_carry)"
+    source_carry_atoms="$(json_number_value "$chunk_json" source_carry_atoms)"
     if (( chunk_end < segment_count )); then
-      has_live_source="$(json_bool_value "$chunk_json" has_source_carry)"
       require_extracted "$has_live_source" "CHUNK_${chunk_id}_HAS_SOURCE_CARRY"
       if [[ "$terminal_dead" == "true" || "$has_live_source" != "true" ]]; then
         write_status "K26_FULL_RUN_BUNDLE_BLOCKED_CHUNK_${chunk_id}_NOT_RESUMABLE"
@@ -483,6 +560,12 @@ run_k26_continuation() {
     else
       cp "$chunk_json" "$out_dir/k26-continuation-result.json"
     fi
+
+    append_chunk_ledger "$chunk_id" "$chunk_index" "$action" \
+      "$chunk_start" "$chunk_end" "$chunk_r_start" "$chunk_r_final" \
+      "$chunk_csv" "$final_chunk" "$chunk_input_manifest" \
+      "$chunk_output_manifest" "$chunk_json" "$chunk_progress" \
+      "$terminal_dead" "$has_live_source" "$source_carry_atoms"
 
     chunk_start="$chunk_end"
     chunk_index=$((chunk_index + 1))
