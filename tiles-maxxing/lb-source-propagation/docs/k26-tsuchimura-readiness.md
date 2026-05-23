@@ -605,6 +605,14 @@ qualifying-market offer was `$0.4000/hr`, `0.0300/hr` over cap. No Vast
 instance was created, the failure ledger recorded the capped stop, and
 `vastai show instances --raw` returned `[]`.
 
+After binding the remote K26 timing probe to independently built source-death
+checkers at local head `a66d021`, another guarded one-band timing-probe
+attempt used the same `$0.37/hr` and `$1.50` caps and excluded host `53663`.
+No RTX 4090 offer satisfied the cap; the nearest observed qualifying-market
+offer was `$0.5214/hr`, `0.1514/hr` over cap. No Vast instance was created,
+the failure ledger recorded the capped stop, and `vastai show instances --raw`
+returned `[]`.
+
 After any partial continuation, run:
 
 ```bash
