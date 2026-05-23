@@ -154,6 +154,22 @@ atom_path_kind_counts() {
   printf '%s %s\n' "$coordinate_count" "$port_count"
 }
 
+first_coordinate_atom_id() {
+  local atom_path="$1"
+  local body token
+  body="${atom_path#[}"
+  body="${body%]}"
+  IFS=',' read -r -a tokens <<< "$body"
+  for token in "${tokens[@]}"; do
+    token="${token//[[:space:]]/}"
+    [[ -z "$token" ]] && continue
+    if [[ "$token" != -* ]]; then
+      printf '%s\n' "$token"
+      return
+    fi
+  done
+}
+
 require_json_string_value() {
   local path="$1"
   local field="$2"
@@ -589,6 +605,8 @@ require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_cla
   "K26 source-dead gap target path provenance"
 require_grep '"coordinate_path_obligation":.*"required_provenance":"coordinate_gaussian_prime_path".*"observed_provenance":"mixed_coordinate_port_atom_chain_non_claim".*"per_port_coordinate_expansion":"missing".*"claim_grade_path_accepted":false' "$gap" \
   "K26 source-dead gap coordinate path obligation"
+require_grep '"coordinate_path_obligation":.*"origin_prefix_witness_artifact":"k26-prefix-witness.txt".*"origin_prefix_witness_target_atom_id":[0-9]+.*"origin_prefix_witness_accepted":true' "$gap" \
+  "K26 source-dead gap origin-prefix witness obligation"
 require_grep '"terminal_inventory_obligation":.*"required_mode":"claim_grade_terminal_inventory".*"observed_mode":"summary_digest_only_non_claim".*"listed_inventory_present":false.*"claim_grade_inventory_accepted":false' "$gap" \
   "K26 source-dead gap terminal inventory obligation"
 require_grep '"missing_for_source_dead_cert":.*coordinate Gaussian-prime source_path' "$gap" \
@@ -721,6 +739,14 @@ require_equal "${atom_path_counts%% *}" "$gap_coordinate_atom_count" \
   "K26 gap coordinate path coordinate atom count"
 require_equal "${atom_path_counts##* }" "$gap_port_atom_count" \
   "K26 gap coordinate path port atom count"
+gap_prefix_atom_id="$(
+  require_json_number_value "$gap" origin_prefix_witness_target_atom_id
+)"
+first_coordinate_atom="$(first_coordinate_atom_id "$gap_atom_path")"
+require_equal "$first_coordinate_atom" "$gap_prefix_atom_id" \
+  "K26 gap origin-prefix witness target atom binding"
+require_fixed "witness ${gap_prefix_atom_id} " "$out_dir/k26-prefix-witness.txt" \
+  "K26 prefix witness target row binding"
 continuation_inventory_count="$(
   require_json_number_value "$continuation" source_inventory_count
 )"

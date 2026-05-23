@@ -145,8 +145,12 @@ with `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE` because there is no
 source-dead gap to certify. The gap artifact binds the continuation artifact
 plus the prefix manifest and prefix witness, and records the exact remaining
 certificate obligations: bridge safety, target/coordinate path, terminal
-inventory, and repaired K26 BZ schedule evidence. For chunked runs it also
-binds `k26-continuation-chunks.jsonl` by SHA-256, so the gap report carries the
+inventory, and repaired K26 BZ schedule evidence. When the mixed target atom
+chain is present, the gap also requires the first coordinate atom to be a target
+row in `k26-prefix-witness.txt`; the origin-prefix side is then bound, while
+the TileOp-port edges still need coordinate expansion before any
+`SOURCE_DEAD_CERT` claim. For chunked runs it also binds
+`k26-continuation-chunks.jsonl` by SHA-256, so the gap report carries the
 checked continuation ledger identity. It separately binds
 `k26-continuation-chunk-000.json` when chunking is used, because
 coordinate-to-port bridge safety is a row-0 seam obligation while the

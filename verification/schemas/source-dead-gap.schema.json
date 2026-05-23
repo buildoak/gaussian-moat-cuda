@@ -181,6 +181,9 @@
         "observed_provenance",
         "observed_coordinate_atom_count",
         "observed_port_atom_count",
+        "origin_prefix_witness_artifact",
+        "origin_prefix_witness_target_atom_id",
+        "origin_prefix_witness_accepted",
         "per_port_coordinate_expansion",
         "claim_grade_path_accepted"
       ],
@@ -201,6 +204,15 @@
         "observed_port_atom_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "origin_prefix_witness_artifact": {
+          "const": "k26-prefix-witness.txt"
+        },
+        "origin_prefix_witness_target_atom_id": {
+          "type": ["integer", "null"]
+        },
+        "origin_prefix_witness_accepted": {
+          "type": "boolean"
         },
         "per_port_coordinate_expansion": { "const": "missing" },
         "claim_grade_path_accepted": { "const": false }

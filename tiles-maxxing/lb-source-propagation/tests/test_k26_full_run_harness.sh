@@ -57,7 +57,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$manifest" ]] && echo "manifest" > "$manifest"
-[[ -n "$witness" ]] && echo "witness" > "$witness"
+if [[ -n "$witness" ]]; then
+  cat > "$witness" <<'WITNESS'
+LB_SOURCE_PREFIX_WITNESS_V1
+k_sq 26
+outer_radius 8192
+witness_count 1
+witness 1615075207963900 376039 943356 1031325872257 2
+point 0 3 9
+point 376039 943356 1031325872257
+END
+WITNESS
+fi
 [[ -n "$progress" ]] && echo '{"schema":"lb_source_origin_progress_v1","accepted":true}' > "$progress"
 cat <<'JSON'
 {"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"manifest_written":true,"prefix_witness_written":true}

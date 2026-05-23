@@ -430,6 +430,34 @@ std::string verify_gap(const nlohmann::json& gap) {
   if (require_u64(path_obligation, "observed_port_atom_count") != port_atoms) {
     throw std::runtime_error("coordinate path obligation port count mismatch");
   }
+  if (require_string(path_obligation, "origin_prefix_witness_artifact") !=
+      "k26-prefix-witness.txt") {
+    throw std::runtime_error(
+        "coordinate path obligation has wrong origin-prefix witness artifact");
+  }
+  const nlohmann::json& prefix_target =
+      require_field(path_obligation, "origin_prefix_witness_target_atom_id");
+  const bool prefix_accepted =
+      require_bool(path_obligation, "origin_prefix_witness_accepted");
+  if (target_not_reached) {
+    if (!prefix_target.is_null() || prefix_accepted) {
+      throw std::runtime_error(
+          "target-not-reached gap must not accept origin-prefix witness");
+    }
+  } else {
+    if (!prefix_target.is_number_integer()) {
+      throw std::runtime_error(
+          "origin-prefix witness target atom must be an integer");
+    }
+    if (!prefix_accepted) {
+      throw std::runtime_error(
+          "reached mixed path must accept origin-prefix witness");
+    }
+    if (prefix_target.get<std::int64_t>() != atom_path.front()) {
+      throw std::runtime_error(
+          "origin-prefix witness target does not match first path atom");
+    }
+  }
   if (!target_not_reached && port_atoms == 0) {
     throw std::runtime_error("coordinate path obligation needs a port expansion gap");
   }

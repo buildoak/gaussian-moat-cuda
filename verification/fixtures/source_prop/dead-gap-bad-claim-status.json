@@ -61,7 +61,10 @@
     "observed_coordinate_atom_count": 2,
     "observed_port_atom_count": 1,
     "per_port_coordinate_expansion": "missing",
-    "claim_grade_path_accepted": false
+    "claim_grade_path_accepted": false,
+    "origin_prefix_witness_artifact": "k26-prefix-witness.txt",
+    "origin_prefix_witness_target_atom_id": 1615075207963900,
+    "origin_prefix_witness_accepted": true
   },
   "terminal_source_inventory_summary": {
     "count": 14542615005,
