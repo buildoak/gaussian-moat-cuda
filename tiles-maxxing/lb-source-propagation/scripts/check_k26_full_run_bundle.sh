@@ -560,6 +560,8 @@ require_grep '"max_source_norm_sq":[1-9][0-9]*' "$continuation" \
   "K26 continuation max source norm"
 require_grep '"max_source_norm_atom_ids":\[[0-9]' "$continuation" \
   "K26 continuation max-norm tie set"
+require_grep '"terminal_source_inventory_accumulator":.*"mode":"summary_digest_only_non_claim".*"provenance":"terminal_component_inventory_accumulator".*"listed_inventory_present":false.*"claim_grade_inventory_accepted":false' "$continuation" \
+  "K26 continuation non-claim terminal accumulator"
 
 require_grep '"schema":"lb_source_k26_source_dead_gap_v1"' "$gap" \
   "K26 source-dead gap schema"
@@ -699,6 +701,10 @@ continuation_max_norm="$(require_json_number_value "$continuation" max_source_no
 continuation_max_ties="$(
   require_json_array_value "$continuation" max_source_norm_atom_ids
 )"
+require_grep "\"terminal_source_inventory_accumulator\":.*\"count\":${continuation_inventory_count}.*\"digest_hex\":\"${continuation_inventory_digest}\".*\"max_norm_sq\":${continuation_max_norm}" "$continuation" \
+  "K26 continuation terminal accumulator summary binding"
+require_fixed "\"max_norm_atom_ids\":${continuation_max_ties}" "$continuation" \
+  "K26 continuation terminal accumulator max-norm tie binding"
 gap_inventory_count="$(require_json_number_value "$gap" count)"
 gap_inventory_digest="$(require_json_string_value "$gap" digest_hex)"
 gap_max_norm="$(require_json_number_value "$gap" max_norm_sq)"
