@@ -575,6 +575,14 @@ offer. The nearest observed qualifying-market offer was `$0.4014/hr`,
 `0.0314/hr` over cap. No Vast instance was created; `vastai show instances
 --raw` returned `[]` after the attempt.
 
+After exposing the auto summary/non-claim certificate contract at local head
+`a5dd815`, a guarded Vast smoke attempt found RTX 4090 offer `31475019` on
+host `53663` at `$0.2801/hr`, inside the cap, and created instance
+`37460590`. SSH metadata never became available within the 600-second readiness
+window, so no deploy or remote smoke ran. Because the attempt used
+`--destroy-on-exit`, the guard destroyed the unready instance. A final
+`vastai show instances --raw` returned `[]`.
+
 After any partial continuation, run:
 
 ```bash
