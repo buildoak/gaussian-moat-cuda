@@ -192,7 +192,11 @@ per chunk, recording the schedule slice, input/output carry manifest names,
 result/progress artifacts, whether the chunk was executed or reused, and the
 observed live/dead source state. Chunk artifacts and the chunk ledger are also
 hashed in `k26-full-run-artifacts.sha256`. This is an execution-resilience
-protocol, not a certificate relaxation.
+protocol, not a certificate relaxation. The full bundle checker validates the
+ledger when present: chunk rows must cover the command schedule contiguously,
+chain input/output carry manifests, bind every chunk artifact through the hash
+manifest, and make the final chunk result byte-identical to
+`k26-continuation-result.json`.
 If a paid attempt times out after producing complete prefix or chunk artifacts,
 rerun the same command with `--resume-existing`. The harness skips the prefix
 only when `k26-prefix-result.json`, `k26-prefix-progress.jsonl`,

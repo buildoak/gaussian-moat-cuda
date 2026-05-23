@@ -298,6 +298,10 @@ mismatches, malformed gap artifacts, unsafe source-connected bridge gaps,
 overflow, wrong component size, missing source-dead draft, a source-dead draft
 whose terminal inventory summary does not match the executed continuation
 result, or a source-dead draft not accepted by the independent checker.
+When a chunk ledger is present, the checker also validates that the ledger
+covers the command schedule contiguously, chains carry manifests, binds every
+chunk artifact through the hash manifest, and matches the final chunk result to
+`k26-continuation-result.json`.
 
 The paid/full-run harness is:
 

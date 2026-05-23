@@ -20,6 +20,7 @@ Required artifact names:
   k26-prefix-progress.jsonl
   k26-continuation-result.json
   k26-continuation-progress.jsonl
+  k26-continuation-chunks.jsonl, when present
   k26-prefix-manifest.txt
   k26-prefix-witness.txt
   k26-source-dead-gap.json
@@ -188,6 +189,7 @@ prefix="$out_dir/k26-prefix-result.json"
 prefix_progress="$out_dir/k26-prefix-progress.jsonl"
 continuation="$out_dir/k26-continuation-result.json"
 continuation_progress="$out_dir/k26-continuation-progress.jsonl"
+chunk_ledger="$out_dir/k26-continuation-chunks.jsonl"
 prefix_manifest="$out_dir/k26-prefix-manifest.txt"
 prefix_witness="$out_dir/k26-prefix-witness.txt"
 gap="$out_dir/k26-source-dead-gap.json"
@@ -222,6 +224,9 @@ require_manifest_hash "$prefix" k26-prefix-result.json
 require_manifest_hash "$prefix_progress" k26-prefix-progress.jsonl
 require_manifest_hash "$continuation" k26-continuation-result.json
 require_manifest_hash "$continuation_progress" k26-continuation-progress.jsonl
+if [[ -f "$chunk_ledger" ]]; then
+  require_manifest_hash "$chunk_ledger" k26-continuation-chunks.jsonl
+fi
 require_manifest_hash "$prefix_manifest" k26-prefix-manifest.txt
 require_manifest_hash "$prefix_witness" k26-prefix-witness.txt
 require_manifest_hash "$gap" k26-source-dead-gap.json
@@ -318,6 +323,161 @@ commands_digest="$(require_json_string_value "$commands" schedule_digest_hex)"
 profile_digest="$(require_json_string_value "$profile" schedule_digest_hex)"
 require_equal "$bz_digest" "$commands_digest" "K26 BZ digest command binding"
 require_equal "$bz_digest" "$profile_digest" "K26 BZ digest profile binding"
+
+validate_chunk_ledger() {
+  if [[ ! -f "$chunk_ledger" ]]; then
+    return
+  fi
+  python3 - "$out_dir" "$commands" "$continuation" "$artifact_manifest" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+
+out_dir = pathlib.Path(sys.argv[1])
+commands_path = pathlib.Path(sys.argv[2])
+continuation_path = pathlib.Path(sys.argv[3])
+artifact_manifest_path = pathlib.Path(sys.argv[4])
+ledger_path = out_dir / "k26-continuation-chunks.jsonl"
+prefix_manifest_name = "k26-prefix-manifest.txt"
+
+
+def reject(message: str) -> None:
+    print(
+        f"K26_FULL_RUN_BUNDLE_REJECT: K26 chunk ledger {message}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
+def load_json(path: pathlib.Path) -> dict:
+    try:
+        return json.loads(path.read_text())
+    except Exception as exc:  # noqa: BLE001
+        reject(f"bad JSON in {path.name}: {exc}")
+
+
+def require_file(name: str, label: str) -> pathlib.Path:
+    if not name:
+        reject(f"missing {label}")
+    path = out_dir / name
+    if not path.is_file():
+        reject(f"{label} does not exist: {name}")
+    return path
+
+
+def digest(path: pathlib.Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+manifest_entries = set()
+for raw in artifact_manifest_path.read_text().splitlines():
+    parts = raw.split()
+    if len(parts) == 2:
+        manifest_entries.add((parts[0], parts[1]))
+
+
+def require_hashed(name: str, label: str) -> pathlib.Path:
+    path = require_file(name, label)
+    entry = (digest(path), name)
+    if entry not in manifest_entries:
+        reject(f"{label} hash is absent or stale in k26-full-run-artifacts.sha256: {name}")
+    return path
+
+
+commands = load_json(commands_path)
+continuation = load_json(continuation_path)
+radii_csv = commands.get("continuation", {}).get("schedule_radii_csv")
+if not isinstance(radii_csv, str) or not radii_csv:
+    reject("missing command schedule_radii_csv")
+try:
+    radii = [int(part) for part in radii_csv.split(",")]
+except ValueError:
+    reject("command schedule_radii_csv is not integer CSV")
+if len(radii) < 2:
+    reject("command schedule has fewer than two radii")
+segment_count = len(radii) - 1
+
+rows = []
+for line_no, line in enumerate(ledger_path.read_text().splitlines(), start=1):
+    if not line.strip():
+        continue
+    try:
+        rows.append(json.loads(line))
+    except json.JSONDecodeError as exc:
+        reject(f"line {line_no} is not JSON: {exc}")
+if not rows:
+    reject("is empty")
+
+expected_start = 0
+previous_output = prefix_manifest_name
+for index, row in enumerate(rows):
+    if row.get("schema") != "lb_source_k26_continuation_chunk_v1":
+        reject(f"row {index} has wrong schema")
+    if row.get("chunk_index") != index:
+        reject(f"row {index} has nonsequential chunk_index")
+    if row.get("chunk_id") != f"{index:03d}":
+        reject(f"row {index} has unexpected chunk_id")
+    if row.get("action") not in {"executed", "reused"}:
+        reject(f"row {index} has invalid action")
+    start = row.get("schedule_segment_start")
+    end = row.get("schedule_segment_end")
+    count = row.get("schedule_segment_count")
+    if not isinstance(start, int) or not isinstance(end, int) or not isinstance(count, int):
+        reject(f"row {index} has noninteger schedule segment fields")
+    if start != expected_start:
+        reject(f"row {index} starts at {start}, expected {expected_start}")
+    if end <= start or end > segment_count:
+        reject(f"row {index} has invalid segment interval")
+    if count != end - start:
+        reject(f"row {index} has wrong segment count")
+    expected_csv = ",".join(str(value) for value in radii[start : end + 1])
+    if row.get("schedule_radii_csv") != expected_csv:
+        reject(f"row {index} schedule_radii_csv does not match command schedule")
+    if row.get("r_start") != radii[start] or row.get("r_final") != radii[end]:
+        reject(f"row {index} radius endpoints do not match command schedule")
+    final_chunk = end == segment_count
+    if row.get("final_chunk") is not final_chunk:
+        reject(f"row {index} final_chunk flag mismatch")
+    if row.get("input_manifest") != previous_output:
+        reject(f"row {index} input_manifest does not chain from previous output")
+    require_hashed(row.get("input_manifest", ""), f"row {index} input_manifest")
+    result_path = require_hashed(row.get("result", ""), f"row {index} result")
+    require_hashed(row.get("progress", ""), f"row {index} progress")
+    output_manifest = row.get("output_manifest")
+    if final_chunk:
+        if output_manifest != "":
+            reject(f"row {index} final chunk unexpectedly has output_manifest")
+        if result_path.read_bytes() != continuation_path.read_bytes():
+            reject(f"row {index} final result differs from k26-continuation-result.json")
+        if row.get("terminal_source_dead") is not True:
+            reject(f"row {index} final chunk must record terminal_source_dead=true")
+        if row.get("has_source_carry") is not False:
+            reject(f"row {index} final chunk must record has_source_carry=false")
+    else:
+        output_path = require_hashed(output_manifest, f"row {index} output_manifest")
+        previous_output = output_path.name
+        if row.get("terminal_source_dead") is not False:
+            reject(f"row {index} non-final chunk must record terminal_source_dead=false")
+        if row.get("has_source_carry") is not True:
+            reject(f"row {index} non-final chunk must record has_source_carry=true")
+        source_carry_atoms = row.get("source_carry_atoms")
+        if not isinstance(source_carry_atoms, int) or source_carry_atoms <= 0:
+            reject(f"row {index} live chunk must record positive source_carry_atoms")
+    expected_start = end
+
+if expected_start != segment_count:
+    reject(f"does not cover all command schedule segments: stopped at {expected_start}")
+if rows[-1].get("r_final") != continuation.get("r_final"):
+    reject("final row r_final does not match continuation result")
+PY
+}
+
+validate_chunk_ledger
 
 require_grep '"schema":"lb_source_origin_cpu_runner_v1"' "$prefix" \
   "K26 prefix result schema"
