@@ -348,7 +348,11 @@ after expensive continuation stages (`manifest_read`, `prefix_witness_read`,
 timeout can therefore identify the active phase even when no continuation band
 has finished yet. The current local K26 probe completes the prefix row in about
 24 seconds and times out in the first continuation band's `tileop_build` phase
-for `8192 -> 16384`; this is diagnostic runtime evidence, not a
+for `8192 -> 16384`. The TileOp build loop is parallelized only inside this
+sidecar runner when OpenMP is available, preserving the deterministic output
+order and reporting `tileop_worker_threads` in progress/final JSON; this does
+not alter the underlying TileOp implementation or any existing campaign
+verdict semantics. The timeout evidence is diagnostic runtime evidence, not a
 `SOURCE_ORIGIN_K26` claim.
 If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
 the hash manifest, and runs the full bundle checker with the supplied

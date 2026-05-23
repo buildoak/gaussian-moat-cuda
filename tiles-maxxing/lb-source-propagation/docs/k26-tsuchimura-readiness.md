@@ -151,7 +151,10 @@ rows before and after expensive stages such as `prefix_witness_read`,
 the first completed continuation band still leaves evidence for the active
 runtime phase. The current local K26 probe completes the prefix row in about 24
 seconds and times out during the first continuation band's `tileop_build` phase
-for `8192 -> 16384`. Neither progress artifact relaxes the
+for `8192 -> 16384`. The sidecar runner parallelizes this TileOp build loop
+when OpenMP is available, while preserving output order and reporting
+`tileop_worker_threads`; this is a sidecar execution optimization and does not
+change production TileOp semantics. Neither progress artifact relaxes the
 `SOURCE_DEAD_CERT` gate.
 With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/progress/continuation/gap artifacts before the

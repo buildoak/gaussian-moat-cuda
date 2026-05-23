@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
@@ -23,6 +24,10 @@
 #include "campaign/grid.h"
 #include "campaign/sieve.h"
 #include "campaign/tileop.h"
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace {
 
@@ -92,6 +97,7 @@ struct RunnerInventorySummary {
 std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b);
 lb_source::AtomId checked_coordinate_atom_id(std::int64_t a, std::int64_t b);
 std::uint64_t dist_sq(const Point& lhs, const Point& rhs);
+std::uint64_t tileop_worker_threads();
 
 bool parse_uint64(std::string_view text, std::uint64_t& out) {
   try {
@@ -747,6 +753,26 @@ void emit_phase_progress(std::ofstream& progress,
   progress.flush();
 }
 
+void emit_tileop_build_begin(std::ofstream& progress,
+                             std::uint64_t band_index,
+                             std::uint64_t r_start,
+                             std::uint64_t r_outer,
+                             std::uint64_t tiles) {
+  if (!progress) {
+    return;
+  }
+  progress << "{\"schema\":\"lb_source_tileop_port_phase_v1\""
+           << ",\"phase\":\"tileop_build\""
+           << ",\"event\":\"begin\""
+           << ",\"band_index\":" << band_index
+           << ",\"r_start\":" << r_start
+           << ",\"r_outer\":" << r_outer
+           << ",\"tiles\":" << tiles
+           << ",\"tileop_worker_threads\":" << tileop_worker_threads()
+           << "}\n";
+  progress.flush();
+}
+
 bool all_rejected_candidates_are_dead_end(
     const std::set<std::string>& reasons) {
   return !reasons.empty() &&
@@ -856,15 +882,39 @@ std::vector<campaign::TileOp> build_tileops(
     const campaign::Grid& grid,
     std::uint64_t& overflow_tiles) {
   std::vector<campaign::TileOp> tileops;
-  tileops.reserve(coords.size());
-  for (const campaign::TileCoord& coord : coords) {
-    campaign::TileOp op = campaign::process_tile(coord, constants, grid);
+  tileops.resize(coords.size());
+#ifdef _OPENMP
+  std::uint64_t overflow_count = 0;
+#pragma omp parallel for schedule(dynamic, 1) reduction(+ : overflow_count)
+  for (std::ptrdiff_t i = 0;
+       i < static_cast<std::ptrdiff_t>(coords.size()); ++i) {
+    const std::size_t index = static_cast<std::size_t>(i);
+    campaign::TileOp op = campaign::process_tile(coords[index], constants,
+                                                 grid);
+    if ((op.tile_flags & campaign::OVERFLOW_BIT) != 0) {
+      ++overflow_count;
+    }
+    tileops[index] = op;
+  }
+  overflow_tiles += overflow_count;
+#else
+  for (std::size_t i = 0; i < coords.size(); ++i) {
+    campaign::TileOp op = campaign::process_tile(coords[i], constants, grid);
     if ((op.tile_flags & campaign::OVERFLOW_BIT) != 0) {
       ++overflow_tiles;
     }
-    tileops.push_back(op);
+    tileops[i] = op;
   }
+#endif
   return tileops;
+}
+
+std::uint64_t tileop_worker_threads() {
+#ifdef _OPENMP
+  return static_cast<std::uint64_t>(omp_get_max_threads());
+#else
+  return 1;
+#endif
 }
 
 PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
@@ -1325,9 +1375,8 @@ int main(int argc, char** argv) {
     emit_phase_progress(progress, "active_tile_enumerate", "end", segment,
                         previous_outer, outer,
                         elapsed_ms(grid_done, enumerate_done));
-    emit_phase_progress(progress, "tileop_build", "begin", segment,
-                        previous_outer, outer,
-                        std::numeric_limits<std::uint64_t>::max());
+    emit_tileop_build_begin(progress, segment, previous_outer, outer,
+                            coords.size());
     std::vector<campaign::TileOp> tileops =
         build_tileops(coords, constants, grid, tileop_overflows);
     const auto tileop_done = std::chrono::steady_clock::now();
@@ -1500,6 +1549,7 @@ int main(int argc, char** argv) {
                << ",\"r_start\":" << previous_outer
                << ",\"r_outer\":" << outer
                << ",\"tiles\":" << coords.size()
+               << ",\"tileop_worker_threads\":" << tileop_worker_threads()
                << ",\"port_atoms\":" << graph.port_atoms
                << ",\"internal_edges\":" << graph.internal_edges
                << ",\"seam_edges\":" << graph.seam_edges
@@ -1657,6 +1707,7 @@ int main(int argc, char** argv) {
             << ",\"schedule_max_width\":"
             << max_schedule_width(schedule_radii)
             << ",\"bands_processed\":" << bands_processed
+            << ",\"tileop_worker_threads\":" << tileop_worker_threads()
             << ",\"campaign_tiles_processed\":" << campaign_tiles_processed
             << ",\"tileop_overflows\":" << tileop_overflows
             << ",\"port_atoms\":" << port_atoms
