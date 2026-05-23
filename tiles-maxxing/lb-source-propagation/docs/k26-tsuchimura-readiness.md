@@ -558,6 +558,14 @@ offer probe used the same `$0.37/hr` and `$1.50` caps. No RTX 4090 offer
 satisfied the cap; the nearest observed qualifying-market offer was
 `$0.6681/hr`, `0.2981/hr` over cap. No Vast instance was created.
 
+After binding full coordinate-port expansion paths and summary-only
+non-claim cert generation at local head `6f423ff`, a capped dry-run saw an
+RTX 4090 offer at `$0.2947/hr`, inside the `$0.37/hr` cap. The guarded execute
+path rechecked the market before creating an instance and found no qualifying
+offer. The nearest observed qualifying-market offer was `$0.4014/hr`,
+`0.0314/hr` over cap. No Vast instance was created; `vastai show instances
+--raw` returned `[]` after the attempt.
+
 After any partial continuation, run:
 
 ```bash
