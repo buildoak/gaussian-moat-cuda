@@ -37,8 +37,10 @@ Artifacts written under OUT_DIR:
 If --cert-in is supplied, it is copied to k26-source-dead-cert.json and the
 bundle checker is run. Without terminal source death, the script stops after
 the continuation with K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE. With
-terminal source death but no cert, it writes the source-dead gap and stops with
-K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING.
+terminal source death but no target reachability, it writes the source-dead gap
+and stops with K26_FULL_RUN_BUNDLE_BLOCKED_TARGET_NOT_REACHED. With terminal
+source death and target reachability but no cert, it writes the source-dead gap
+and stops with K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING.
 USAGE
 }
 
@@ -735,6 +737,15 @@ fi
 write_source_dead_gap
 check_source_dead_gap
 write_artifact_manifest
+
+gap_blocker="$(json_string_value "$source_dead_gap" blocker)"
+require_extracted "$gap_blocker" "SOURCE_DEAD_GAP_BLOCKER"
+if [[ "$gap_blocker" == "SOURCE_DEAD_CERT_TARGET_NOT_REACHED" ]]; then
+  write_status "K26_FULL_RUN_BUNDLE_BLOCKED_TARGET_NOT_REACHED"
+  echo "K26 full-run prefix and continuation artifacts were produced, and source death was reached, but the canonical Tsuchimura endpoint was not source-reached." >&2
+  echo "This is not a SOURCE_DEAD_CERT state; inspect k26-source-dead-gap.json for target reachability evidence." >&2
+  exit 3
+fi
 
 if [[ -n "$cert_in" ]]; then
   if [[ ! -f "$cert_in" ]]; then

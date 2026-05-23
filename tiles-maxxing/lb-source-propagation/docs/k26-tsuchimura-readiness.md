@@ -128,10 +128,13 @@ run_k26_full_source_bundle.sh \
 It writes the command, BZ, profile, prefix, and continuation artifacts using
 the repaired continuation schedule and the unsafe-candidate bridge gate. It is
 deliberately certificate-gated: without a supplied `k26-source-dead-cert.json`
-it still
-writes `k26-prefix-progress.jsonl`, `k26-continuation-progress.jsonl`,
-`k26-source-dead-gap.json` when terminal source death is reached, a partial
-`k26-full-run-artifacts.sha256` manifest, and stops with
+it still writes `k26-prefix-progress.jsonl`,
+`k26-continuation-progress.jsonl`, `k26-source-dead-gap.json` when terminal
+source death is reached, and a partial `k26-full-run-artifacts.sha256`
+manifest. If terminal source death occurs before the canonical Tsuchimura
+endpoint is source-reached, the harness stops with
+`K26_FULL_RUN_BUNDLE_BLOCKED_TARGET_NOT_REACHED`. If the endpoint is reached
+but no cert is supplied, it stops with
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. If the continuation
 finishes with live source carry instead of terminal death, the harness stops
 with `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE` because there is no

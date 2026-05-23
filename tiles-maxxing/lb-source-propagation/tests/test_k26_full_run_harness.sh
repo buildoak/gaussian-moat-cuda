@@ -107,6 +107,10 @@ set -euo pipefail
 if grep -q '"schema":"lb_source_k26_source_dead_gap_v1"' "$1" &&
     grep -q '"target_atom_path":\[1615075207963900,-25220051735553,1615075207964004\]' "$1"; then
   echo '{"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS","bridge_safety":"accepted_non_claim","coordinate_path_obligation":"blocked_coordinate_gaussian_prime_path","bz_schedule_obligation":"blocked_schedule_only_non_claim","terminal_inventory_obligation":"blocked_claim_grade_terminal_inventory","claim_grade":false}'
+elif grep -q '"schema":"lb_source_k26_source_dead_gap_v1"' "$1" &&
+    grep -q '"blocker":"SOURCE_DEAD_CERT_TARGET_NOT_REACHED"' "$1" &&
+    grep -q '"target_atom_path":\[\]' "$1"; then
+  echo '{"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS","bridge_safety":"accepted_non_claim","coordinate_path_obligation":"blocked_target_not_reached","bz_schedule_obligation":"blocked_schedule_only_non_claim","terminal_inventory_obligation":"blocked_claim_grade_terminal_inventory","claim_grade":false}'
 else
   echo 'SOURCE_DEAD_GAP_REJECT: bad fixture' >&2
   exit 1
@@ -221,6 +225,58 @@ fi
 if grep -q 'k26-source-dead-gap.json' \
     "$live_out/k26-full-run-artifacts.sha256"; then
   echo "live-source manifest unexpectedly included source-dead gap" >&2
+  exit 1
+fi
+
+target_not_reached_build="$tmp/target-not-reached-build"
+cp -R "$build_dir" "$target_not_reached_build"
+cat > "$target_not_reached_build/source_tileop_port_runner" <<'SH'
+#!/usr/bin/env bash
+progress=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --progress-out)
+      progress="$2"; shift 2 ;;
+    *)
+      shift ;;
+  esac
+done
+[[ -n "$progress" ]] && echo '{"schema":"lb_source_tileop_port_progress_v1","accepted":true}' > "$progress"
+cat <<'JSON'
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":2022302,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"7463f2808ab896cd47b740719c3d8df5e321c1f978bf8b232ab3f48858b7901f","max_source_norm_sq":279511040,"max_source_norm_atom_ids":[-463856527362]}
+JSON
+SH
+chmod +x "$target_not_reached_build/source_tileop_port_runner"
+target_not_reached_out="$tmp/target-not-reached-out"
+if "$harness" \
+    --build-dir "$target_not_reached_build" \
+    --out-dir "$target_not_reached_out" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    >/tmp/k26-harness-target-not-reached.out \
+    2>/tmp/k26-harness-target-not-reached.err; then
+  echo "harness accepted target-not-reached terminal death as source-dead" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_TARGET_NOT_REACHED' \
+  "$target_not_reached_out/status.txt"
+grep -q 'source_dead_gap_coordinate_path_obligation=blocked_target_not_reached' \
+  "$target_not_reached_out/status.txt"
+grep -q 'canonical Tsuchimura endpoint was not source-reached' \
+  /tmp/k26-harness-target-not-reached.err
+test -f "$target_not_reached_out/k26-source-dead-gap.json"
+test -f "$target_not_reached_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-source-dead-gap.json' \
+  "$target_not_reached_out/k26-full-run-artifacts.sha256"
+grep -q '"blocker":"SOURCE_DEAD_CERT_TARGET_NOT_REACHED"' \
+  "$target_not_reached_out/k26-source-dead-gap.json"
+grep -q '"target_path_provenance":"component_reachability_only"' \
+  "$target_not_reached_out/k26-source-dead-gap.json"
+grep -q '"target_atom_path_length":0' \
+  "$target_not_reached_out/k26-source-dead-gap.json"
+grep -q '"target_atom_path":\[\]' \
+  "$target_not_reached_out/k26-source-dead-gap.json"
+if [[ -f "$target_not_reached_out/k26-source-dead-cert.json" ]]; then
+  echo "target-not-reached blocker unexpectedly accepted/copied a cert" >&2
   exit 1
 fi
 

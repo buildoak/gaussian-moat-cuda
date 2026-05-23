@@ -317,8 +317,11 @@ tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
 
 It runs the exact K26 command/profile/BZ emitters, then executes the row-0
 coordinate prefix and diagnostic-bridge TileOp-port continuation. It does not
-manufacture a source-dead certificate. If no `k26-source-dead-cert.json` is
-available, it writes
+manufacture a source-dead certificate. If terminal source death occurs but the
+canonical Tsuchimura endpoint was not source-reached, it writes
+`K26_FULL_RUN_BUNDLE_BLOCKED_TARGET_NOT_REACHED` to `status.txt`; that is a
+terminal diagnostic blocker, not a missing-cert case. If the endpoint was
+reached but no `k26-source-dead-cert.json` is available, it writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt` after
 the prefix and continuation artifacts are produced. It also writes
 `k26-prefix-progress.jsonl`, one JSON row per processed coordinate-prefix band,
@@ -346,9 +349,10 @@ claim-grade terminal inventory provenance. The gap artifact also binds the
 repaired K26 BZ schedule digest as schedule-only, non-claim evidence.
 When
 `--source-dead-gap-checker` is supplied, the harness runs the independent gap
-checker before stopping on the missing cert, and mirrors the checker status
-fields into `status.txt` so remote logs show whether bridge safety passed and
-which certificate obligations remain blocked. It also writes
+checker before stopping on either a target-not-reached gap or the missing cert,
+and mirrors the checker status fields into `status.txt` so remote logs show
+whether bridge safety passed and which certificate obligations remain blocked.
+It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
 prefix-progress, continuation, continuation-progress, manifest, witness, gap,
 and any supplied cert artifacts by SHA-256.
