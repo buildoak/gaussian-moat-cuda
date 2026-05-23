@@ -1823,6 +1823,14 @@ int main(int argc, char** argv) {
   std::optional<lb_source::SeparatorState> incoming;
   lb_source::ProcessResult last;
   const std::vector<std::uint64_t> schedule_radii = build_schedule_radii(config);
+  campaign::CampaignConstants tileop_constants;
+  try {
+    tileop_constants = campaign::CampaignConstants::from_radii(
+        config.r_start, config.r_final, campaign::k_sq_value);
+  } catch (const std::exception& ex) {
+    std::cerr << "campaign run construction failed: " << ex.what() << "\n";
+    return EXIT_FAILURE;
+  }
   std::uint64_t bands_processed = 0;
   std::uint64_t campaign_tiles_processed = 0;
   std::uint64_t tileop_overflows = 0;
@@ -1858,15 +1866,12 @@ int main(int argc, char** argv) {
     const std::uint64_t outer = schedule_radii[segment + 1];
     emit_phase_progress(progress, "band", "begin", segment, previous_outer,
                         outer, std::numeric_limits<std::uint64_t>::max());
-    campaign::CampaignConstants constants;
     campaign::Grid grid;
     const auto grid_begin = std::chrono::steady_clock::now();
     emit_phase_progress(progress, "grid_build", "begin", segment,
                         previous_outer, outer,
                         std::numeric_limits<std::uint64_t>::max());
     try {
-      constants = campaign::CampaignConstants::from_radii(
-          previous_outer, outer, campaign::k_sq_value);
       grid = campaign::Grid::build(previous_outer, outer,
                                    campaign::k_sq_value);
     } catch (const std::exception& ex) {
@@ -1900,7 +1905,7 @@ int main(int argc, char** argv) {
     emit_tileop_build_begin(progress, segment, previous_outer, outer,
                             coords.size(), tileop_threads);
     std::vector<campaign::TileOp> tileops =
-        build_tileops(coords, constants, grid, tileop_overflows,
+        build_tileops(coords, tileop_constants, grid, tileop_overflows,
                       tileop_threads);
     const auto tileop_done = std::chrono::steady_clock::now();
     emit_phase_progress(progress, "tileop_build", "end", segment,
@@ -1940,8 +1945,8 @@ int main(int argc, char** argv) {
     if (target.has_value() && !target_seen &&
         norm_in_radial_segment(target->norm_sq, previous_outer, outer)) {
       const TargetBridgeResult target_bridge =
-          bridge_target_coordinate_to_ports(*target, constants, coords, tileops,
-                                            band);
+          bridge_target_coordinate_to_ports(*target, tileop_constants, coords,
+                                            tileops, band);
       if (target_bridge.seen) {
         segment_target_seen = true;
         segment_target_port_atoms = target_bridge.port_atoms;
@@ -1976,9 +1981,9 @@ int main(int argc, char** argv) {
                           previous_outer, outer,
                           std::numeric_limits<std::uint64_t>::max());
       const PortManifestBridgeResult bridge =
-          bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
-                                              coords, tileops, bridged_band,
-                                              tileop_threads);
+          bridge_coordinate_manifest_to_ports(*coordinate_manifest,
+                                              tileop_constants, coords, tileops,
+                                              bridged_band, tileop_threads);
       bridge_done = std::chrono::steady_clock::now();
       emit_phase_progress(progress, "manifest_bridge", "end", segment,
                           previous_outer, outer,

@@ -864,7 +864,9 @@ ProcessResult process_band(const BandInput& band,
       const auto existing = index_by_id.find(atom.id);
       if (existing == index_by_id.end()) {
         const std::size_t idx = all_atoms.size();
-        all_atoms.push_back({atom.id, atom.norm_sq, false, false});
+        all_atoms.push_back(
+            {atom.id, atom.norm_sq, false,
+             decode_port_atom_id(atom.id).has_value()});
         index_by_id.emplace(atom.id, idx);
       } else if (all_atoms[existing->second].norm_sq != atom.norm_sq) {
         return reject(RejectReason::kMalformed,

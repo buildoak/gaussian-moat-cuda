@@ -316,6 +316,14 @@ add_test(NAME source_tileop_port_runner_resume_smoke
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_tileop_port_runner_resume.sh
     $<TARGET_FILE:source_tileop_port_runner>)
+add_test(NAME source_tileop_port_runner_wide_band_equivalence
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_tileop_port_wide_band_equivalence.sh
+    $<TARGET_FILE:source_tileop_port_runner>
+    --r-start 248
+    --segments 2
+    --segment-width 128
+    --out-dir ${CMAKE_CURRENT_BINARY_DIR}/source_tileop_port_wide_band_equivalence)
 add_test(NAME source_tileop_port_runner_manifest_smoke
   COMMAND source_tileop_port_runner
     --r-start 248
