@@ -526,12 +526,28 @@ if cert.get("terminal_source_inventory_mode") != "summary_only_non_claim":
 if cert.get("terminal_source_inventory_accumulator", {}).get("mode") != "summary_digest_only_non_claim":
     print("SOURCE_DEAD_CERT_DRAFT_REJECT: missing accumulator", file=sys.stderr)
     raise SystemExit(1)
+summary = cert.get("terminal_source_inventory_summary", {})
 source_path = cert.get("source_path", [])
 if len(source_path) < 2 or source_path[0].get("norm_sq", 10**30) > 26:
     print("SOURCE_DEAD_CERT_DRAFT_REJECT: bad generated source path", file=sys.stderr)
     raise SystemExit(1)
 if source_path[-1] != {"a": 376039, "b": 943460, "norm_sq": 1031522101121}:
     print("SOURCE_DEAD_CERT_DRAFT_REJECT: generated path misses endpoint", file=sys.stderr)
+    raise SystemExit(1)
+max_norm = int(summary.get("max_norm_sq", -1))
+ties = set(summary.get("max_norm_atom_ids", []))
+path_atoms = set()
+for point in source_path:
+    atom_id = (int(point.get("a", -1)) << 32) | int(point.get("b", -1))
+    path_atoms.add(atom_id)
+    if int(point.get("norm_sq", -1)) > max_norm:
+        print("SOURCE_DEAD_CERT_DRAFT_REJECT: summary max below path", file=sys.stderr)
+        raise SystemExit(1)
+    if int(point.get("norm_sq", -1)) == max_norm and atom_id not in ties:
+        print("SOURCE_DEAD_CERT_DRAFT_REJECT: summary max tie omits path", file=sys.stderr)
+        raise SystemExit(1)
+if int(summary.get("count", -1)) < len(path_atoms):
+    print("SOURCE_DEAD_CERT_DRAFT_REJECT: summary count below path", file=sys.stderr)
     raise SystemExit(1)
 print('{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}')
 PY
@@ -734,6 +750,23 @@ if cert.get("proof_status") == "SUMMARY_ONLY_NON_CLAIM":
         raise SystemExit(1)
     if accumulator.get("claim_grade_inventory_accepted") is not False:
         print("SOURCE_DEAD_CERT_DRAFT_REJECT: accumulator claims grade", file=sys.stderr)
+        raise SystemExit(1)
+    summary = cert.get("terminal_source_inventory_summary", {})
+    source_path = cert.get("source_path", [])
+    max_norm = int(summary.get("max_norm_sq", -1))
+    ties = set(summary.get("max_norm_atom_ids", []))
+    path_atoms = set()
+    for point in source_path:
+        atom_id = (int(point.get("a", -1)) << 32) | int(point.get("b", -1))
+        path_atoms.add(atom_id)
+        if int(point.get("norm_sq", -1)) > max_norm:
+            print("SOURCE_DEAD_CERT_DRAFT_REJECT: summary max below path", file=sys.stderr)
+            raise SystemExit(1)
+        if int(point.get("norm_sq", -1)) == max_norm and atom_id not in ties:
+            print("SOURCE_DEAD_CERT_DRAFT_REJECT: summary max tie omits path", file=sys.stderr)
+            raise SystemExit(1)
+    if int(summary.get("count", -1)) < len(path_atoms):
+        print("SOURCE_DEAD_CERT_DRAFT_REJECT: summary count below path", file=sys.stderr)
         raise SystemExit(1)
     print('{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}')
     raise SystemExit(0)
