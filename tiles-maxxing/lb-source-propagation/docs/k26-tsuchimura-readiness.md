@@ -513,6 +513,12 @@ head `8a6363c`, another 120-second dry-run Vast offer probe used the same
 observed qualifying-market offer was `$0.4010/hr`, `0.0310/hr` over cap. No
 Vast instance was created.
 
+After binding the K26 gap to explicit target-bridge evidence at local head
+`4c6e867`, another 120-second dry-run Vast offer probe used the same
+`$0.37/hr` and `$1.50` caps. No RTX 4090 offer satisfied the cap; the nearest
+observed qualifying-market offer was `$0.4000/hr`, `0.0300/hr` over cap. No
+Vast instance was created.
+
 After any partial continuation, run:
 
 ```bash
