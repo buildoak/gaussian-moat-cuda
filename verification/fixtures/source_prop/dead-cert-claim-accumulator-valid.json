@@ -1,0 +1,42 @@
+{
+  "schema": "lb_source_dead_cert_draft_v1",
+  "certificate_id": "cert-claim-accumulator-valid",
+  "profile_id": "profile-claim-accumulator-valid",
+  "metadata": {
+    "source_mode": "ORIGIN_SOURCE",
+    "source_id": "omega",
+    "geometry_id": "SOURCE_ORIGIN_DIAGNOSTIC",
+    "commit_id": "abc123",
+    "build_id": "local-test",
+    "bz_status": "BZ_CLEAN_DIAGNOSTIC",
+    "artifact_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "terminal_source_inventory_mode": "claim_grade_accumulator",
+  "k_sq": 26,
+  "terminal_radius": 20,
+  "negative_guard_pass": true,
+  "endpoint": { "a": 0, "b": 3, "norm_sq": 9 },
+  "endpoint_atom_id": 3,
+  "source_path_provenance": "coordinate_gaussian_prime_path",
+  "source_path": [
+    { "a": 0, "b": 3, "norm_sq": 9 }
+  ],
+  "terminal_source_inventory_summary": {
+    "count": 3,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "5581d7afe8168334e0a52b984f406365c56b37935a22bca28d45d75060c07e46",
+    "max_norm_sq": 9,
+    "max_norm_atom_ids": [3]
+  },
+  "terminal_source_inventory_accumulator": {
+    "mode": "claim_grade_digest_accumulator",
+    "provenance": "terminal_component_inventory_accumulator",
+    "listed_inventory_present": false,
+    "claim_grade_inventory_accepted": true,
+    "count": 3,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "5581d7afe8168334e0a52b984f406365c56b37935a22bca28d45d75060c07e46",
+    "max_norm_sq": 9,
+    "max_norm_atom_ids": [3]
+  }
+}

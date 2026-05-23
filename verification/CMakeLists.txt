@@ -77,6 +77,9 @@ add_test(NAME source_dead_cert_fixture_first_quadrant_valid
 add_test(NAME source_dead_cert_fixture_summary_nonclaim_valid
   COMMAND source_dead_cert_check
     ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-cert-summary-nonclaim-valid.json)
+add_test(NAME source_dead_cert_fixture_claim_accumulator_valid
+  COMMAND source_dead_cert_check
+    ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-cert-claim-accumulator-valid.json)
 add_test(NAME source_dead_gap_fixture_valid
   COMMAND source_dead_gap_check
     ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-gap-valid.json)
@@ -98,6 +101,8 @@ set_tests_properties(source_dead_gap_fixture_chunked_valid PROPERTIES
 foreach(bad_source_dead_cert
     dead-cert-bad-accumulator-claim
     dead-cert-bad-artifact-hash
+    dead-cert-bad-claim-accumulator-flag
+    dead-cert-bad-claim-accumulator-mode
     dead-cert-bad-digest
     dead-cert-bad-endpoint-atom-id
     dead-cert-bad-endpoint-inventory

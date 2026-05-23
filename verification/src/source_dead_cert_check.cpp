@@ -575,9 +575,9 @@ std::vector<std::int64_t> require_summary_ties(const nlohmann::json& summary) {
 }
 
 void require_terminal_inventory_accumulator_shape(
-    const nlohmann::json& accumulator, const nlohmann::json& summary) {
-  if (require_string(accumulator, "mode") !=
-      "summary_digest_only_non_claim") {
+    const nlohmann::json& accumulator, const nlohmann::json& summary,
+    std::string_view expected_mode, bool expected_claim_grade) {
+  if (require_string(accumulator, "mode") != expected_mode) {
     throw std::runtime_error("unsupported terminal inventory accumulator mode");
   }
   if (require_string(accumulator, "provenance") !=
@@ -589,9 +589,10 @@ void require_terminal_inventory_accumulator_shape(
     throw std::runtime_error(
         "terminal inventory accumulator must not report listed inventory");
   }
-  if (require_bool(accumulator, "claim_grade_inventory_accepted")) {
+  if (require_bool(accumulator, "claim_grade_inventory_accepted") !=
+      expected_claim_grade) {
     throw std::runtime_error(
-        "terminal inventory accumulator must be non-claim");
+        "terminal inventory accumulator claim-grade flag mismatch");
   }
   if (require_u64(accumulator, "count") != require_u64(summary, "count")) {
     throw std::runtime_error("terminal inventory accumulator count mismatch");
@@ -622,8 +623,58 @@ bool has_i64(const std::vector<std::int64_t>& values, std::int64_t value) {
 
 enum class CertStatus {
   kListedDraftPass,
+  kAccumulatorDraftPass,
   kSummaryOnlyNonClaimPass,
 };
+
+void require_summary_covers_source_path(
+    const nlohmann::json& summary,
+    const std::vector<Point>& source_path,
+    std::uint64_t terminal_radius,
+    std::set<std::int64_t>* source_path_atom_ids_out = nullptr) {
+  const std::uint64_t count = require_u64(summary, "count");
+  if (count == 0) {
+    throw std::runtime_error("inventory summary count must be nonzero");
+  }
+  const std::uint64_t max_norm_sq = require_u64(summary, "max_norm_sq");
+  if (static_cast<unsigned __int128>(max_norm_sq) >
+      static_cast<unsigned __int128>(terminal_radius) * terminal_radius) {
+    throw std::runtime_error("inventory summary max_norm_sq exceeds terminal radius");
+  }
+  const std::vector<std::int64_t> ties = require_summary_ties(summary);
+  if (ties.empty()) {
+    throw std::runtime_error("inventory summary max_norm_atom_ids must be nonempty");
+  }
+  if (count < ties.size()) {
+    throw std::runtime_error(
+        "inventory summary count is smaller than max-norm tie set");
+  }
+  std::set<std::int64_t> source_path_atom_ids;
+  for (const Point& path_point : source_path) {
+    const std::int64_t path_atom_id = coordinate_atom_id_for_point(path_point);
+    source_path_atom_ids.insert(path_atom_id);
+    if (path_point.norm_sq > max_norm_sq) {
+      throw std::runtime_error("inventory summary max_norm_sq is below source_path");
+    }
+    if (path_point.norm_sq == max_norm_sq &&
+        !std::binary_search(ties.begin(), ties.end(), path_atom_id)) {
+      throw std::runtime_error(
+          "inventory summary max_norm_atom_ids omits max source_path atom");
+    }
+  }
+  if (count < source_path_atom_ids.size()) {
+    throw std::runtime_error(
+        "inventory summary count is smaller than source_path atom set");
+  }
+  for (const std::int64_t id : ties) {
+    if (coordinate_atom_norm_sq(id) != max_norm_sq) {
+      throw std::runtime_error("inventory summary max_norm_atom_ids norm mismatch");
+    }
+  }
+  if (source_path_atom_ids_out != nullptr) {
+    *source_path_atom_ids_out = std::move(source_path_atom_ids);
+  }
+}
 
 CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   if (!cert.is_object()) {
@@ -705,7 +756,8 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
           ? require_string(cert, "terminal_source_inventory_mode")
           : "listed";
   if (inventory_mode != "listed" &&
-      inventory_mode != "summary_only_non_claim") {
+      inventory_mode != "summary_only_non_claim" &&
+      inventory_mode != "claim_grade_accumulator") {
     throw std::runtime_error("unsupported terminal_source_inventory_mode");
   }
 
@@ -739,7 +791,7 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
     }
     require_terminal_inventory_accumulator_shape(
         require_object(cert, "terminal_source_inventory_accumulator"),
-        summary);
+        summary, "summary_digest_only_non_claim", false);
     if (require_string(cert, "proof_status") != "SUMMARY_ONLY_NON_CLAIM") {
       throw std::runtime_error(
           "summary-only inventory requires SUMMARY_ONLY_NON_CLAIM proof_status");
@@ -748,49 +800,10 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
     if (!sane_token(non_claim) || pending_like(non_claim)) {
       throw std::runtime_error("non_claim explanation is malformed");
     }
+    require_summary_covers_source_path(summary, source_path, terminal_radius);
     const std::uint64_t count = require_u64(summary, "count");
-    if (count == 0) {
-      throw std::runtime_error("summary-only inventory count must be nonzero");
-    }
     const std::uint64_t max_norm_sq = require_u64(summary, "max_norm_sq");
-    if (static_cast<unsigned __int128>(max_norm_sq) >
-        static_cast<unsigned __int128>(terminal_radius) * terminal_radius) {
-      throw std::runtime_error(
-          "summary-only inventory max_norm_sq exceeds terminal radius");
-    }
     const std::vector<std::int64_t> ties = require_summary_ties(summary);
-    if (ties.empty()) {
-      throw std::runtime_error(
-          "summary-only inventory max_norm_atom_ids must be nonempty");
-    }
-    if (count < ties.size()) {
-      throw std::runtime_error(
-          "summary-only inventory count is smaller than max-norm tie set");
-    }
-    std::set<std::int64_t> source_path_atom_ids;
-    for (const Point& path_point : source_path) {
-      const std::int64_t path_atom_id = coordinate_atom_id_for_point(path_point);
-      source_path_atom_ids.insert(path_atom_id);
-      if (path_point.norm_sq > max_norm_sq) {
-        throw std::runtime_error(
-            "summary-only inventory max_norm_sq is below source_path");
-      }
-      if (path_point.norm_sq == max_norm_sq &&
-          !std::binary_search(ties.begin(), ties.end(), path_atom_id)) {
-        throw std::runtime_error(
-            "summary-only inventory max_norm_atom_ids omits max source_path atom");
-      }
-    }
-    if (count < source_path_atom_ids.size()) {
-      throw std::runtime_error(
-          "summary-only inventory count is smaller than source_path atom set");
-    }
-    for (const std::int64_t id : ties) {
-      if (coordinate_atom_norm_sq(id) != max_norm_sq) {
-        throw std::runtime_error(
-            "summary-only inventory max_norm_atom_ids norm mismatch");
-      }
-    }
     if (is_k26_cert) {
       if (count != kK26ExpectedComponentSize ||
           max_norm_sq != kK26EndpointNormSq ||
@@ -800,6 +813,33 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
       }
     }
     return CertStatus::kSummaryOnlyNonClaimPass;
+  }
+
+  if (inventory_mode == "claim_grade_accumulator") {
+    if (has_field(cert, "proof_status") || has_field(cert, "non_claim")) {
+      throw std::runtime_error(
+          "claim-grade accumulator cert must not carry non-claim markers");
+    }
+    if (has_field(cert, "terminal_source_inventory")) {
+      throw std::runtime_error(
+          "claim-grade accumulator cert must not include listed inventory");
+    }
+    require_terminal_inventory_accumulator_shape(
+        require_object(cert, "terminal_source_inventory_accumulator"),
+        summary, "claim_grade_digest_accumulator", true);
+    require_summary_covers_source_path(summary, source_path, terminal_radius);
+    const std::uint64_t count = require_u64(summary, "count");
+    const std::uint64_t max_norm_sq = require_u64(summary, "max_norm_sq");
+    const std::vector<std::int64_t> ties = require_summary_ties(summary);
+    if (is_k26_cert) {
+      if (count != kK26ExpectedComponentSize ||
+          max_norm_sq != kK26EndpointNormSq ||
+          !has_i64(ties, endpoint_atom_id)) {
+        throw std::runtime_error(
+            "SOURCE_ORIGIN_K26 claim-grade accumulator does not match Tsuchimura component");
+      }
+    }
+    return CertStatus::kAccumulatorDraftPass;
   }
 
   if (has_field(cert, "proof_status") || has_field(cert, "non_claim")) {
@@ -879,7 +919,8 @@ int main(int argc, char** argv) {
     }
     nlohmann::json cert = nlohmann::json::parse(in);
     const CertStatus status = verify_source_dead_cert(cert);
-    if (status == CertStatus::kListedDraftPass) {
+    if (status == CertStatus::kListedDraftPass ||
+        status == CertStatus::kAccumulatorDraftPass) {
       std::cout << "{\"status\":\"SOURCE_DEAD_CERT_DRAFT_PASS\"}\n";
     } else {
       std::cout

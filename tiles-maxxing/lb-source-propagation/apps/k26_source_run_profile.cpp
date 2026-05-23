@@ -128,7 +128,7 @@ int main() {
       "full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget",
       "coordinate-to-port seam bridge remains diagnostic",
       "generated coordinate source paths are accepted only as summary-only non-claim evidence until the full-run checker binds them to claim-grade inventory and BZ evidence",
-      "terminal inventory has only a summary-only non-claim verifier; claim-grade full-run provenance is still missing",
+      "terminal runner output still emits a summary-only non-claim accumulator; claim-grade accumulator provenance is still missing",
       "no K26 full-run artifact hash or non-pending build metadata exists"};
 
   std::cout

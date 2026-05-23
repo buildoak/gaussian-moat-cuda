@@ -54,9 +54,12 @@ retired source-connected component, not merely the final carry atoms.
 `SOURCE_DEAD_CERT` is a claim-grade certificate. It requires a positive
 coordinate Gaussian-prime source path to the claimed endpoint, a negative final
 guard proving no legal continuation survives, bound BZ/schedule evidence,
-artifact hashes, and a verifier-accepted terminal inventory summary. A
-`SOURCE_TERMINAL` diagnostic is necessary evidence for such a certificate but
-is not sufficient by itself.
+artifact hashes, and a verifier-accepted terminal inventory summary. For very
+large components, the inventory may be accepted through a claim-grade digest
+accumulator instead of a literal JSON listing, but the accumulator must
+explicitly identify itself as claim-grade evidence. A `SOURCE_TERMINAL`
+diagnostic is necessary evidence for such a certificate but is not sufficient
+by itself.
 
 ## Lemma 1: Local TileOp Equivalence
 
@@ -191,6 +194,9 @@ themselves keep the source component alive.
 - Source reachability and geometric boundary flags remain separate.
 - Source/origin proof rows reject overflow.
 - Terminal inventory must preserve retired source components before compaction.
+- Summary-only terminal inventory accumulators are non-claim evidence. A
+  claim-grade accumulator must use an explicit claim-grade mode and claim-grade
+  acceptance flag before it can substitute for a literal inventory listing.
 - Certificates must bind seed mode, geometry, commit, build, BZ/schedule
   evidence, artifact hashes, endpoint path, and terminal inventory.
 - Static-annulus `ANY-SPAN` and `ANY-SHELL-MOAT` rows remain diagnostics for
