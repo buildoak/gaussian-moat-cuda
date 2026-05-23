@@ -181,14 +181,14 @@ add_test(NAME k26_source_run_profile
   COMMAND k26_source_run_profile)
 set_tests_properties(k26_source_run_profile PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"execution_protocol\":.*\"recommended_continuation_chunk_bands\":8.*\"resume_existing_supported\":true.*\"chunk_ledger\":\"k26-continuation-chunks.jsonl\".*\"chunk_ledger_required_for_checked_bundle\":true.*\"source_dead_gap_checker\":\"source_dead_gap_check\".*\"source_dead_checker\":\"source_dead_cert_check\".*\"recommended_max_runtime_seconds\":14000.*chunk/resume execution"
+    "\"schema\":\"lb_source_k26_run_profile_v1\".*\"profile_status\":\"RUN_PROFILE_DRAFT_NON_CLAIM\".*\"executable_now\":false.*\"required_k_sq\":26.*\"bz_schedule\":\"repaired\".*\"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE\".*\"accepted_for_schedule\":true.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"band_count\":124.*\"prefix_row_index\":0.*\"tileop_port_first_row_index\":1.*\"execution_protocol\":.*\"recommended_continuation_chunk_bands\":8.*\"resume_existing_supported\":true.*\"chunk_ledger\":\"k26-continuation-chunks.jsonl\".*\"chunk_ledger_required_for_checked_bundle\":true.*\"runtime_budget_checker\":\"check_k26_runtime_budget.py\".*\"source_dead_gap_checker\":\"source_dead_gap_check\".*\"source_dead_checker\":\"source_dead_cert_check\".*\"recommended_max_runtime_seconds\":14000.*chunk/resume execution"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_source_run_commands
   COMMAND k26_source_run_commands)
 set_tests_properties(k26_source_run_commands PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_k26_run_commands_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"required_k_sq\":26.*endpoint-a 376039 --endpoint-b 943460.*\"schedule_boundary_count\":124.*\"schedule_segment_count\":123.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"seam_bridge_policy\":\"diagnostic_allow_unbridged\".*\"claim_grade_requires_source_unbridged_unsafe_candidate_atoms\":0.*\"recommended_chunk_bands\":8.*\"resume_existing_supported\":true.*run_k26_full_source_bundle.sh.*\"chunk_ledger\":\"k26-continuation-chunks.jsonl\".*\"chunk_ledger_required_for_checked_bundle\":true.*\"source_dead_gap_checker\":\"source_dead_gap_check\".*\"source_dead_checker\":\"source_dead_cert_check\".*\"max_runtime_seconds\":14000.*--continuation-chunk-bands 8 --resume-existing.*--max-runtime-seconds 14000.*--cert-in k26-source-dead-cert.json --source-dead-checker source_dead_cert_check"
+    "\"schema\":\"lb_source_k26_run_commands_v1\".*\"claim_label\":\"SOURCE_ORIGIN_K26\".*\"executable_now\":false.*\"required_k_sq\":26.*endpoint-a 376039 --endpoint-b 943460.*\"schedule_boundary_count\":124.*\"schedule_segment_count\":123.*\"schedule_digest_algorithm\":\"sha256:lb_source_k26_repaired_bz_schedule_v1\".*\"seam_bridge_policy\":\"diagnostic_allow_unbridged\".*\"claim_grade_requires_source_unbridged_unsafe_candidate_atoms\":0.*\"recommended_chunk_bands\":8.*\"resume_existing_supported\":true.*run_k26_full_source_bundle.sh.*\"chunk_ledger\":\"k26-continuation-chunks.jsonl\".*\"chunk_ledger_required_for_checked_bundle\":true.*\"runtime_budget_checker\":\"check_k26_runtime_budget.py\".*\"source_dead_gap_checker\":\"source_dead_gap_check\".*\"source_dead_checker\":\"source_dead_cert_check\".*\"max_runtime_seconds\":14000.*--continuation-chunk-bands 8 --resume-existing.*--max-runtime-seconds 14000.*--cert-in k26-source-dead-cert.json --source-dead-checker source_dead_cert_check"
   FAIL_REGULAR_EXPRESSION
     "\"executable_now\":true|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME remote_smoke_artifact_checker
@@ -209,6 +209,10 @@ add_test(NAME k26_full_run_harness
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_k26_full_run_harness.sh
     ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_k26_full_source_bundle.sh)
+add_test(NAME k26_runtime_budget_checker
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_k26_runtime_budget_checker.sh
+    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_k26_runtime_budget.py)
 add_test(NAME source_origin_cpu_runner_smoke
   COMMAND source_origin_cpu_runner
     --k-sq 26

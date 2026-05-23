@@ -171,6 +171,7 @@ int main() {
             << "\"resume_existing_flag\":\"--resume-existing\","
             << "\"chunk_ledger\":\"k26-continuation-chunks.jsonl\","
             << "\"chunk_ledger_required_for_checked_bundle\":true,"
+            << "\"runtime_budget_checker\":\"check_k26_runtime_budget.py\","
             << "\"source_dead_gap_checker\":\"source_dead_gap_check\","
             << "\"source_dead_checker\":\"source_dead_cert_check\","
             << "\"recommended_max_runtime_seconds\":14000,"

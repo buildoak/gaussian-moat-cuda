@@ -130,7 +130,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" "sidecar" 27
+require_ctest_log "$out_dir/ctest.log" "sidecar" 28
 require_ctest_log "$out_dir/verification-ctest.log" "verification" 78
 
 for artifact in \

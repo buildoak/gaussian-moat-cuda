@@ -350,6 +350,20 @@ completed under the active runtime/budget gate yet. The current local blocker
 is therefore runtime/budget, not the earlier target-not-reached terminal
 diagnostic.
 
+After any partial continuation, run:
+
+```bash
+check_k26_runtime_budget.py \
+  --progress OUT_DIR/k26-continuation-progress.jsonl \
+  --chunk-ledger OUT_DIR/k26-continuation-chunks.jsonl \
+  --schedule-segment-count 123 \
+  --max-runtime-seconds 14000
+```
+
+This emits `K26_RUNTIME_BUDGET_PASS`, `K26_RUNTIME_BUDGET_REJECT`, or
+`K26_RUNTIME_BUDGET_INSUFFICIENT_PROGRESS` as diagnostic non-claim evidence.
+It is a stop/continue guard for budgeted execution, not source/origin proof.
+
 ## Stop Conditions
 
 Stop and report without claiming reproduction if:

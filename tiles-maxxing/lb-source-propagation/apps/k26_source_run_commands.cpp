@@ -221,6 +221,7 @@ int main() {
             << ",\"resume_existing_supported\":true,"
             << "\"chunk_ledger\":\"k26-continuation-chunks.jsonl\","
             << "\"chunk_ledger_required_for_checked_bundle\":true,"
+            << "\"runtime_budget_checker\":\"check_k26_runtime_budget.py\","
             << "\"source_dead_gap_checker\":\"source_dead_gap_check\","
             << "\"source_dead_checker\":\"source_dead_cert_check\","
             << "\"timeout_seconds\":1200,"

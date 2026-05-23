@@ -29,7 +29,7 @@ write_ctest_log() {
   } > "$path"
 }
 
-write_ctest_log "$tmp/ctest.log" 27
+write_ctest_log "$tmp/ctest.log" 28
 write_ctest_log "$tmp/verification-ctest.log" 78
 
 cat > "$tmp/status.txt" <<'STATUS'

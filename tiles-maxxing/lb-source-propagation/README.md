@@ -394,6 +394,11 @@ whether the chunk was executed or reused, and the observed live/dead source
 state. Add `--resume-existing` after a timeout to reuse complete prefix
 artifacts and complete live-source chunks from the same output directory
 instead of restarting the paid continuation from row 0.
+`check_k26_runtime_budget.py` can be run against
+`k26-continuation-progress.jsonl` after any partial continuation. It reads the
+completed TileOp-port band timings, projects the full 123-segment continuation
+against the `14000` second wall-clock budget, reports the last completed radius
+and active phase context, and emits only diagnostic non-claim status.
 The TileOp build loop is parallelized only inside this sidecar runner with
 standard C++ worker threads, preserving the deterministic output order and
 reporting
