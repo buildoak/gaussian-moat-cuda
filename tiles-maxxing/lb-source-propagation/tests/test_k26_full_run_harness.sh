@@ -318,6 +318,40 @@ grep -q 'k26-continuation-chunk-001.json' \
 grep -q '"terminal_source_dead":true' \
   "$chunked_out/k26-continuation-result.json"
 
+resume_out="$tmp/resume-existing"
+mkdir -p "$resume_out"
+cp "$chunked_out"/k26-prefix-result.json "$resume_out"/
+cp "$chunked_out"/k26-prefix-progress.jsonl "$resume_out"/
+cp "$chunked_out"/k26-prefix-manifest.txt "$resume_out"/
+cp "$chunked_out"/k26-prefix-witness.txt "$resume_out"/
+cp "$chunked_out"/k26-continuation-chunk-000.json "$resume_out"/
+cp "$chunked_out"/k26-continuation-chunk-000.progress.jsonl "$resume_out"/
+cp "$chunked_out"/k26-continuation-chunk-000.manifest.txt "$resume_out"/
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$resume_out" \
+    --continuation-chunk-bands 2 \
+    --resume-existing \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    >/tmp/k26-harness-resume-existing.out \
+    2>/tmp/k26-harness-resume-existing.err; then
+  echo "harness accepted a resumed chunked run without k26-source-dead-cert.json" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING' \
+  "$resume_out/status.txt"
+grep -q 'resume_existing=1' "$resume_out/status.txt"
+grep -q 'SKIP K26_PREFIX: existing prefix artifacts' "$resume_out/run.log"
+grep -q 'SKIP K26_CONTINUATION_CHUNK_000: existing complete chunk' \
+  "$resume_out/run.log"
+grep -q 'RUN K26_CONTINUATION_CHUNK_001:' "$resume_out/run.log"
+test -f "$resume_out/k26-continuation-result.json"
+test -f "$resume_out/k26-continuation-chunk-001.json"
+grep -q 'k26-continuation-chunk-000.manifest.txt' \
+  "$resume_out/k26-full-run-artifacts.sha256"
+grep -q 'k26-continuation-chunk-001.json' \
+  "$resume_out/k26-full-run-artifacts.sha256"
+
 cert="$tmp/k26-source-dead-cert.json"
 continuation_digest="$("$build_dir/source_tileop_port_runner" \
   --target-a 376039 --target-b 943460 \

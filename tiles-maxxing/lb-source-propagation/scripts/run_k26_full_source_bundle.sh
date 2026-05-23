@@ -8,6 +8,7 @@ Usage:
                                 [--max-atoms N]
                                 [--timeout-seconds N]
                                 [--continuation-chunk-bands N]
+                                [--resume-existing]
                                 [--cert-in PATH]
                                 [--source-dead-gap-checker PATH]
                                 [--source-dead-checker PATH]
@@ -45,6 +46,7 @@ out_dir=""
 max_atoms="50000000"
 timeout_seconds="0"
 continuation_chunk_bands="0"
+resume_existing="0"
 cert_in=""
 source_dead_gap_checker=""
 source_dead_checker=""
@@ -70,6 +72,10 @@ while [[ $# -gt 0 ]]; do
     --continuation-chunk-bands)
       continuation_chunk_bands="$2"
       shift 2
+      ;;
+    --resume-existing)
+      resume_existing="1"
+      shift
       ;;
     --cert-in)
       cert_in="$2"
@@ -168,6 +174,7 @@ write_status() {
     echo "max_atoms=$max_atoms"
     echo "timeout_seconds=$timeout_seconds"
     echo "continuation_chunk_bands=$continuation_chunk_bands"
+    echo "resume_existing=$resume_existing"
     echo "non_claim=this is an executed bundle harness, not a source-dead acceptance"
     if [[ -f "$out_dir/k26-source-dead-gap-check.log" ]]; then
       sed -nE 's/.*"status":"([^"]+)".*/source_dead_gap_check_status=\1/p' \
@@ -341,6 +348,36 @@ append_file_if_exists() {
   fi
 }
 
+prefix_resume_ready() {
+  [[ "$resume_existing" == "1" &&
+     -f "$out_dir/k26-prefix-result.json" &&
+     -f "$out_dir/k26-prefix-progress.jsonl" &&
+     -f "$out_dir/k26-prefix-manifest.txt" &&
+     -f "$out_dir/k26-prefix-witness.txt" ]]
+}
+
+chunk_resume_ready() {
+  local chunk_json="$1"
+  local chunk_progress="$2"
+  local chunk_manifest="$3"
+  local final_chunk="$4"
+  if [[ "$resume_existing" != "1" ||
+        ! -f "$chunk_json" ||
+        ! -f "$chunk_progress" ]]; then
+    return 1
+  fi
+  if [[ "$final_chunk" == "1" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$chunk_manifest" ]]; then
+    return 1
+  fi
+  local terminal_dead has_live_source
+  terminal_dead="$(json_bool_value "$chunk_json" terminal_source_dead)"
+  has_live_source="$(json_bool_value "$chunk_json" has_source_carry)"
+  [[ "$terminal_dead" == "false" && "$has_live_source" == "true" ]]
+}
+
 run_k26_continuation() {
   if [[ "$continuation_chunk_bands" == "0" ]]; then
     run_json K26_CONTINUATION "$out_dir/k26-continuation-result.json" \
@@ -393,27 +430,38 @@ run_k26_continuation() {
     chunk_json="$out_dir/k26-continuation-chunk-${chunk_id}.json"
     chunk_progress="$out_dir/k26-continuation-chunk-${chunk_id}.progress.jsonl"
     chunk_manifest="$out_dir/k26-continuation-chunk-${chunk_id}.manifest.txt"
-
-    local args=(
-      "$build_dir/source_tileop_port_runner"
-      --r-start "$chunk_r_start"
-      --r-final "$chunk_r_final"
-      --band-width 8192
-      --schedule-radii "$chunk_csv"
-      --max-atoms "$max_atoms"
-      --target-a 376039
-      --target-b 943460
-      --manifest-in "$manifest_in"
-      --progress-out "$chunk_progress"
-    )
-    if (( chunk_index == 0 )); then
-      args+=(--prefix-witness-in "$out_dir/k26-prefix-witness.txt")
-    fi
-    if (( chunk_end < segment_count )); then
-      args+=(--manifest-out "$chunk_manifest")
+    local final_chunk=0
+    if (( chunk_end >= segment_count )); then
+      final_chunk=1
     fi
 
-    run_json "K26_CONTINUATION_CHUNK_${chunk_id}" "$chunk_json" "${args[@]}"
+    if chunk_resume_ready "$chunk_json" "$chunk_progress" "$chunk_manifest" \
+        "$final_chunk"; then
+      echo "SKIP K26_CONTINUATION_CHUNK_${chunk_id}: existing complete chunk" \
+        >> "$out_dir/run.log"
+    else
+      local args=(
+        "$build_dir/source_tileop_port_runner"
+        --r-start "$chunk_r_start"
+        --r-final "$chunk_r_final"
+        --band-width 8192
+        --schedule-radii "$chunk_csv"
+        --max-atoms "$max_atoms"
+        --target-a 376039
+        --target-b 943460
+        --manifest-in "$manifest_in"
+        --progress-out "$chunk_progress"
+      )
+      if (( chunk_index == 0 )); then
+        args+=(--prefix-witness-in "$out_dir/k26-prefix-witness.txt")
+      fi
+      if (( chunk_end < segment_count )); then
+        args+=(--manifest-out "$chunk_manifest")
+      fi
+
+      run_json "K26_CONTINUATION_CHUNK_${chunk_id}" "$chunk_json" "${args[@]}"
+    fi
+
     append_file_if_exists "$chunk_progress" "$out_dir/k26-continuation-progress.jsonl"
 
     terminal_dead="$(json_bool_value "$chunk_json" terminal_source_dead)"
@@ -564,17 +612,21 @@ if [[ "$schedule_csv" != 8192,* || "$schedule_csv" != *,1015645 ]]; then
   exit 1
 fi
 
-run_json K26_PREFIX "$out_dir/k26-prefix-result.json" \
-  "$build_dir/source_origin_cpu_runner" \
-    --k-sq 26 \
-    --r-final 8192 \
-    --band-width 8192 \
-    --endpoint-a 376039 \
-    --endpoint-b 943460 \
-    --max-atoms "$max_atoms" \
-    --manifest-out "$out_dir/k26-prefix-manifest.txt" \
-    --prefix-witness-out "$out_dir/k26-prefix-witness.txt" \
-    --progress-out "$out_dir/k26-prefix-progress.jsonl"
+if prefix_resume_ready; then
+  echo "SKIP K26_PREFIX: existing prefix artifacts" >> "$out_dir/run.log"
+else
+  run_json K26_PREFIX "$out_dir/k26-prefix-result.json" \
+    "$build_dir/source_origin_cpu_runner" \
+      --k-sq 26 \
+      --r-final 8192 \
+      --band-width 8192 \
+      --endpoint-a 376039 \
+      --endpoint-b 943460 \
+      --max-atoms "$max_atoms" \
+      --manifest-out "$out_dir/k26-prefix-manifest.txt" \
+      --prefix-witness-out "$out_dir/k26-prefix-witness.txt" \
+      --progress-out "$out_dir/k26-prefix-progress.jsonl"
+fi
 
 run_k26_continuation
 

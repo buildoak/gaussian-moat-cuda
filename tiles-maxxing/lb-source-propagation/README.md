@@ -306,6 +306,7 @@ tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
   --build-dir /tmp/gm-lbsp-remote-smoke \
   --out-dir /workspace/k26-full-source-bundle \
   --continuation-chunk-bands 8 \
+  --resume-existing \
   --timeout-seconds 1200 \
   --source-dead-gap-checker /path/to/source_dead_gap_check
 ```
@@ -369,7 +370,9 @@ The bundle harness exposes this as `--continuation-chunk-bands N`: it splits
 the repaired continuation schedule into bounded chunks, concatenates chunk
 progress into the canonical continuation progress JSONL, preserves
 `k26-continuation-result.json` as the final chunk result, and hashes chunk
-artifacts in the bundle manifest.
+artifacts in the bundle manifest. Add `--resume-existing` after a timeout to
+reuse complete prefix artifacts and complete live-source chunks from the same
+output directory instead of restarting the paid continuation from row 0.
 The TileOp build loop is parallelized only inside this sidecar runner with
 standard C++ worker threads, preserving the deterministic output order and
 reporting

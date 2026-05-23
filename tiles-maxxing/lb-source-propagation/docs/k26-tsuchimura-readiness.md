@@ -121,6 +121,7 @@ run_k26_full_source_bundle.sh \
   --build-dir BUILD_DIR \
   --out-dir OUT_DIR \
   --continuation-chunk-bands 8 \
+  --resume-existing \
   --timeout-seconds 1200
 ```
 
@@ -189,6 +190,12 @@ the final chunk output to `k26-continuation-result.json` for the existing
 bundle checker. Chunk artifacts are also hashed in
 `k26-full-run-artifacts.sha256`. This is an execution-resilience protocol, not
 a certificate relaxation.
+If a paid attempt times out after producing complete prefix or chunk artifacts,
+rerun the same command with `--resume-existing`. The harness skips the prefix
+only when `k26-prefix-result.json`, `k26-prefix-progress.jsonl`,
+`k26-prefix-manifest.txt`, and `k26-prefix-witness.txt` are all present. It
+skips a non-final continuation chunk only when the chunk JSON/progress/manifest
+are present and the chunk result proves live source carry remains for resume.
 With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/progress/continuation/gap artifacts before the
 checker runs.
