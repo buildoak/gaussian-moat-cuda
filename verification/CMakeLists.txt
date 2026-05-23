@@ -128,6 +128,7 @@ foreach(bad_source_dead_gap
     dead-gap-bad-bridge-candidate-total
     dead-gap-bad-bridge-counts
     dead-gap-bad-bridge-source-artifact
+    dead-gap-bad-bridge-source-without-ledger
     dead-gap-bad-bridge-unsafe
     dead-gap-bad-bz-digest
     dead-gap-bad-bz-evidence

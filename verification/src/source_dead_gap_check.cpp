@@ -311,6 +311,9 @@ std::string verify_gap(const nlohmann::json& gap) {
       throw std::runtime_error(
           "bridge source artifact hash is not sha256 hex");
     }
+  } else if (has_field(gap, "bridge_source_artifact")) {
+    throw std::runtime_error(
+        "bridge_source_artifact requires chunk_ledger_artifact");
   }
 
   const nlohmann::json& bz_evidence = require_object(gap, "bz_evidence");
