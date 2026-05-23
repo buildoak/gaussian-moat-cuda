@@ -262,6 +262,12 @@ write_status() {
         "$out_dir/k26-runtime-budget-check.log" | head -n 1
       sed -nE 's/.*"projected_total_seconds":([0-9]+).*/runtime_budget_projected_total_seconds=\1/p' \
         "$out_dir/k26-runtime-budget-check.log" | head -n 1
+      sed -nE 's/.*"cumulative_projected_total_seconds":([0-9]+).*/runtime_budget_cumulative_projected_total_seconds=\1/p' \
+        "$out_dir/k26-runtime-budget-check.log" | head -n 1
+      sed -nE 's/.*"tail_projected_total_seconds":([0-9]+).*/runtime_budget_tail_projected_total_seconds=\1/p' \
+        "$out_dir/k26-runtime-budget-check.log" | head -n 1
+      sed -nE 's/.*"tail_window_band_count":([0-9]+).*/runtime_budget_tail_window_band_count=\1/p' \
+        "$out_dir/k26-runtime-budget-check.log" | head -n 1
       sed -nE 's/.*"budget_margin_seconds":(-?[0-9]+).*/runtime_budget_margin_seconds=\1/p' \
         "$out_dir/k26-runtime-budget-check.log" | head -n 1
       sed -nE 's/.*"last_completed_r_outer":([0-9]+).*/runtime_budget_last_completed_r_outer=\1/p' \

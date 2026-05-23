@@ -117,6 +117,15 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--schedule-segment-count", type=positive_int, default=123)
     parser.add_argument("--max-runtime-seconds", type=nonnegative_float, default=14000.0)
     parser.add_argument("--min-completed-bands", type=positive_int, default=1)
+    parser.add_argument(
+        "--tail-window-bands",
+        type=positive_int,
+        default=1,
+        help=(
+            "also project from the last N completed bands; status rejects if "
+            "either the cumulative or tail projection exceeds the runtime cap"
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -147,7 +156,17 @@ def main(argv: list[str]) -> int:
 
     elapsed_ms = sum(int(row["total_ms"]) for row in complete)
     mean_ms = elapsed_ms / len(complete)
-    projected_seconds = (mean_ms * args.schedule_segment_count) / 1000.0
+    cumulative_projected_seconds = (
+        mean_ms * args.schedule_segment_count
+    ) / 1000.0
+    tail_count = min(args.tail_window_bands, len(complete))
+    tail_rows = complete[-tail_count:]
+    tail_elapsed_ms = sum(int(row["total_ms"]) for row in tail_rows)
+    tail_mean_ms = tail_elapsed_ms / tail_count
+    tail_projected_seconds = (
+        tail_mean_ms * args.schedule_segment_count
+    ) / 1000.0
+    projected_seconds = max(cumulative_projected_seconds, tail_projected_seconds)
     observed_seconds = elapsed_ms / 1000.0
     last = complete[-1]
     margin = args.max_runtime_seconds - projected_seconds
@@ -164,6 +183,13 @@ def main(argv: list[str]) -> int:
         "schedule_segment_count": args.schedule_segment_count,
         "observed_seconds": round(observed_seconds, 3),
         "mean_band_seconds": round(mean_ms / 1000.0, 3),
+        "cumulative_projected_total_seconds": math.ceil(
+            cumulative_projected_seconds
+        ),
+        "tail_window_band_count": tail_count,
+        "tail_observed_seconds": round(tail_elapsed_ms / 1000.0, 3),
+        "tail_mean_band_seconds": round(tail_mean_ms / 1000.0, 3),
+        "tail_projected_total_seconds": math.ceil(tail_projected_seconds),
         "projected_total_seconds": math.ceil(projected_seconds),
         "max_runtime_seconds": args.max_runtime_seconds,
         "budget_margin_seconds": math.floor(margin),

@@ -27,7 +27,9 @@ JSONL
   --max-runtime-seconds 14000 \
   > "$tmp/pass.out"
 grep -q '"status":"K26_RUNTIME_BUDGET_PASS"' "$tmp/pass.out"
-grep -q '"projected_total_seconds":185' "$tmp/pass.out"
+grep -q '"cumulative_projected_total_seconds":185' "$tmp/pass.out"
+grep -q '"tail_projected_total_seconds":246' "$tmp/pass.out"
+grep -q '"projected_total_seconds":246' "$tmp/pass.out"
 grep -q '"chunk_ledger_rows":1' "$tmp/pass.out"
 grep -q '"claim_grade":false' "$tmp/pass.out"
 
@@ -69,6 +71,24 @@ if "$checker" \
 fi
 grep -q '"status":"K26_RUNTIME_BUDGET_REJECT"' "$tmp/slow.out"
 grep -q '"budget_margin_seconds":-' "$tmp/slow.out"
+
+cat > "$tmp/late-spike-progress.jsonl" <<'JSONL'
+{"schema":"lb_source_tileop_port_progress_v1","band_index":0,"r_start":8192,"r_outer":16384,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":1200,"total_ms":1000}
+{"schema":"lb_source_tileop_port_progress_v1","band_index":1,"r_start":16384,"r_outer":24576,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":2337,"total_ms":200000}
+JSONL
+
+if "$checker" \
+    --progress "$tmp/late-spike-progress.jsonl" \
+    --schedule-segment-count 123 \
+    --max-runtime-seconds 14000 \
+    > "$tmp/late-spike.out"; then
+  echo "runtime checker accepted over-budget tail projection" >&2
+  exit 1
+fi
+grep -q '"status":"K26_RUNTIME_BUDGET_REJECT"' "$tmp/late-spike.out"
+grep -q '"cumulative_projected_total_seconds":12362' "$tmp/late-spike.out"
+grep -q '"tail_projected_total_seconds":24600' "$tmp/late-spike.out"
+grep -q '"projected_total_seconds":24600' "$tmp/late-spike.out"
 
 cat > "$tmp/phase-only.jsonl" <<'JSONL'
 {"schema":"lb_source_tileop_port_phase_v1","phase":"tileop_build","event":"begin","band_index":0,"r_start":8192,"r_outer":16384}

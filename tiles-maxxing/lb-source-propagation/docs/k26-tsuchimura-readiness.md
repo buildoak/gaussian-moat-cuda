@@ -377,7 +377,11 @@ check_k26_runtime_budget.py \
 
 This emits `K26_RUNTIME_BUDGET_PASS`, `K26_RUNTIME_BUDGET_REJECT`, or
 `K26_RUNTIME_BUDGET_INSUFFICIENT_PROGRESS` as diagnostic non-claim evidence.
-It is a stop/continue guard for budgeted execution, not source/origin proof.
+By default it computes both a cumulative-average projection and a conservative
+tail projection from the latest completed band; the effective
+`projected_total_seconds` is the larger of those values. This prevents early
+cheap bands from masking later-radius runtime growth. It is a stop/continue
+guard for budgeted execution, not source/origin proof.
 For chunked continuation, the checker treats radial intervals as the stable
 identity of completed rows; local `band_index` values may restart inside each
 resumed `source_tileop_port_runner` process.
@@ -385,11 +389,11 @@ The full bundle harness also invokes this checker automatically after a
 continuation timeout, whole-bundle runtime-limit stop, failed continuation with
 progress, or completed continuation. The harness stores the raw checker output
 as `k26-runtime-budget-check.log` plus stderr/meta sidecars, and copies the
-checker status, projection, margin, last completed radius, progress artifact,
-and exit code into `status.txt` when those fields exist. A paid attempt should
-therefore leave enough runtime evidence to decide whether to resume, reduce
-chunk size, or stop under the `$1.50` cap without weakening the
-`SOURCE_DEAD_CERT` gate.
+checker status, effective projection, cumulative projection, tail projection,
+tail window, margin, last completed radius, progress artifact, and exit code
+into `status.txt` when those fields exist. A paid attempt should therefore
+leave enough runtime evidence to decide whether to resume, reduce chunk size,
+or stop under the `$1.50` cap without weakening the `SOURCE_DEAD_CERT` gate.
 
 ## Stop Conditions
 
