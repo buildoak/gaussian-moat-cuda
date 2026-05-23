@@ -425,6 +425,13 @@ std::string verify_gap(const nlohmann::json& gap) {
     }
     ++port_atoms;
   }
+  std::size_t coordinate_port_edges = 0;
+  for (std::size_t i = 1; i < atom_path.size(); ++i) {
+    if ((atom_path[i - 1] >= 0 && atom_path[i] < 0) ||
+        (atom_path[i - 1] < 0 && atom_path[i] >= 0)) {
+      ++coordinate_port_edges;
+    }
+  }
   if (!target_not_reached && coordinate_atoms < 2) {
     throw std::runtime_error("target atom path needs coordinate source and endpoint atoms");
   }
@@ -477,6 +484,14 @@ std::string verify_gap(const nlohmann::json& gap) {
       require_u64(path_obligation, "origin_prefix_witness_seed_norm_sq");
   const std::uint64_t prefix_path_target_norm = require_u64(
       path_obligation, "origin_prefix_witness_path_target_norm_sq");
+  const std::string per_port_expansion =
+      require_string(path_obligation, "per_port_coordinate_expansion");
+  const std::uint64_t per_port_required = require_u64(
+      path_obligation, "per_port_coordinate_expansion_required_edges");
+  const std::uint64_t per_port_available = require_u64(
+      path_obligation, "per_port_coordinate_expansion_available_edges");
+  const std::uint64_t per_port_path_points = require_u64(
+      path_obligation, "per_port_coordinate_expansion_path_points_total");
   if (target_not_reached) {
     if (!prefix_target.is_null() || prefix_accepted ||
         !prefix_path_target.is_null() || prefix_path_available ||
@@ -484,6 +499,11 @@ std::string verify_gap(const nlohmann::json& gap) {
         prefix_path_target_norm != 0) {
       throw std::runtime_error(
           "target-not-reached gap must not accept origin-prefix witness");
+    }
+    if (per_port_expansion != "not_applicable" || per_port_required != 0 ||
+        per_port_available != 0 || per_port_path_points != 0) {
+      throw std::runtime_error(
+          "target-not-reached gap must not report per-port expansion");
     }
   } else {
     if (!prefix_target.is_number_integer()) {
@@ -518,13 +538,24 @@ std::string verify_gap(const nlohmann::json& gap) {
       throw std::runtime_error(
           "origin-prefix witness path target norm mismatch");
     }
+    if (per_port_expansion != "available_summary_non_claim") {
+      throw std::runtime_error(
+          "reached mixed path must report per-port expansion evidence");
+    }
+    if (per_port_required != coordinate_port_edges) {
+      throw std::runtime_error(
+          "per-port expansion required edge count does not match atom chain");
+    }
+    if (per_port_available != per_port_required) {
+      throw std::runtime_error(
+          "per-port expansion does not cover every coordinate-port edge");
+    }
+    if (per_port_path_points < per_port_available) {
+      throw std::runtime_error("per-port expansion path point count is too small");
+    }
   }
   if (!target_not_reached && port_atoms == 0) {
-    throw std::runtime_error("coordinate path obligation needs a port expansion gap");
-  }
-  if (require_string(path_obligation, "per_port_coordinate_expansion") !=
-      "missing") {
-    throw std::runtime_error("coordinate path obligation must report missing port expansion");
+    throw std::runtime_error("coordinate path obligation needs a TileOp port edge");
   }
   if (require_bool(path_obligation, "claim_grade_path_accepted")) {
     throw std::runtime_error("coordinate path obligation must not accept mixed atom chain as claim-grade");

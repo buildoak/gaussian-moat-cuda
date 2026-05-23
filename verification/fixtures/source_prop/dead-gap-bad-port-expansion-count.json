@@ -58,11 +58,11 @@
   "coordinate_path_obligation": {
     "required_provenance": "coordinate_gaussian_prime_path",
     "observed_provenance": "mixed_coordinate_port_atom_chain_non_claim",
-    "observed_coordinate_atom_count": 3,
+    "observed_coordinate_atom_count": 2,
     "observed_port_atom_count": 1,
     "per_port_coordinate_expansion": "available_summary_non_claim",
     "per_port_coordinate_expansion_required_edges": 2,
-    "per_port_coordinate_expansion_available_edges": 2,
+    "per_port_coordinate_expansion_available_edges": 1,
     "per_port_coordinate_expansion_path_points_total": 4,
     "claim_grade_path_accepted": false,
     "origin_prefix_witness_artifact": "k26-prefix-witness.txt",
@@ -75,6 +75,19 @@
     "origin_prefix_witness_path_target_norm_sq": 1031325872257
   },
   "terminal_source_inventory_summary": {
+    "count": 14542615005,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "max_norm_sq": 1031522101121,
+    "max_norm_atom_ids": [
+      1615075207964004
+    ]
+  },
+  "terminal_source_inventory_accumulator": {
+    "mode": "summary_digest_only_non_claim",
+    "provenance": "terminal_component_inventory_accumulator",
+    "listed_inventory_present": false,
+    "claim_grade_inventory_accepted": false,
     "count": 14542615005,
     "digest_algorithm": "sha256:lb_source_inventory_v1",
     "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

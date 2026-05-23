@@ -134,6 +134,7 @@ foreach(bad_source_dead_gap
     dead-gap-bad-origin-prefix-target
     dead-gap-bad-path-obligation-claim
     dead-gap-bad-path-obligation-count
+    dead-gap-bad-port-expansion-count
     dead-gap-bad-prefix-witness-path-seed
     dead-gap-bad-prefix-witness-hash
     dead-gap-bad-port-atom

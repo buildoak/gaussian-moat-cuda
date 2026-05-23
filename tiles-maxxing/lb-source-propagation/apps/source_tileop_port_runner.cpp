@@ -111,12 +111,33 @@ struct PortManifestBridgeResult {
   std::map<std::string, std::uint64_t> source_bridge_reject_reasons;
   std::uint64_t bridged_port_carry_atoms = 0;
   std::uint64_t bridge_edges = 0;
+  std::map<std::pair<lb_source::AtomId, lb_source::AtomId>,
+           std::vector<lb_source::CoordinateAtom>>
+      coordinate_port_paths;
 };
 
 struct TargetBridgeResult {
   bool seen = false;
   std::uint64_t port_atoms = 0;
   std::uint64_t bridge_edges = 0;
+  std::map<std::pair<lb_source::AtomId, lb_source::AtomId>,
+           std::vector<lb_source::CoordinateAtom>>
+      coordinate_port_paths;
+};
+
+struct CoordinatePortExpansionSummary {
+  lb_source::AtomId coordinate_atom_id = 0;
+  lb_source::AtomId port_atom_id = 0;
+  std::uint64_t path_points = 0;
+  std::uint64_t coordinate_norm_sq = 0;
+  std::uint64_t port_witness_norm_sq = 0;
+};
+
+struct CoordinatePortExpansionStatus {
+  std::uint64_t required_edges = 0;
+  std::uint64_t available_edges = 0;
+  std::uint64_t path_points_total = 0;
+  std::vector<CoordinatePortExpansionSummary> summaries;
 };
 
 struct RunnerInventorySummary {
@@ -1002,6 +1023,102 @@ std::vector<lb_source::AtomId> atom_path_to_target(
   return {reversed.rbegin(), reversed.rend()};
 }
 
+lb_source::CoordinateAtom coordinate_atom_from_point(const Point& point) {
+  return {.a = point.a, .b = point.b, .norm_sq = point.norm_sq};
+}
+
+bool coordinate_path_less(const std::vector<lb_source::CoordinateAtom>& lhs,
+                          const std::vector<lb_source::CoordinateAtom>& rhs) {
+  if (lhs.size() != rhs.size()) {
+    return lhs.size() < rhs.size();
+  }
+  return std::lexicographical_compare(
+      lhs.begin(), lhs.end(), rhs.begin(), rhs.end(),
+      [](const lb_source::CoordinateAtom& a,
+         const lb_source::CoordinateAtom& b) {
+        if (a.a != b.a) {
+          return a.a < b.a;
+        }
+        if (a.b != b.b) {
+          return a.b < b.b;
+        }
+        return a.norm_sq < b.norm_sq;
+      });
+}
+
+void record_coordinate_port_path(
+    std::map<std::pair<lb_source::AtomId, lb_source::AtomId>,
+             std::vector<lb_source::CoordinateAtom>>& paths,
+    lb_source::AtomId coordinate_atom_id,
+    lb_source::AtomId port_atom_id,
+    std::vector<lb_source::CoordinateAtom> path) {
+  if (path.empty()) {
+    return;
+  }
+  const auto key = std::pair{coordinate_atom_id, port_atom_id};
+  const auto existing = paths.find(key);
+  if (existing == paths.end() || coordinate_path_less(path, existing->second)) {
+    paths[key] = std::move(path);
+  }
+}
+
+void append_coordinate_port_expansion_status(
+    std::ostream& out, const CoordinatePortExpansionStatus& status) {
+  out << "{\"required_edges\":" << status.required_edges
+      << ",\"available_edges\":" << status.available_edges
+      << ",\"path_points_total\":" << status.path_points_total
+      << ",\"expansions\":[";
+  for (std::size_t i = 0; i < status.summaries.size(); ++i) {
+    if (i != 0) {
+      out << ',';
+    }
+    const CoordinatePortExpansionSummary& summary = status.summaries[i];
+    out << "{\"coordinate_atom_id\":" << summary.coordinate_atom_id
+        << ",\"port_atom_id\":" << summary.port_atom_id
+        << ",\"path_points\":" << summary.path_points
+        << ",\"coordinate_norm_sq\":" << summary.coordinate_norm_sq
+        << ",\"port_witness_norm_sq\":" << summary.port_witness_norm_sq
+        << '}';
+  }
+  out << "]}";
+}
+
+CoordinatePortExpansionStatus summarize_coordinate_port_expansions(
+    const std::vector<lb_source::AtomId>& atom_path,
+    const std::map<std::pair<lb_source::AtomId, lb_source::AtomId>,
+                   std::vector<lb_source::CoordinateAtom>>& paths) {
+  CoordinatePortExpansionStatus status;
+  for (std::size_t i = 1; i < atom_path.size(); ++i) {
+    lb_source::AtomId coordinate_atom_id = 0;
+    lb_source::AtomId port_atom_id = 0;
+    if (atom_path[i - 1] >= 0 && atom_path[i] < 0) {
+      coordinate_atom_id = atom_path[i - 1];
+      port_atom_id = atom_path[i];
+    } else if (atom_path[i - 1] < 0 && atom_path[i] >= 0) {
+      coordinate_atom_id = atom_path[i];
+      port_atom_id = atom_path[i - 1];
+    } else {
+      continue;
+    }
+    ++status.required_edges;
+    const auto path_it = paths.find({coordinate_atom_id, port_atom_id});
+    if (path_it == paths.end() || path_it->second.empty()) {
+      continue;
+    }
+    const std::vector<lb_source::CoordinateAtom>& path = path_it->second;
+    ++status.available_edges;
+    status.path_points_total += path.size();
+    status.summaries.push_back(CoordinatePortExpansionSummary{
+        .coordinate_atom_id = coordinate_atom_id,
+        .port_atom_id = port_atom_id,
+        .path_points = path.size(),
+        .coordinate_norm_sq = path.front().norm_sq,
+        .port_witness_norm_sq = path.back().norm_sq,
+    });
+  }
+  return status;
+}
+
 std::vector<campaign::TileOp> build_tileops(
     const std::vector<campaign::TileCoord>& coords,
     const campaign::CampaignConstants& constants,
@@ -1161,6 +1278,9 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
         rejected_coord_ids_by_reason;
     std::map<lb_source::AtomId, std::set<std::string>>
         rejected_reasons_by_coord_id;
+    std::map<std::pair<lb_source::AtomId, lb_source::AtomId>,
+             std::vector<lb_source::CoordinateAtom>>
+        coordinate_port_paths;
   };
 
   const auto process_tile_bridge =
@@ -1231,6 +1351,47 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
             local.ports_by_coord_id[coord_id];
         ports.insert(bridge.port_atoms.begin(), bridge.port_atoms.end());
       }
+      const campaign::Prime& target_prime = primes[target_prime_indices[b]];
+      for (const lb_source::CoordinatePortBridgeResult::PortExpansion&
+               expansion : bridge.port_expansions) {
+        if (expansion.path.empty() ||
+            expansion.path.front().a != target_prime.a ||
+            expansion.path.front().b != target_prime.b ||
+            expansion.path.front().norm_sq != target_prime.norm_sq) {
+          std::cerr << "TileOp coordinate bridge emitted mismatched local "
+                       "expansion path\n";
+          std::exit(EXIT_FAILURE);
+        }
+        for (const lb_source::AtomId coord_id : adjacent_carry_ids) {
+          const auto carry_it = carry_point_by_id.find(coord_id);
+          if (carry_it == carry_point_by_id.end()) {
+            std::cerr << "bridge candidate is missing carry point\n";
+            std::exit(EXIT_FAILURE);
+          }
+          std::vector<lb_source::CoordinateAtom> full_path;
+          full_path.reserve(expansion.path.size() + 1);
+          const lb_source::CoordinateAtom carry_atom =
+              coordinate_atom_from_point(carry_it->second);
+          if (carry_atom.a != expansion.path.front().a ||
+              carry_atom.b != expansion.path.front().b) {
+            if (dist_sq(carry_it->second,
+                        Point{expansion.path.front().a,
+                              expansion.path.front().b,
+                              expansion.path.front().norm_sq}) >
+                static_cast<std::uint64_t>(campaign::k_sq_value)) {
+              std::cerr << "carry-to-TileOp expansion first step exceeds "
+                           "K_SQ\n";
+              std::exit(EXIT_FAILURE);
+            }
+            full_path.push_back(carry_atom);
+          }
+          full_path.insert(full_path.end(), expansion.path.begin(),
+                           expansion.path.end());
+          record_coordinate_port_path(local.coordinate_port_paths, coord_id,
+                                      expansion.port_atom,
+                                      std::move(full_path));
+        }
+      }
     }
   };
 
@@ -1252,6 +1413,10 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
       std::set<std::string>& merged_reasons =
           rejected_reasons_by_coord_id[coord_id];
       merged_reasons.insert(reasons.begin(), reasons.end());
+    }
+    for (const auto& [key, path] : local.coordinate_port_paths) {
+      record_coordinate_port_path(result.coordinate_port_paths, key.first,
+                                  key.second, path);
     }
   };
 
@@ -1441,6 +1606,18 @@ TargetBridgeResult bridge_target_coordinate_to_ports(
         std::exit(EXIT_FAILURE);
       }
       target_ports.insert(bridge.port_atoms.begin(), bridge.port_atoms.end());
+      for (const lb_source::CoordinatePortBridgeResult::PortExpansion&
+               expansion : bridge.port_expansions) {
+        if (expansion.path.empty() || expansion.path.front().a != target.a ||
+            expansion.path.front().b != target.b ||
+            expansion.path.front().norm_sq != target.norm_sq) {
+          std::cerr << "target TileOp-port bridge emitted mismatched local "
+                       "expansion path\n";
+          std::exit(EXIT_FAILURE);
+        }
+        record_coordinate_port_path(result.coordinate_port_paths, target_id,
+                                    expansion.port_atom, expansion.path);
+      }
     }
   }
 
@@ -1536,6 +1713,9 @@ int main(int argc, char** argv) {
   std::vector<lb_source::AtomId> provenance_source_ids;
   std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>
       provenance_adjacency;
+  std::map<std::pair<lb_source::AtomId, lb_source::AtomId>,
+           std::vector<lb_source::CoordinateAtom>>
+      coordinate_port_expansion_paths;
   if (config.manifest_in.has_value()) {
     const auto manifest_read_begin = std::chrono::steady_clock::now();
     emit_phase_progress(progress, "manifest_read", "begin",
@@ -1759,6 +1939,10 @@ int main(int argc, char** argv) {
         target_port_atoms = target_bridge.port_atoms;
         target_bridge_edges = target_bridge.bridge_edges;
         norm_by_id.emplace(*target_id, target->norm_sq);
+        for (const auto& [key, path] : target_bridge.coordinate_port_paths) {
+          record_coordinate_port_path(coordinate_port_expansion_paths,
+                                      key.first, key.second, path);
+        }
       }
     }
     const auto target_bridge_done = std::chrono::steady_clock::now();
@@ -1848,6 +2032,10 @@ int main(int argc, char** argv) {
       source_bridge_reject_reasons = bridge.source_bridge_reject_reasons;
       bridged_port_carry_atoms = bridge.bridged_port_carry_atoms;
       bridge_edges = bridge.bridge_edges;
+      for (const auto& [key, path] : bridge.coordinate_port_paths) {
+        record_coordinate_port_path(coordinate_port_expansion_paths, key.first,
+                                    key.second, path);
+      }
     } else {
       emit_phase_progress(progress, "source_process", "begin", segment,
                           previous_outer, outer,
@@ -2053,6 +2241,9 @@ int main(int argc, char** argv) {
     std::cerr << "target atom-chain lacks prefix witness path provenance\n";
     return EXIT_FAILURE;
   }
+  const CoordinatePortExpansionStatus target_expansion_status =
+      summarize_coordinate_port_expansions(target_atom_path,
+                                           coordinate_port_expansion_paths);
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_port_runner_v1\","
@@ -2164,6 +2355,9 @@ int main(int argc, char** argv) {
                       ? target_prefix_path->target_norm_sq
                       : 0)
               << '}';
+    std::cout << ",\"coordinate_port_expansions\":";
+    append_coordinate_port_expansion_status(std::cout,
+                                            target_expansion_status);
   }
   std::cout << "}"
             << ",\"accepted\":" << (accepted ? "true" : "false")

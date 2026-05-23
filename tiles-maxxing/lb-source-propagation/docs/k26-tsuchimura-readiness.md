@@ -150,12 +150,14 @@ binds the repaired K26 BZ digest as schedule-accepted but source-claim
 non-accepted, which keeps non-square BZ evidence out of `SOURCE_DEAD_CERT`
 until the cert layer has a claim-grade BZ gate. When the mixed target atom chain
 is present, the gap also requires the first coordinate atom to be a target row
-in `k26-prefix-witness.txt`; the origin-prefix side is then bound, while the
-TileOp-port edges still need coordinate expansion before any `SOURCE_DEAD_CERT`
-claim. The continuation now preserves a compact `prefix_witness_path` summary
-for that first coordinate atom, and the gap binds it into
-`coordinate_path_obligation`; this verifies that the row-0 prefix segment starts
-from an origin source seed and ends at the first mixed-chain coordinate atom.
+in `k26-prefix-witness.txt`; the origin-prefix side is then bound. The
+continuation now preserves a compact `prefix_witness_path` summary for that
+first coordinate atom plus a `coordinate_port_expansions` summary for every
+coordinate/port edge in the mixed atom chain. The gap binds these into
+`coordinate_path_obligation`, verifying that the row-0 prefix segment starts
+from an origin source seed and that the TileOp-port edges have local
+Gaussian-prime expansion evidence. This is still non-claim until a verifier
+binds the full coordinate path, terminal inventory, and BZ schedule.
 The same gap records a `target_bridge_obligation`
 that mirrors whether the canonical endpoint was seen, bridged to TileOp ports,
 and source-reached. For chunked runs it also binds

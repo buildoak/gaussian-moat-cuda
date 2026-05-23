@@ -826,6 +826,8 @@ write_source_dead_gap() {
   local target_prefix_path_available_json target_prefix_path_atom_id_json
   local target_prefix_path_points target_prefix_path_seed_norm_sq
   local target_prefix_path_target_norm_sq
+  local target_port_expansion_required_edges target_port_expansion_available_edges
+  local target_port_expansion_path_points_total
   path_provenance="$(json_string_value "$continuation" path_provenance)"
   atom_path="$(json_array_value "$continuation" atom_path)"
   atom_path_length="$(json_number_value "$continuation" atom_path_length)"
@@ -855,6 +857,9 @@ with open(sys.argv[1], "r", encoding="utf-8") as fh:
 prefix_path = target.get("prefix_witness_path", {})
 if not isinstance(prefix_path, dict):
     prefix_path = {}
+port_expansions = target.get("coordinate_port_expansions", {})
+if not isinstance(port_expansions, dict):
+    port_expansions = {}
 
 def b(value):
     return "true" if value is True else "false"
@@ -872,6 +877,9 @@ print(
     int(prefix_path.get("path_points", 0)),
     int(prefix_path.get("seed_norm_sq", 0)),
     int(prefix_path.get("target_norm_sq", 0)),
+    int(port_expansions.get("required_edges", 0)),
+    int(port_expansions.get("available_edges", 0)),
+    int(port_expansions.get("path_points_total", 0)),
 )
 PY
   )"
@@ -879,6 +887,8 @@ PY
     target_port_atoms target_bridge_edges target_prefix_path_available_json \
     target_prefix_path_atom_id_json target_prefix_path_points \
     target_prefix_path_seed_norm_sq target_prefix_path_target_norm_sq \
+    target_port_expansion_required_edges target_port_expansion_available_edges \
+    target_port_expansion_path_points_total \
     <<< "$target_values"
   require_extracted "$path_provenance" "PATH_PROVENANCE"
   require_extracted "$atom_path" "ATOM_PATH"
@@ -986,6 +996,9 @@ PY
   require_extracted "$target_prefix_path_points" "TARGET_PREFIX_PATH_POINTS"
   require_extracted "$target_prefix_path_seed_norm_sq" "TARGET_PREFIX_PATH_SEED_NORM"
   require_extracted "$target_prefix_path_target_norm_sq" "TARGET_PREFIX_PATH_TARGET_NORM"
+  require_extracted "$target_port_expansion_required_edges" "TARGET_PORT_EXPANSION_REQUIRED_EDGES"
+  require_extracted "$target_port_expansion_available_edges" "TARGET_PORT_EXPANSION_AVAILABLE_EDGES"
+  require_extracted "$target_port_expansion_path_points_total" "TARGET_PORT_EXPANSION_PATH_POINTS_TOTAL"
   if [[ -f "$chunk_ledger" ]]; then
     local chunk_ledger_digest
     local bridge_source_digest
@@ -997,17 +1010,19 @@ PY
     bridge_artifact_json=",\"bridge_source_artifact\":{\"name\":\"k26-continuation-chunk-000.json\",\"sha256\":\"$bridge_source_digest\"}"
   fi
 
-  local blocker missing_for_cert
+  local blocker missing_for_cert per_port_expansion_status
   blocker="SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"
-  missing_for_cert='"coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","per-port representative coordinate path expansion for TileOp atom-chain edges","claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"'
+  per_port_expansion_status="available_summary_non_claim"
+  missing_for_cert='"coordinate Gaussian-prime source_path verifier acceptance from origin prefix to canonical endpoint","claim-grade terminal inventory listing or independently checkable accumulator","claim-grade BZ schedule acceptance","claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"'
   if [[ "$path_provenance" == "component_reachability_only" &&
         "$atom_path_length" == "0" ]]; then
     blocker="SOURCE_DEAD_CERT_TARGET_NOT_REACHED"
+    per_port_expansion_status="not_applicable"
     missing_for_cert='"positive target reachability to canonical Tsuchimura endpoint","coordinate Gaussian-prime source_path from origin prefix to canonical endpoint","claim-grade verifier binding the coordinate path to terminal inventory and BZ schedule"'
   fi
 
   cat > "$source_dead_gap" <<JSON
-{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"$blocker","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"$prefix_manifest_digest"},"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"$prefix_witness_digest"},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"}$chunk_ledger_artifact_json$bridge_artifact_json,"bz_evidence":{"status":"$bz_status","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"$bz_digest_algorithm","schedule_digest_hex":"$bz_digest_hex"},"bz_schedule_obligation":{"required_status":"claim_grade_bz_schedule","observed_status":"$bz_status","observed_schedule_digest_algorithm":"$bz_digest_algorithm","observed_schedule_digest_hex":"$bz_digest_hex","accepted_for_schedule":true,"accepted_for_claim":false,"claim_grade_bz_accepted":false},"bridge_safety":{"seam_bridge_policy":"$seam_bridge_policy","source_coordinate_carry_atoms_with_next_band_candidates":$source_with_next_candidates,"source_bridged_coordinate_carry_atoms":$source_bridged,"source_unbridged_coordinate_carry_atoms":$source_unbridged,"source_unbridged_without_next_band_candidates":$source_unbridged_without,"source_unbridged_with_next_band_candidates":$source_unbridged_with,"source_unbridged_dead_end_candidate_atoms":$source_dead_end,"source_unbridged_unsafe_candidate_atoms":$source_unsafe,"source_bridge_rejected_candidate_atoms":$source_bridge_rejected},"target_path_provenance":"$path_provenance","target_atom_path_length":$atom_path_length,"target_atom_path":$atom_path,"coordinate_path_obligation":{"required_provenance":"coordinate_gaussian_prime_path","observed_provenance":"$path_provenance","observed_coordinate_atom_count":$coordinate_atom_count,"observed_port_atom_count":$port_atom_count,"origin_prefix_witness_artifact":"k26-prefix-witness.txt","origin_prefix_witness_target_atom_id":${prefix_atom_id:-null},"origin_prefix_witness_accepted":$prefix_accepted_json,"origin_prefix_witness_path_available":$target_prefix_path_available_json,"origin_prefix_witness_path_target_atom_id":$target_prefix_path_atom_id_json,"origin_prefix_witness_path_points":$target_prefix_path_points,"origin_prefix_witness_seed_norm_sq":$target_prefix_path_seed_norm_sq,"origin_prefix_witness_path_target_norm_sq":$target_prefix_path_target_norm_sq,"per_port_coordinate_expansion":"missing","claim_grade_path_accepted":false},"target_bridge_obligation":{"endpoint_atom_id":1615075207964004,"observed_target_seen":$target_seen_json,"observed_target_source_reached":$target_source_reached_json,"observed_target_port_atoms":$target_port_atoms,"observed_target_bridge_edges":$target_bridge_edges,"endpoint_bridge_accepted":$target_source_reached_json},"terminal_source_inventory_summary":{"count":$inventory_count,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"$inventory_digest","max_norm_sq":$max_norm,"max_norm_atom_ids":$max_ties},"terminal_source_inventory_accumulator":$terminal_accumulator_json,"terminal_inventory_obligation":{"required_mode":"claim_grade_terminal_inventory","observed_mode":"summary_digest_only_non_claim","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"observed_count":$inventory_count,"observed_digest_algorithm":"sha256:lb_source_inventory_v1","observed_digest_hex":"$inventory_digest","observed_max_norm_sq":$max_norm},"missing_for_source_dead_cert":[$missing_for_cert]}
+{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"$blocker","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"$prefix_manifest_digest"},"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"$prefix_witness_digest"},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"}$chunk_ledger_artifact_json$bridge_artifact_json,"bz_evidence":{"status":"$bz_status","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"$bz_digest_algorithm","schedule_digest_hex":"$bz_digest_hex"},"bz_schedule_obligation":{"required_status":"claim_grade_bz_schedule","observed_status":"$bz_status","observed_schedule_digest_algorithm":"$bz_digest_algorithm","observed_schedule_digest_hex":"$bz_digest_hex","accepted_for_schedule":true,"accepted_for_claim":false,"claim_grade_bz_accepted":false},"bridge_safety":{"seam_bridge_policy":"$seam_bridge_policy","source_coordinate_carry_atoms_with_next_band_candidates":$source_with_next_candidates,"source_bridged_coordinate_carry_atoms":$source_bridged,"source_unbridged_coordinate_carry_atoms":$source_unbridged,"source_unbridged_without_next_band_candidates":$source_unbridged_without,"source_unbridged_with_next_band_candidates":$source_unbridged_with,"source_unbridged_dead_end_candidate_atoms":$source_dead_end,"source_unbridged_unsafe_candidate_atoms":$source_unsafe,"source_bridge_rejected_candidate_atoms":$source_bridge_rejected},"target_path_provenance":"$path_provenance","target_atom_path_length":$atom_path_length,"target_atom_path":$atom_path,"coordinate_path_obligation":{"required_provenance":"coordinate_gaussian_prime_path","observed_provenance":"$path_provenance","observed_coordinate_atom_count":$coordinate_atom_count,"observed_port_atom_count":$port_atom_count,"origin_prefix_witness_artifact":"k26-prefix-witness.txt","origin_prefix_witness_target_atom_id":${prefix_atom_id:-null},"origin_prefix_witness_accepted":$prefix_accepted_json,"origin_prefix_witness_path_available":$target_prefix_path_available_json,"origin_prefix_witness_path_target_atom_id":$target_prefix_path_atom_id_json,"origin_prefix_witness_path_points":$target_prefix_path_points,"origin_prefix_witness_seed_norm_sq":$target_prefix_path_seed_norm_sq,"origin_prefix_witness_path_target_norm_sq":$target_prefix_path_target_norm_sq,"per_port_coordinate_expansion":"$per_port_expansion_status","per_port_coordinate_expansion_required_edges":$target_port_expansion_required_edges,"per_port_coordinate_expansion_available_edges":$target_port_expansion_available_edges,"per_port_coordinate_expansion_path_points_total":$target_port_expansion_path_points_total,"claim_grade_path_accepted":false},"target_bridge_obligation":{"endpoint_atom_id":1615075207964004,"observed_target_seen":$target_seen_json,"observed_target_source_reached":$target_source_reached_json,"observed_target_port_atoms":$target_port_atoms,"observed_target_bridge_edges":$target_bridge_edges,"endpoint_bridge_accepted":$target_source_reached_json},"terminal_source_inventory_summary":{"count":$inventory_count,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"$inventory_digest","max_norm_sq":$max_norm,"max_norm_atom_ids":$max_ties},"terminal_source_inventory_accumulator":$terminal_accumulator_json,"terminal_inventory_obligation":{"required_mode":"claim_grade_terminal_inventory","observed_mode":"summary_digest_only_non_claim","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"observed_count":$inventory_count,"observed_digest_algorithm":"sha256:lb_source_inventory_v1","observed_digest_hex":"$inventory_digest","observed_max_norm_sq":$max_norm},"missing_for_source_dead_cert":[$missing_for_cert]}
 JSON
 }
 

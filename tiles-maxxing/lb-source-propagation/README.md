@@ -384,11 +384,15 @@ schedule-only, non-claim evidence. `bz_schedule_obligation` makes that BZ
 status explicit: accepted for this schedule, not accepted for a source claim
 until a claim-grade BZ gate exists. When the mixed target atom chain is present,
 `coordinate_path_obligation` also binds its first coordinate atom to a target
-row in `k26-prefix-witness.txt`; the remaining path blocker is the missing
-coordinate expansion of TileOp-port edges. The TileOp-port continuation also
-reports a compact `prefix_witness_path` summary for that first coordinate atom,
-so the gap checker can verify that the origin-to-row-0 prefix segment is backed
-by a valid coordinate source path before the mixed TileOp-port step begins.
+row in `k26-prefix-witness.txt`. The TileOp-port continuation also reports a
+compact `prefix_witness_path` summary for that first coordinate atom and a
+`coordinate_port_expansions` summary for every coordinate/port edge in the
+mixed target atom chain. Those expansions are reconstructed from the exact
+per-tile Gaussian-prime graph after the TileOp byte check passes, so the gap
+checker can verify that the origin-to-row-0 prefix segment and the local
+TileOp-port segments are backed by coordinate-path evidence. This remains
+non-claim until a claim-grade verifier binds the full coordinate path,
+terminal inventory, and BZ schedule into one certificate.
 `target_bridge_obligation` mirrors the continuation target bridge, so the gap
 also records whether the canonical endpoint was seen, bridged to TileOp ports,
 and source-reached.

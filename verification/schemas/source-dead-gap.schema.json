@@ -218,6 +218,9 @@
         "origin_prefix_witness_seed_norm_sq",
         "origin_prefix_witness_path_target_norm_sq",
         "per_port_coordinate_expansion",
+        "per_port_coordinate_expansion_required_edges",
+        "per_port_coordinate_expansion_available_edges",
+        "per_port_coordinate_expansion_path_points_total",
         "claim_grade_path_accepted"
       ],
       "properties": {
@@ -265,7 +268,21 @@
           "type": "integer",
           "minimum": 0
         },
-        "per_port_coordinate_expansion": { "const": "missing" },
+        "per_port_coordinate_expansion": {
+          "enum": ["available_summary_non_claim", "not_applicable"]
+        },
+        "per_port_coordinate_expansion_required_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "per_port_coordinate_expansion_available_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "per_port_coordinate_expansion_path_points_total": {
+          "type": "integer",
+          "minimum": 0
+        },
         "claim_grade_path_accepted": { "const": false }
       }
     },
@@ -469,6 +486,21 @@
               "origin_prefix_witness_path_target_norm_sq": {
                 "type": "integer",
                 "minimum": 1
+              },
+              "per_port_coordinate_expansion": {
+                "const": "available_summary_non_claim"
+              },
+              "per_port_coordinate_expansion_required_edges": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "per_port_coordinate_expansion_available_edges": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "per_port_coordinate_expansion_path_points_total": {
+                "type": "integer",
+                "minimum": 1
               }
             }
           },
@@ -513,7 +545,11 @@
               "origin_prefix_witness_path_target_atom_id": { "type": "null" },
               "origin_prefix_witness_path_points": { "const": 0 },
               "origin_prefix_witness_seed_norm_sq": { "const": 0 },
-              "origin_prefix_witness_path_target_norm_sq": { "const": 0 }
+              "origin_prefix_witness_path_target_norm_sq": { "const": 0 },
+              "per_port_coordinate_expansion": { "const": "not_applicable" },
+              "per_port_coordinate_expansion_required_edges": { "const": 0 },
+              "per_port_coordinate_expansion_available_edges": { "const": 0 },
+              "per_port_coordinate_expansion_path_points_total": { "const": 0 }
             }
           },
           "terminal_source_inventory_summary": {

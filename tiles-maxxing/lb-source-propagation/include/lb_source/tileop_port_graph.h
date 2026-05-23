@@ -43,6 +43,14 @@ struct CoordinatePortBridgeInput {
 
 struct CoordinatePortBridgeResult {
   std::vector<AtomId> port_atoms;
+  struct PortExpansion {
+    AtomId port_atom = 0;
+    std::uint8_t face = 0;
+    std::uint8_t ordinal = 0;
+    std::uint8_t tileop_label = 0;
+    std::vector<CoordinateAtom> path;
+  };
+  std::vector<PortExpansion> port_expansions;
   std::uint8_t tileop_label = 0;
   std::string diagnostic;
 

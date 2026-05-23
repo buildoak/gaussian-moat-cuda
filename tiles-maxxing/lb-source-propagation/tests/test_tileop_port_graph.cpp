@@ -242,6 +242,8 @@ void test_coordinate_bridge_matches_real_tileop_ports() {
   const std::optional<BridgeFixture> fixture = first_bridgeable_real_tileop();
   CHECK_TRUE(fixture.has_value());
   CHECK_TRUE(!fixture->bridge.port_atoms.empty());
+  CHECK_EQ(fixture->bridge.port_expansions.size(),
+           fixture->bridge.port_atoms.size());
   CHECK_TRUE(fixture->bridge.tileop_label != 0);
   CHECK_EQ(fixture->bridge.port_atoms,
            encoded_ports_for_label(fixture->tile_coord, fixture->op,
@@ -252,6 +254,25 @@ void test_coordinate_bridge_matches_real_tileop_ports() {
     CHECK_TRUE(decoded.has_value());
     CHECK_EQ(decoded->tile_i, fixture->tile_coord.i);
     CHECK_EQ(decoded->tile_j, fixture->tile_coord.j);
+  }
+  for (const auto& expansion : fixture->bridge.port_expansions) {
+    CHECK_TRUE(std::find(fixture->bridge.port_atoms.begin(),
+                         fixture->bridge.port_atoms.end(),
+                         expansion.port_atom) !=
+               fixture->bridge.port_atoms.end());
+    CHECK_TRUE(!expansion.path.empty());
+    CHECK_EQ(expansion.path.front().a, fixture->prime.a);
+    CHECK_EQ(expansion.path.front().b, fixture->prime.b);
+    CHECK_EQ(expansion.path.front().norm_sq, fixture->prime.norm_sq);
+    CHECK_EQ(expansion.tileop_label, fixture->bridge.tileop_label);
+    for (std::size_t i = 1; i < expansion.path.size(); ++i) {
+      const __int128 da = static_cast<__int128>(expansion.path[i].a) -
+                          expansion.path[i - 1].a;
+      const __int128 db = static_cast<__int128>(expansion.path[i].b) -
+                          expansion.path[i - 1].b;
+      CHECK_TRUE(da * da + db * db <=
+                 static_cast<__int128>(campaign::k_sq_value));
+    }
   }
 }
 

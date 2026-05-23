@@ -626,7 +626,7 @@ require_grep '"bridge_safety":.*"source_unbridged_unsafe_candidate_atoms":0' "$g
   "K26 source-dead gap unsafe bridge stop condition"
 require_grep '"target_path_provenance":"mixed_coordinate_port_atom_chain_non_claim"' "$gap" \
   "K26 source-dead gap target path provenance"
-require_grep '"coordinate_path_obligation":.*"required_provenance":"coordinate_gaussian_prime_path".*"observed_provenance":"mixed_coordinate_port_atom_chain_non_claim".*"per_port_coordinate_expansion":"missing".*"claim_grade_path_accepted":false' "$gap" \
+require_grep '"coordinate_path_obligation":.*"required_provenance":"coordinate_gaussian_prime_path".*"observed_provenance":"mixed_coordinate_port_atom_chain_non_claim".*"per_port_coordinate_expansion":"available_summary_non_claim".*"per_port_coordinate_expansion_required_edges":[1-9][0-9]*.*"per_port_coordinate_expansion_available_edges":[1-9][0-9]*.*"per_port_coordinate_expansion_path_points_total":[1-9][0-9]*.*"claim_grade_path_accepted":false' "$gap" \
   "K26 source-dead gap coordinate path obligation"
 require_grep '"coordinate_path_obligation":.*"origin_prefix_witness_artifact":"k26-prefix-witness.txt".*"origin_prefix_witness_target_atom_id":[0-9]+.*"origin_prefix_witness_accepted":true' "$gap" \
   "K26 source-dead gap origin-prefix witness obligation"
@@ -771,6 +771,21 @@ require_equal "${atom_path_counts%% *}" "$gap_coordinate_atom_count" \
   "K26 gap coordinate path coordinate atom count"
 require_equal "${atom_path_counts##* }" "$gap_port_atom_count" \
   "K26 gap coordinate path port atom count"
+gap_per_port_required="$(
+  require_json_number_value "$gap" per_port_coordinate_expansion_required_edges
+)"
+gap_per_port_available="$(
+  require_json_number_value "$gap" per_port_coordinate_expansion_available_edges
+)"
+gap_per_port_points="$(
+  require_json_number_value "$gap" per_port_coordinate_expansion_path_points_total
+)"
+if [[ "$gap_per_port_required" == "0" ||
+      "$gap_per_port_required" != "$gap_per_port_available" ||
+      "$gap_per_port_points" -lt "$gap_per_port_available" ]]; then
+  echo "K26_FULL_RUN_BUNDLE_REJECT: per-port coordinate expansion binding is incomplete" >&2
+  exit 1
+fi
 gap_prefix_atom_id="$(
   require_json_number_value "$gap" origin_prefix_witness_target_atom_id
 )"

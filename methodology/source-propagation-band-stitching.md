@@ -169,6 +169,17 @@ diagnostic evidence unless a verifier-accepted seam lemma binds the coordinate
 carry atoms, TileOp-port components, dead-end classification, terminal
 inventory, and BZ schedule into one certificate contract.
 
+When a coordinate carry atom is bridged to a TileOp port, the diagnostic runner
+must also be able to reconstruct a local Gaussian-prime path from the coordinate
+side of the bridge to a representative prime of that port component. This
+reconstruction is not allowed to change TileOp bytes or labels; it is a
+post-encoding witness built from the same sorted tile primes after the emitted
+TileOp is checked byte-for-byte against the local rebuild. The witness upgrades
+the mixed coordinate/port atom chain from "unexpanded port edge" to
+"locally expanded non-claim evidence", while still leaving the final
+`SOURCE_DEAD_CERT` blocked until the full coordinate path, terminal inventory,
+and BZ schedule are verified together.
+
 ## Lemma 1: Local TileOp Equivalence
 
 For a fixed band, the existing TileOp construction and port stitching represent
