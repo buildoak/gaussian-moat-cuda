@@ -8,6 +8,7 @@ Usage:
                              [--chunk-bands N]
                              [--timeout-seconds N]
                              [--max-runtime-seconds N]
+                             [--tileop-threads N]
 
 Run a bounded, non-claim sqrt(26) source/origin timing probe on a remote host.
 This performs no Vast API actions. It builds the LB source-propagation sidecar
@@ -26,6 +27,7 @@ Defaults:
   --chunk-bands         8
   --timeout-seconds     1200
   --max-runtime-seconds 14000
+  --tileop-threads      0 (source_tileop_port_runner hardware auto)
 USAGE
 }
 
@@ -35,6 +37,7 @@ out_dir="/workspace/lb-source-k26-timing-probe"
 chunk_bands="8"
 timeout_seconds="1200"
 max_runtime_seconds="14000"
+tileop_threads="0"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -60,6 +63,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --max-runtime-seconds)
       max_runtime_seconds="$2"
+      shift 2
+      ;;
+    --tileop-threads)
+      tileop_threads="$2"
       shift 2
       ;;
     -h|--help)
@@ -96,6 +103,7 @@ require_positive_integer() {
 require_positive_integer "$chunk_bands" "--chunk-bands"
 require_nonnegative_integer "$timeout_seconds" "--timeout-seconds"
 require_nonnegative_integer "$max_runtime_seconds" "--max-runtime-seconds"
+require_nonnegative_integer "$tileop_threads" "--tileop-threads"
 
 sidecar_dir="$repo_dir/tiles-maxxing/lb-source-propagation"
 if [[ ! -f "$sidecar_dir/CMakeLists.txt" ]]; then
@@ -115,6 +123,7 @@ mkdir -p "$out_dir"
   echo "chunk_bands=$chunk_bands"
   echo "timeout_seconds=$timeout_seconds"
   echo "max_runtime_seconds=$max_runtime_seconds"
+  echo "tileop_threads=$tileop_threads"
   if command -v nvidia-smi >/dev/null 2>&1; then
     echo "nvidia_smi_begin"
     nvidia-smi || true
@@ -137,6 +146,7 @@ set +e
   --resume-existing \
   --timeout-seconds "$timeout_seconds" \
   --max-runtime-seconds "$max_runtime_seconds" \
+  --tileop-threads "$tileop_threads" \
   > "$out_dir/k26-bundle-harness.log" \
   2> "$out_dir/k26-bundle-harness.err"
 harness_status="$?"

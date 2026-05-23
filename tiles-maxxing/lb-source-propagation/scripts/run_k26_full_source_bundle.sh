@@ -8,6 +8,7 @@ Usage:
                                 [--max-atoms N]
                                 [--timeout-seconds N]
                                 [--max-runtime-seconds N]
+                                [--tileop-threads N]
                                 [--continuation-chunk-bands N]
                                 [--resume-existing]
                                 [--cert-in PATH]
@@ -50,6 +51,7 @@ out_dir=""
 max_atoms="50000000"
 timeout_seconds="0"
 max_runtime_seconds="0"
+tileop_threads="0"
 continuation_chunk_bands="0"
 resume_existing="0"
 cert_in=""
@@ -76,6 +78,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --max-runtime-seconds)
       max_runtime_seconds="$2"
+      shift 2
+      ;;
+    --tileop-threads)
+      tileop_threads="$2"
       shift 2
       ;;
     --continuation-chunk-bands)
@@ -145,6 +151,10 @@ if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
 fi
 if [[ ! "$max_runtime_seconds" =~ ^[0-9]+$ ]]; then
   echo "--max-runtime-seconds must be a nonnegative integer" >&2
+  exit 2
+fi
+if [[ ! "$tileop_threads" =~ ^[0-9]+$ ]]; then
+  echo "--tileop-threads must be a nonnegative integer" >&2
   exit 2
 fi
 if [[ ! "$continuation_chunk_bands" =~ ^[0-9]+$ ]]; then
@@ -237,6 +247,7 @@ write_status() {
     echo "max_atoms=$max_atoms"
     echo "timeout_seconds=$timeout_seconds"
     echo "max_runtime_seconds=$max_runtime_seconds"
+    echo "tileop_threads=$tileop_threads"
     echo "elapsed_seconds=$((SECONDS - run_start_seconds))"
     echo "continuation_chunk_bands=$continuation_chunk_bands"
     echo "resume_existing=$resume_existing"
@@ -567,6 +578,7 @@ run_k26_continuation() {
         --band-width 8192 \
         --schedule-radii "$schedule_csv" \
         --max-atoms "$max_atoms" \
+        --tileop-threads "$tileop_threads" \
         --target-a 376039 \
         --target-b 943460 \
         --manifest-in "$out_dir/k26-prefix-manifest.txt" \
@@ -637,6 +649,7 @@ run_k26_continuation() {
         --band-width 8192
         --schedule-radii "$chunk_csv"
         --max-atoms "$max_atoms"
+        --tileop-threads "$tileop_threads"
         --target-a 376039
         --target-b 943460
         --manifest-in "$manifest_in"

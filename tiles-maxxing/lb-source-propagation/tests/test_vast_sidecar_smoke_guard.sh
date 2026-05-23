@@ -83,11 +83,14 @@ PATH="$tmp/bin:$PATH" "$guard" \
   --max-dph 0.37 \
   --max-budget 1.50 \
   --k-sq 26 \
+  --k26-tileop-threads 6 \
   > "$tmp/dry-run-k26-timing.log"
 grep -q 'QUALIFYING_OFFER id=12345 host_id=777 dph=0.29' \
   "$tmp/dry-run-k26-timing.log"
 grep -q 'REMOTE_K26_TIMING_PROBE:' "$tmp/dry-run-k26-timing.log"
 grep -q -- '--run-k26-timing-probe' "$tmp/dry-run-k26-timing.log"
+grep -q -- '--tileop-threads 6' "$tmp/dry-run-k26-timing.log"
+grep -q -- '--k26-tileop-threads 6' "$tmp/dry-run-k26-timing.log"
 grep -q 'DRY_RUN_ONLY' "$tmp/dry-run-k26-timing.log"
 if grep -q '^create instance ' "$VAST_MOCK_LOG"; then
   echo "K26 timing dry-run unexpectedly created a Vast instance" >&2

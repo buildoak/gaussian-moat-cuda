@@ -186,10 +186,13 @@ byte-identical final carry manifests, with `source_carry_atoms=2337` and
 build loop with standard C++ worker threads, while preserving output order and
 reporting
 `tileop_worker_threads`; `--tileop-threads N` can pin the count, while
-`--tileop-threads 0` uses hardware auto. This is a sidecar execution
-optimization and does not change production TileOp semantics. Neither progress
-artifact nor live-source continuation evidence relaxes the `SOURCE_DEAD_CERT`
-gate.
+`--tileop-threads 0` uses hardware auto. The K26 bundle harness and remote
+timing probe now pass this option through to `source_tileop_port_runner`, so a
+future paid timing probe can test fractional-CPU Vast hosts with a pinned
+worker count instead of using every visible hardware thread. This is a sidecar
+execution optimization and does not change production TileOp semantics.
+Neither progress artifact nor live-source continuation evidence relaxes the
+`SOURCE_DEAD_CERT` gate.
 The bundle harness exposes the same resumability with
 `--continuation-chunk-bands N`: it splits the repaired continuation schedule
 into bounded chunks, uses the origin-prefix coordinate manifest only for the

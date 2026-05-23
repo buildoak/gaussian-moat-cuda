@@ -296,7 +296,8 @@ tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh \
   --out-dir /workspace/lb-source-k26-timing-probe \
   --chunk-bands 8 \
   --timeout-seconds 1200 \
-  --max-runtime-seconds 14000
+  --max-runtime-seconds 14000 \
+  --tileop-threads 0
 ```
 
 This builds the sidecar with `-DK_SQ=26`, runs the chunked K26 bundle harness,
@@ -337,6 +338,7 @@ tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
   --resume-existing \
   --timeout-seconds 1200 \
   --max-runtime-seconds 14000 \
+  --tileop-threads 0 \
   --source-dead-gap-checker /path/to/source_dead_gap_check
 ```
 
@@ -441,10 +443,12 @@ The TileOp build loop is parallelized only inside this sidecar runner with
 standard C++ worker threads, preserving the deterministic output order and
 reporting
 `tileop_worker_threads` in progress/final JSON. Use `--tileop-threads N` to pin
-the worker count, or `--tileop-threads 0` for hardware auto. This does not
-alter the underlying TileOp implementation or any existing campaign verdict
-semantics. Live-source continuation evidence is diagnostic runtime evidence,
-not a `SOURCE_ORIGIN_K26` claim.
+the worker count, or `--tileop-threads 0` for hardware auto. The bundle harness
+and remote timing probe pass this through, so fractional-CPU Vast hosts can be
+benchmarked with an explicit worker count instead of blindly using all visible
+hardware threads. This does not alter the underlying TileOp implementation or
+any existing campaign verdict semantics. Live-source continuation evidence is
+diagnostic runtime evidence, not a `SOURCE_ORIGIN_K26` claim.
 If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
 the hash manifest, and runs the full bundle checker with the supplied
 `--source-dead-checker`.

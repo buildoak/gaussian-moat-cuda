@@ -71,6 +71,11 @@ if [[ "$*" != *"--target-a 376039 --target-b 943460"* ]]; then
   echo "missing K26 target bridge flags" >&2
   exit 1
 fi
+if [[ -n "${EXPECT_TILEOP_THREADS:-}" &&
+      "$*" != *"--tileop-threads ${EXPECT_TILEOP_THREADS}"* ]]; then
+  echo "missing expected --tileop-threads ${EXPECT_TILEOP_THREADS}" >&2
+  exit 1
+fi
 progress=""
 manifest=""
 r_start="8192"
@@ -146,6 +151,18 @@ if "$harness" \
 fi
 grep -q -- '--max-runtime-seconds must be a nonnegative integer' \
   /tmp/k26-harness-bad-runtime.err
+
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$tmp/bad-tileop-threads" \
+    --tileop-threads nope \
+    >/tmp/k26-harness-bad-tileop-threads.out \
+    2>/tmp/k26-harness-bad-tileop-threads.err; then
+  echo "harness accepted nonnumeric TileOp thread count" >&2
+  exit 1
+fi
+grep -q -- '--tileop-threads must be a nonnegative integer' \
+  /tmp/k26-harness-bad-tileop-threads.err
 
 if "$harness" \
     --build-dir "$build_dir" \
@@ -415,6 +432,21 @@ if grep -q 'k26-source-dead-cert.json' \
   echo "blocked partial manifest unexpectedly included missing cert" >&2
   exit 1
 fi
+
+threaded_out="$tmp/threaded"
+if EXPECT_TILEOP_THREADS=6 "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$threaded_out" \
+    --tileop-threads 6 \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    >/tmp/k26-harness-threaded.out 2>/tmp/k26-harness-threaded.err; then
+  echo "harness accepted a thread-pinned run without k26-source-dead-cert.json" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING' \
+  "$threaded_out/status.txt"
+grep -q 'tileop_threads=6' "$threaded_out/status.txt"
+grep -q -- '--tileop-threads 6' "$threaded_out/run.log"
 
 chunked_out="$tmp/chunked"
 if "$harness" \

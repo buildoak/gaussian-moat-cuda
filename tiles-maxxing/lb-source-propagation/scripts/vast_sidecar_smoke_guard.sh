@@ -17,6 +17,7 @@ Usage:
                               [--stop-on-ssh-timeout]
                               [--run-remote-smoke]
                               [--run-k26-timing-probe]
+                              [--k26-tileop-threads N]
                               [--destroy-on-exit]
 
 Dry-run by default. Searches for a single RTX 4090 offer, enforces the price
@@ -62,6 +63,7 @@ ssh_poll_seconds="10"
 stop_on_ssh_timeout=0
 run_remote_smoke=0
 run_k26_timing_probe=0
+k26_tileop_threads="0"
 destroy_on_exit=0
 created_instance_id=""
 failure_ledger=""
@@ -143,6 +145,10 @@ while [[ $# -gt 0 ]]; do
       run_k26_timing_probe=1
       shift
       ;;
+    --k26-tileop-threads)
+      k26_tileop_threads="$2"
+      shift 2
+      ;;
     --destroy-on-exit)
       destroy_on_exit=1
       shift
@@ -198,6 +204,7 @@ require_nonnegative_integer "$ssh_poll_seconds" "--ssh-poll-seconds"
 require_nonnegative_integer "$offer_wait_seconds" "--offer-wait-seconds"
 require_nonnegative_integer "$offer_poll_seconds" "--offer-poll-seconds"
 require_nonnegative_integer "$max_create_attempts" "--max-create-attempts"
+require_nonnegative_integer "$k26_tileop_threads" "--k26-tileop-threads"
 for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
   require_nonnegative_integer "$id" "--exclude-offer-id"
 done
@@ -511,7 +518,7 @@ run_remote_k26_timing_probe_gate() {
 
   echo "RUNNING_REMOTE_K26_TIMING_PROBE id=${instance_id}"
   "${ssh_cmd[@]}" \
-    "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh --repo ${remote_dir} --out-dir /workspace/lb-source-k26-timing-probe"
+    "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh --repo ${remote_dir} --out-dir /workspace/lb-source-k26-timing-probe --tileop-threads ${k26_tileop_threads}"
 
   echo "PULLING_REMOTE_K26_TIMING_ARTIFACTS id=${instance_id}"
   "${ssh_cmd[@]}" "cd /workspace/lb-source-k26-timing-probe && tar -czf - ." |
@@ -696,6 +703,9 @@ print_offer_plan() {
     --ssh-poll-seconds "$ssh_poll_seconds")
   if [[ "$run_k26_timing_probe" -eq 1 ]]; then
     one_shot_cmd+=(--run-k26-timing-probe)
+    if [[ "$k26_tileop_threads" != "0" ]]; then
+      one_shot_cmd+=(--k26-tileop-threads "$k26_tileop_threads")
+    fi
   else
     one_shot_cmd+=(--run-remote-smoke)
   fi
@@ -735,7 +745,7 @@ EOF
   printf "deployed_local_head=%s\ndeployed_local_branch=%s\n" "\$LOCAL_HEAD" "\$LOCAL_BRANCH" | \$SSH_CMD "mkdir -p /workspace/lb-source-k26-timing-probe && cat > /workspace/lb-source-k26-timing-probe/deployed_source.txt"
 
 REMOTE_K26_TIMING_PROBE:
-  \$SSH_CMD "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh --repo ${remote_dir} --out-dir /workspace/lb-source-k26-timing-probe"
+  \$SSH_CMD "cd ${remote_dir} && tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh --repo ${remote_dir} --out-dir /workspace/lb-source-k26-timing-probe --tileop-threads ${k26_tileop_threads}"
 
 PULL:
   mkdir -p ${pull_dir}
