@@ -487,6 +487,15 @@ accepted full-run artifacts, terminal inventory provenance is claim-grade, the
 full-run K26 BZ digest is bound, and an accepted `SOURCE_DEAD_CERT` artifact
 exists.
 
+The Phase 1 sidecar carries explicit `component_inventory` vectors so tiny
+stitched-vs-big proofs and small terminal-death checks can compare exact atom
+sets. `--max-atoms` now also caps that accumulated inventory. If a continuation
+would exceed the cap, the runner rejects with `reject=overflow` and
+`reject_diagnostic="component inventory exceeds source cap"`. This is an
+intentional stop condition for K26: Tsuchimura-scale terminal inventory cannot
+be accepted as a flat in-memory list and still needs a streaming or
+accumulator-based claim-grade witness.
+
 `k26_execution_plan` emits the machine-checkable execution plan for the same
 target. It expands the conservative `R_final=1015645` guard into 124 radial
 rows at preferred width 8192, records the final row width 8029, binds the active

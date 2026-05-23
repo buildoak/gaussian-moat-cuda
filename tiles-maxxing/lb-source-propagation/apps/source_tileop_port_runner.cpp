@@ -189,6 +189,7 @@ void usage(const char* prog) {
       << "  --schedule-radii CSV  explicit increasing radial boundaries;\n"
       << "                        first must equal --r-start and last --r-final\n"
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
+      << "                        also caps accumulated component inventory\n"
       << "                        (default 1000000)\n"
       << "  --tileop-threads N    worker threads for sidecar TileOp build;\n"
       << "                        0 means hardware auto (default 0)\n"
@@ -1771,7 +1772,8 @@ int main(int argc, char** argv) {
           bridged_band, incoming,
           {.max_atoms = config.max_atoms,
            .max_carry_atoms = config.max_atoms,
-           .max_components = config.max_atoms});
+           .max_components = config.max_atoms,
+           .max_inventory_atoms = config.max_atoms});
       const auto source_process_done = std::chrono::steady_clock::now();
       emit_phase_progress(progress, "source_process", "end", segment,
                           previous_outer, outer,
@@ -1821,7 +1823,8 @@ int main(int argc, char** argv) {
           band, incoming,
           {.max_atoms = config.max_atoms,
            .max_carry_atoms = config.max_atoms,
-           .max_components = config.max_atoms});
+           .max_components = config.max_atoms,
+           .max_inventory_atoms = config.max_atoms});
       const auto source_process_done = std::chrono::steady_clock::now();
       emit_phase_progress(progress, "source_process", "end", segment,
                           previous_outer, outer,
@@ -1860,6 +1863,9 @@ int main(int argc, char** argv) {
                << ",\"accepted\":" << (segment_accepted ? "true" : "false")
                << ",\"reject\":\""
                << lb_source::reject_reason_name(last.reject) << "\""
+               << ",\"reject_diagnostic\":";
+      append_json_string(progress, last.diagnostic);
+      progress
                << ",\"terminal_source_dead\":"
                << (segment_accepted && last.terminal_source_dead ? "true"
                                                                  : "false")
@@ -2086,6 +2092,9 @@ int main(int argc, char** argv) {
             << ",\"accepted\":" << (accepted ? "true" : "false")
             << ",\"reject\":\"" << lb_source::reject_reason_name(last.reject)
             << "\""
+            << ",\"reject_diagnostic\":";
+  append_json_string(std::cout, last.diagnostic);
+  std::cout
             << ",\"terminal_source_dead\":"
             << (accepted && last.terminal_source_dead ? "true" : "false")
             << ",\"has_source_carry\":"

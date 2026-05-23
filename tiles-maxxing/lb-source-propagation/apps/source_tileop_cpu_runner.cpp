@@ -99,6 +99,7 @@ void usage(const char* prog) {
       << "  --endpoint-a A        endpoint real coordinate (default 0)\n"
       << "  --endpoint-b B        endpoint imaginary coordinate (default 251)\n"
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
+      << "                        also caps accumulated component inventory\n"
       << "                        (default 65535)\n"
       << "  --manifest-in PATH    read an incoming origin-prefix carry manifest\n"
       << "                        at --r-start instead of seeding one atom\n"
@@ -718,11 +719,12 @@ int main(int argc, char** argv) {
     }
     band.edges.assign(edges.begin(), edges.end());
 
-    last = lb_source::process_band(
-        band, incoming,
-        {.max_atoms = config.max_atoms,
-         .max_carry_atoms = config.max_atoms,
-         .max_components = config.max_atoms});
+      last = lb_source::process_band(
+          band, incoming,
+          {.max_atoms = config.max_atoms,
+           .max_carry_atoms = config.max_atoms,
+           .max_components = config.max_atoms,
+           .max_inventory_atoms = config.max_atoms});
     ++bands_processed;
     generated_atoms += new_points.size();
     if (!last.accepted()) {

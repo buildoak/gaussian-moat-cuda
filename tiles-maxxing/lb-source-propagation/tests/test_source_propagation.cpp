@@ -294,6 +294,32 @@ void test_process_band_canonicalizes_unsorted_incoming_inventory() {
            (std::vector<std::vector<AtomId>>{{1, 2, 3, 4}}));
 }
 
+void test_component_inventory_cap_rejects_before_unbounded_growth() {
+  SeparatorState incoming;
+  incoming.carry_atoms = {{2, 100}};
+  incoming.component_partition = {{2}};
+  incoming.source_bit_per_component = {true};
+  incoming.component_inventory = {{1, 2, 3}};
+
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{4, 400, false}},
+      .edges = {{2, 4}},
+  };
+  lb_source::ProcessOptions options;
+  options.max_atoms = 16;
+  options.max_carry_atoms = 16;
+  options.max_components = 16;
+  options.max_inventory_atoms = 3;
+
+  const ProcessResult result = lb_source::process_band(band, incoming,
+                                                       options);
+  CHECK_EQ(result.reject, RejectReason::kOverflow);
+  CHECK_EQ(result.diagnostic,
+           std::string("component inventory exceeds source cap"));
+}
+
 void test_overflow_reject_is_hard() {
   const BandInput band{
       .k_sq = 36,
@@ -675,6 +701,8 @@ int main() {
       test_non_source_payload_later_merge_is_in_terminal_inventory);
   run("process_band_canonicalizes_unsorted_incoming_inventory",
       test_process_band_canonicalizes_unsorted_incoming_inventory);
+  run("component_inventory_cap_rejects_before_unbounded_growth",
+      test_component_inventory_cap_rejects_before_unbounded_growth);
   run("overflow_reject_is_hard", test_overflow_reject_is_hard);
   run("k32_ceil_sqrt_carry_width_is_six",
       test_k32_ceil_sqrt_carry_width_is_six);

@@ -61,6 +61,7 @@ struct ProcessOptions {
   std::size_t max_atoms = 65535;
   std::size_t max_carry_atoms = 65535;
   std::size_t max_components = 65535;
+  std::size_t max_inventory_atoms = 65535;
 };
 
 enum class RejectReason {

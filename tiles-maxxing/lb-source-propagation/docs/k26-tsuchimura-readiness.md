@@ -453,6 +453,21 @@ projected `3403s`. This is local non-claim timing evidence only, but it
 reopens a capped one-band Vast timing probe as meaningful once an RTX 4090
 offer satisfies the `$0.37/hr` gate.
 
+The same audit also exposed the remaining terminal-inventory scale blocker.
+The current Phase 1 separator keeps explicit `component_inventory` vectors so
+small stitched-vs-big proofs and terminal-death checks can compare exact atom
+sets. That is not a claim-grade representation for Tsuchimura scale: the
+expected terminal source component has `14,542,615,005` members. The sidecar
+therefore now treats `--max-atoms` as a cap on accumulated component inventory
+as well as current band atoms, carry atoms, and components. If the explicit
+inventory exceeds the cap, `process_band` rejects with
+`reject=overflow` and `reject_diagnostic="component inventory exceeds source cap"`.
+A K26 first-continuation probe with an intentionally low `--max-atoms 2000000`
+confirmed the deterministic blocker on `8192 -> 16384`. This prevents a long
+run from exhausting memory silently, but it also means a full Tsuchimura-grade
+`SOURCE_DEAD_CERT` still needs a streaming or accumulator-based terminal
+inventory witness before the 14.5B-member comparison can be accepted.
+
 A guarded paid retry was attempted after this optimization at local head
 `6f94b31`, but no RTX 4090 offer satisfied the active `$0.37/hr` cap. The
 guard refused to rent; the nearest observed qualifying-market offer was about
@@ -517,5 +532,7 @@ Stop and report without claiming reproduction if:
 - coordinate-to-port seam bridging leaves source-connected unbridged carry
   atoms with legal next-band candidates;
 - BZ evidence is missing or mismatched for `K=26`;
-- terminal inventory cannot preserve retired source components;
+- terminal inventory cannot preserve retired source components; the current
+  explicit-inventory sidecar must stop with `component inventory exceeds source
+  cap` rather than attempting a Tsuchimura-scale flat inventory;
 - remote runtime or memory threatens the agreed budget.

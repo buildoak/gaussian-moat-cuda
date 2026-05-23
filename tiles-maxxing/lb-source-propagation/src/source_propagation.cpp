@@ -119,6 +119,18 @@ void merge_inventory_payload(std::vector<AtomId>& target,
   target = std::move(merged);
 }
 
+bool inventory_payload_exceeds_cap(
+    const std::map<std::size_t, std::vector<AtomId>>& inventory_by_root,
+    std::size_t cap) {
+  for (const auto& [root, inventory] : inventory_by_root) {
+    (void)root;
+    if (inventory.size() > cap) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool square_ge(std::uint64_t x, std::uint64_t n) {
   if (n == 0) {
     return true;
@@ -1033,6 +1045,11 @@ ProcessResult process_band(const BandInput& band,
     return reject(RejectReason::kOverflow,
                   "separator state exceeds source caps", carry_width);
   }
+  if (inventory_payload_exceeds_cap(inventory_by_root,
+                                    options.max_inventory_atoms)) {
+    return reject(RejectReason::kOverflow,
+                  "component inventory exceeds source cap", carry_width);
+  }
 
   const bool has_source_carry =
       std::find(result.outgoing.source_bit_per_component.begin(),
@@ -1043,6 +1060,13 @@ ProcessResult process_band(const BandInput& band,
     std::vector<AtomId> source_inventory;
     for (const auto& [root, inventory] : inventory_by_root) {
       if (root_is_source[root]) {
+        if (inventory.size() > options.max_inventory_atoms ||
+            source_inventory.size() >
+                options.max_inventory_atoms - inventory.size()) {
+          return reject(RejectReason::kOverflow,
+                        "terminal source inventory exceeds source cap",
+                        carry_width);
+        }
         source_inventory.insert(source_inventory.end(), inventory.begin(),
                                 inventory.end());
       }
