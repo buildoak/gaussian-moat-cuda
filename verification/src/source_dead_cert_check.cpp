@@ -686,6 +686,14 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   if (source_mode == "ORIGIN_SOURCE" && source_path.front().norm_sq > k_sq) {
     throw std::runtime_error("ORIGIN_SOURCE path does not start at Omega-neighbor");
   }
+  const unsigned __int128 terminal_radius_sq =
+      static_cast<unsigned __int128>(terminal_radius) * terminal_radius;
+  for (const Point& path_point : source_path) {
+    if (static_cast<unsigned __int128>(path_point.norm_sq) >
+        terminal_radius_sq) {
+      throw std::runtime_error("source_path point exceeds terminal radius");
+    }
+  }
   for (std::size_t i = 1; i < source_path.size(); ++i) {
     if (dist_sq_checked(source_path[i - 1], source_path[i]) > k_sq) {
       throw std::runtime_error("source_path step exceeds k_sq");
