@@ -464,6 +464,12 @@ No RTX 4090 offer satisfied the active `$0.37/hr` cap; the nearest observed
 qualifying-market offer was again about `$0.4000/hr`, `0.0300/hr` over cap.
 No Vast instance was created.
 
+After recording the 12-band local timing pass at local head `7996d30`, the
+guarded one-band Vast retry was attempted again with a 120-second offer wait.
+No RTX 4090 offer satisfied the active `$0.37/hr` cap; the nearest observed
+qualifying-market offer was about `$0.4000/hr`, `0.0300/hr` over cap. No Vast
+instance was created.
+
 After any partial continuation, run:
 
 ```bash
