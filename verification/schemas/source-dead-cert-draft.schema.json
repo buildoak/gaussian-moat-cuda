@@ -62,6 +62,18 @@
               "norm_sq": { "const": 1031522101121 }
             }
           },
+          "endpoint_atom_id": { "const": 1615075207964004 },
+          "source_path": {
+            "contains": {
+              "type": "object",
+              "required": ["a", "b", "norm_sq"],
+              "properties": {
+                "a": { "const": 376039 },
+                "b": { "const": 943460 },
+                "norm_sq": { "const": 1031522101121 }
+              }
+            }
+          },
           "metadata": {
             "properties": {
               "bz_status": {
@@ -114,7 +126,10 @@
         "commit_id": { "type": "string", "minLength": 1 },
         "build_id": { "type": "string", "minLength": 1 },
         "bz_status": { "type": "string", "minLength": 1 },
-        "artifact_hash": { "type": "string", "minLength": 1 }
+        "artifact_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
       }
     },
     "k_sq": { "type": "integer", "minimum": 1 },

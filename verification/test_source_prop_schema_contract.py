@@ -13,6 +13,9 @@ SCHEMA_PATH = VERIFICATION_ROOT / "schemas" / "source-prop-fixture.schema.json"
 DEAD_GAP_SCHEMA_PATH = (
     VERIFICATION_ROOT / "schemas" / "source-dead-gap.schema.json"
 )
+DEAD_CERT_SCHEMA_PATH = (
+    VERIFICATION_ROOT / "schemas" / "source-dead-cert-draft.schema.json"
+)
 FIXTURE_ROOT = VERIFICATION_ROOT / "fixtures" / "source_prop"
 BAND_COUNT_GUARD = "composed_band_count_guard"
 
@@ -170,6 +173,68 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             chunk_ledger["properties"]["sha256"]["pattern"],
             "^[0-9a-f]{64}$",
         )
+
+    def test_source_dead_cert_schema_pins_hash_shape_and_k26_endpoint(self) -> None:
+        schema = load_json(DEAD_CERT_SCHEMA_PATH)
+        self.assertEqual(
+            schema["properties"]["metadata"]["properties"]["artifact_hash"][
+                "pattern"
+            ],
+            "^sha256:[0-9a-f]{64}$",
+        )
+
+        k26_rules = [
+            rule["then"]
+            for rule in schema["allOf"]
+            if rule.get("if", {})
+            .get("properties", {})
+            .get("metadata", {})
+            .get("properties", {})
+            .get("geometry_id", {})
+            .get("const")
+            == "SOURCE_ORIGIN_K26"
+        ]
+        self.assertEqual(len(k26_rules), 1)
+        k26_rule = k26_rules[0]["properties"]
+        self.assertEqual(k26_rule["k_sq"]["const"], 26)
+        self.assertEqual(k26_rule["terminal_radius"]["const"], 1015645)
+        self.assertEqual(k26_rule["endpoint"]["properties"]["a"]["const"], 376039)
+        self.assertEqual(k26_rule["endpoint"]["properties"]["b"]["const"], 943460)
+        self.assertEqual(
+            k26_rule["endpoint"]["properties"]["norm_sq"]["const"],
+            1031522101121,
+        )
+        self.assertEqual(k26_rule["endpoint_atom_id"]["const"], 1615075207964004)
+
+        source_path_target = k26_rule["source_path"]["contains"]["properties"]
+        self.assertEqual(source_path_target["a"]["const"], 376039)
+        self.assertEqual(source_path_target["b"]["const"], 943460)
+        self.assertEqual(source_path_target["norm_sq"]["const"], 1031522101121)
+
+    def test_source_dead_cert_schema_keeps_summary_only_non_claim_conditional(
+        self,
+    ) -> None:
+        schema = load_json(DEAD_CERT_SCHEMA_PATH)
+        summary_rules = [
+            rule
+            for rule in schema["allOf"]
+            if rule.get("if", {})
+            .get("properties", {})
+            .get("terminal_source_inventory_mode", {})
+            .get("const")
+            == "summary_only_non_claim"
+        ]
+        self.assertEqual(len(summary_rules), 1)
+        summary_rule = summary_rules[0]
+        self.assertEqual(
+            summary_rule["then"]["properties"]["proof_status"]["const"],
+            "SUMMARY_ONLY_NON_CLAIM",
+        )
+        self.assertIn(
+            "terminal_source_inventory",
+            summary_rule["then"]["not"]["required"],
+        )
+        self.assertIn("terminal_source_inventory", summary_rule["else"]["required"])
 
 
 if __name__ == "__main__":
