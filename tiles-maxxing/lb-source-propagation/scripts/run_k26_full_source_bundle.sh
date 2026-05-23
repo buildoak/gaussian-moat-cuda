@@ -237,6 +237,32 @@ record_runtime_budget_for_run() {
   esac
 }
 
+runtime_budget_status() {
+  if [[ ! -f "$out_dir/k26-runtime-budget-check.log" ]]; then
+    return
+  fi
+  sed -nE 's/.*"status":"([^"]+)".*/\1/p' \
+    "$out_dir/k26-runtime-budget-check.log" | head -n 1
+}
+
+enforce_chunk_runtime_budget() {
+  local chunk_id="$1"
+  if [[ "$max_runtime_seconds" == "0" ]]; then
+    return
+  fi
+  record_runtime_budget_diagnostic \
+    "K26_CONTINUATION_CHUNK_${chunk_id}_CUMULATIVE" \
+    "$out_dir/k26-continuation-progress.jsonl"
+  case "$(runtime_budget_status)" in
+    K26_RUNTIME_BUDGET_REJECT)
+      write_status \
+        "K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_${chunk_id}_RUNTIME_BUDGET_REJECT"
+      echo "K26 continuation chunk ${chunk_id} completed, but cumulative runtime-budget projection now rejects the paid-run cap" >&2
+      exit 3
+      ;;
+  esac
+}
+
 write_status() {
   local status="$1"
   {
@@ -693,6 +719,7 @@ run_k26_continuation() {
       "$chunk_csv" "$final_chunk" "$chunk_input_manifest" \
       "$chunk_output_manifest" "$chunk_json" "$chunk_progress" \
       "$terminal_dead" "$has_live_source" "$source_carry_atoms"
+    enforce_chunk_runtime_budget "$chunk_id"
 
     chunk_start="$chunk_end"
     chunk_index=$((chunk_index + 1))

@@ -439,6 +439,9 @@ completed-band count, effective/cumulative/tail projections, margin, last
 completed radius, progress artifact, and checker exit code into `status.txt`
 when available. This makes a paid stop/retry decision reproducible without
 treating runtime evidence as source/origin proof.
+For chunked continuation, the harness also checks the cumulative appended
+progress after every completed chunk and stops before launching the next chunk
+when the runtime-budget projection rejects the cap.
 The TileOp build loop is parallelized only inside this sidecar runner with
 standard C++ worker threads, preserving the deterministic output order and
 reporting

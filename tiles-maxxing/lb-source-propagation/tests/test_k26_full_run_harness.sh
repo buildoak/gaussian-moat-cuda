@@ -269,6 +269,62 @@ grep -q 'max_runtime_seconds=2' "$runtime_limit_out/status.txt"
 grep -Eq 'K26_CONTINUATION (exceeded K26 bundle max runtime|not started because max runtime) 2s' \
   /tmp/k26-harness-runtime-limit.err
 
+chunk_budget_build="$tmp/chunk-budget-build"
+cp -R "$build_dir" "$chunk_budget_build"
+cat > "$chunk_budget_build/source_tileop_port_runner" <<'SH'
+#!/usr/bin/env bash
+progress=""
+manifest=""
+r_start="8192"
+r_final="1015645"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --r-start)
+      r_start="$2"; shift 2 ;;
+    --r-final)
+      r_final="$2"; shift 2 ;;
+    --manifest-out)
+      manifest="$2"; shift 2 ;;
+    --progress-out)
+      progress="$2"; shift 2 ;;
+    *)
+      shift ;;
+  esac
+done
+[[ -n "$progress" ]] && printf '{"schema":"lb_source_tileop_port_progress_v1","accepted":true,"band_index":0,"r_start":%s,"r_outer":%s,"total_ms":200000,"has_source_carry":true,"terminal_source_dead":false}\n' "$r_start" "$r_final" > "$progress"
+[[ -n "$manifest" ]] && echo "slow-port-manifest-${r_final}" > "$manifest"
+cat <<JSON
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":${r_start},"r_final":${r_final},"schedule_mode":"explicit_radii","schedule_boundary_count":3,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"source_unbridged_unsafe_candidate_atoms":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1],"manifest_written":true}
+JSON
+SH
+chmod +x "$chunk_budget_build/source_tileop_port_runner"
+chunk_budget_out="$tmp/chunk-budget-out"
+if "$harness" \
+    --build-dir "$chunk_budget_build" \
+    --out-dir "$chunk_budget_out" \
+    --continuation-chunk-bands 2 \
+    --max-runtime-seconds 14000 \
+    >/tmp/k26-harness-chunk-budget.out \
+    2>/tmp/k26-harness-chunk-budget.err; then
+  echo "harness accepted an over-budget completed continuation chunk" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_000_RUNTIME_BUDGET_REJECT' \
+  "$chunk_budget_out/status.txt"
+grep -q 'runtime_budget_check_status=K26_RUNTIME_BUDGET_REJECT' \
+  "$chunk_budget_out/status.txt"
+grep -q 'runtime_budget_label=K26_CONTINUATION_CHUNK_000_CUMULATIVE' \
+  "$chunk_budget_out/status.txt"
+grep -q 'runtime_budget_projected_total_seconds=24600' \
+  "$chunk_budget_out/status.txt"
+grep -q 'runtime_budget_tail_projected_total_seconds=24600' \
+  "$chunk_budget_out/status.txt"
+grep -q '"chunk_id":"000"' "$chunk_budget_out/k26-continuation-chunks.jsonl"
+if grep -q 'K26_CONTINUATION_CHUNK_001' "$chunk_budget_out/run.log"; then
+  echo "harness started chunk 001 after chunk 000 budget reject" >&2
+  exit 1
+fi
+
 live_build="$tmp/live-build"
 cp -R "$build_dir" "$live_build"
 cat > "$live_build/source_tileop_port_runner" <<'SH'

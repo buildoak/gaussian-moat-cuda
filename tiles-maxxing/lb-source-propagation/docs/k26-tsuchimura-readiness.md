@@ -431,6 +431,11 @@ tail window, margin, last completed radius, progress artifact, and exit code
 into `status.txt` when those fields exist. A paid attempt should therefore
 leave enough runtime evidence to decide whether to resume, reduce chunk size,
 or stop under the `$1.50` cap without weakening the `SOURCE_DEAD_CERT` gate.
+For chunked continuation, the harness now enforces the same checker after each
+completed chunk against the cumulative appended progress. If the projection is
+already over budget, it stops with
+`K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_<id>_RUNTIME_BUDGET_REJECT`
+before launching the next chunk.
 
 ## Stop Conditions
 
