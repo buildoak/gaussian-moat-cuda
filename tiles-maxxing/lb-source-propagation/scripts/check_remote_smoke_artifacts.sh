@@ -269,6 +269,8 @@ require_grep '"execution_protocol":.*"chunk_ledger":"k26-continuation-chunks.jso
   "$out_dir/k26_source_run_profile.json" "K26 run profile chunk ledger contract"
 require_grep '"execution_protocol":.*"source_dead_gap_checker":"source_dead_gap_check".*"source_dead_checker":"source_dead_cert_check"' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile checked-bundle verifiers"
+require_grep '"execution_protocol":.*"recommended_max_runtime_seconds":14000' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile runtime budget guard"
 require_grep 'full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile runner gap"
 
@@ -296,6 +298,10 @@ require_grep '"bundle_harness":.*"chunk_ledger":"k26-continuation-chunks.jsonl".
   "$out_dir/k26_source_run_commands.json" "K26 run commands chunk ledger contract"
 require_grep '"bundle_harness":.*"source_dead_gap_checker":"source_dead_gap_check".*"source_dead_checker":"source_dead_cert_check"' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands checked-bundle verifiers"
+require_grep '"bundle_harness":.*"timeout_seconds":1200.*"max_runtime_seconds":14000' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands runtime budget guard"
+require_grep '--timeout-seconds 1200 --max-runtime-seconds 14000' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands bounded bundle command"
 require_grep '--cert-in k26-source-dead-cert.json --source-dead-checker source_dead_cert_check' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands checked-bundle command"
 require_grep '--target-a 376039 --target-b 943460' \
