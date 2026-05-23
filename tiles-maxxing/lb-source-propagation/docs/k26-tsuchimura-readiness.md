@@ -437,6 +437,22 @@ evidence only; it does not yet prove that the full K26 continuation fits the
 paid budget gate, so another paid timing probe still requires the same one-band
 default, price cap, and runtime checker.
 
+A bounded local continuation probe at optimized head `6a20e1a` then measured
+the first 12 K26 continuation bands. The first chunk `8192 -> 73728` completed
+8 bands in `92.927s`, kept source carry live with `source_carry_atoms=8362`,
+had `tileop_overflows_total=0`, did not see the target, and emitted
+`K26_RUNTIME_BUDGET_PASS`: cumulative projection `1429s`, latest-band tail
+projection `2547s`, effective projection `2547s`, and budget margin `+11453s`.
+A second bounded continuation from the emitted port manifest covered
+`73728 -> 106496` in 4 more bands. Across all 12 completed bands, the default
+tail-conservative runtime checker still emitted `K26_RUNTIME_BUDGET_PASS`:
+observed continuation time `203.590s`, cumulative projection `2087s`,
+latest-band tail projection `3960s`, effective projection `3960s`, and budget
+margin `+10040s`. A four-band tail window over the same combined progress
+projected `3403s`. This is local non-claim timing evidence only, but it
+reopens a capped one-band Vast timing probe as meaningful once an RTX 4090
+offer satisfies the `$0.37/hr` gate.
+
 A guarded paid retry was attempted after this optimization at local head
 `6f94b31`, but no RTX 4090 offer satisfied the active `$0.37/hr` cap. The
 guard refused to rent; the nearest observed qualifying-market offer was about
