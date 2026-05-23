@@ -8,6 +8,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <tuple>
 #include <utility>
 
 #include "campaign/constants.h"
@@ -258,7 +259,6 @@ TileOpPortGraphResult make_tileop_port_band(
 CoordinatePortBridgeResult bridge_coordinate_prime_to_ports(
     const CoordinatePortBridgeInput& input) {
   CoordinatePortBridgeResult result;
-
   std::vector<campaign::Prime> primes = input.primes;
   if (primes.empty()) {
     primes = campaign::sieve_tile(input.coord, input.constants);
@@ -267,24 +267,66 @@ CoordinatePortBridgeResult bridge_coordinate_prime_to_ports(
     result.diagnostic = "target prime not found in empty tile sieve";
     return result;
   }
+  std::optional<std::size_t> target_index;
+  for (std::size_t i = 0; i < primes.size(); ++i) {
+    const campaign::Prime& prime = primes[i];
+    if (prime.a != input.target.a || prime.b != input.target.b) {
+      continue;
+    }
+    if (input.target.norm_sq != 0 && prime.norm_sq != input.target.norm_sq) {
+      result.diagnostic = "target prime norm mismatch";
+      return result;
+    }
+    target_index = i;
+    break;
+  }
+  if (!target_index.has_value()) {
+    result.diagnostic = "target prime not found in tile sieve";
+    return result;
+  }
+
+  CoordinatePortBridgeBatchResult batch =
+      bridge_coordinate_prime_batch_to_ports({
+          .coord = input.coord,
+          .constants = input.constants,
+          .tileop = input.tileop,
+          .primes = std::move(primes),
+          .target_indices = {*target_index},
+      });
+  if (!batch.accepted()) {
+    result.diagnostic = batch.diagnostic;
+    return result;
+  }
+  return batch.bridges.front();
+}
+
+CoordinatePortBridgeBatchResult bridge_coordinate_prime_batch_to_ports(
+    const CoordinatePortBridgeBatchInput& input) {
+  CoordinatePortBridgeBatchResult batch;
+  std::vector<campaign::Prime> primes = input.primes;
+  if (primes.empty()) {
+    primes = campaign::sieve_tile(input.coord, input.constants);
+  }
+  if (primes.empty()) {
+    batch.diagnostic = "target prime not found in empty tile sieve";
+    return batch;
+  }
 
   std::vector<PrimeWithFlags> zipped =
-      sorted_primes_with_flags(std::move(primes), input.constants);
+      sorted_primes_with_flags(primes, input.constants);
 
   std::vector<campaign::Prime> sorted_primes;
   std::vector<campaign::internal::PrimeGeoFlags> sorted_flags;
+  std::map<std::tuple<std::int64_t, std::int64_t, std::uint64_t>, std::int32_t>
+      sorted_index_by_prime;
   sorted_primes.reserve(zipped.size());
   sorted_flags.reserve(zipped.size());
-  std::optional<std::int32_t> target_index;
   for (std::size_t i = 0; i < zipped.size(); ++i) {
     const campaign::Prime& prime = zipped[i].prime;
-    if (prime.a == input.target.a && prime.b == input.target.b) {
-      if (input.target.norm_sq != 0 && prime.norm_sq != input.target.norm_sq) {
-        result.diagnostic = "target prime norm mismatch";
-        return result;
-      }
-      target_index = static_cast<std::int32_t>(i);
-    }
+    sorted_index_by_prime.emplace(
+        std::tuple<std::int64_t, std::int64_t, std::uint64_t>{
+            prime.a, prime.b, prime.norm_sq},
+        static_cast<std::int32_t>(i));
     sorted_primes.push_back(prime);
     sorted_flags.push_back(zipped[i].flags);
   }
@@ -294,22 +336,28 @@ CoordinatePortBridgeResult bridge_coordinate_prime_to_ports(
                                                   input.coord,
                                                   input.constants);
   if (std::memcmp(&expected, &input.tileop, sizeof(campaign::TileOp)) != 0) {
-    result.diagnostic = "TileOp bytes do not match coord/constants/primes";
-    return result;
+    batch.diagnostic = "TileOp bytes do not match coord/constants/primes";
+    return batch;
   }
+
+  std::vector<std::size_t> target_indices = input.target_indices;
+  if (target_indices.empty()) {
+    batch.diagnostic = "batch target indices must not be empty";
+    return batch;
+  }
+  batch.bridges.resize(target_indices.size());
 
   if ((input.tileop.tile_flags & campaign::OVERFLOW_BIT) != 0) {
-    result.diagnostic = "cannot bridge coordinate prime through overflow TileOp";
-    return result;
+    for (CoordinatePortBridgeResult& bridge : batch.bridges) {
+      bridge.diagnostic = "cannot bridge coordinate prime through overflow TileOp";
+    }
+    return batch;
   }
   if ((input.tileop.tile_flags & campaign::EMPTY_BIT) != 0) {
-    result.diagnostic = "cannot bridge coordinate prime through empty TileOp";
-    return result;
-  }
-
-  if (!target_index.has_value()) {
-    result.diagnostic = "target prime not found in tile sieve";
-    return result;
+    for (CoordinatePortBridgeResult& bridge : batch.bridges) {
+      bridge.diagnostic = "cannot bridge coordinate prime through empty TileOp";
+    }
+    return batch;
   }
 
   campaign::DSU local_dsu = campaign::internal::build_local_dsu(sorted_primes);
@@ -317,43 +365,57 @@ CoordinatePortBridgeResult bridge_coordinate_prime_to_ports(
       campaign::internal::dense_remap_visible_roots(
           &local_dsu, sorted_primes, sorted_flags, input.coord);
   if (remap.overflow) {
-    result.diagnostic = "TileOp visible component remap overflow";
-    return result;
+    batch.diagnostic = "TileOp visible component remap overflow";
+    return batch;
   }
 
-  const std::int32_t raw_root = local_dsu.find(*target_index);
-  result.tileop_label =
-      remap.wire_label_by_raw_root[static_cast<std::size_t>(raw_root)];
-  if (result.tileop_label == 0) {
-    result.diagnostic = "coordinate component is not TileOp-visible";
-    return result;
-  }
-
+  std::map<std::uint8_t, std::vector<AtomId>> ports_by_label;
   for (int face_idx = 0; face_idx < campaign::NUM_FACES; ++face_idx) {
     const campaign::Face face = static_cast<campaign::Face>(face_idx);
     const int offset = campaign::face_offset(input.tileop, face);
     for (std::uint8_t ordinal = 0; ordinal < input.tileop.n[face_idx];
          ++ordinal) {
       const std::uint8_t label = input.tileop.face_groups[offset + ordinal];
-      if (label != result.tileop_label) {
-        continue;
-      }
       const std::optional<AtomId> id =
           checked_port_atom_id(input.coord, face, ordinal);
       if (!id.has_value()) {
-        result.diagnostic = "TileOp port atom id overflow";
-        result.port_atoms.clear();
-        return result;
+        batch.diagnostic = "TileOp port atom id overflow";
+        return batch;
       }
-      result.port_atoms.push_back(*id);
+      ports_by_label[label].push_back(*id);
     }
   }
 
-  if (result.port_atoms.empty()) {
-    result.diagnostic = "visible coordinate component has no encoded face ports";
-    return result;
+  for (std::size_t i = 0; i < target_indices.size(); ++i) {
+    CoordinatePortBridgeResult& bridge = batch.bridges[i];
+    const std::size_t target_index = target_indices[i];
+    if (target_index >= primes.size()) {
+      bridge.diagnostic = "target prime index out of range";
+      continue;
+    }
+    const campaign::Prime& target = primes[target_index];
+    const auto sorted_it = sorted_index_by_prime.find(
+        {target.a, target.b, target.norm_sq});
+    if (sorted_it == sorted_index_by_prime.end()) {
+      bridge.diagnostic = "target prime not found in tile sieve";
+      continue;
+    }
+    const std::int32_t raw_root = local_dsu.find(sorted_it->second);
+    bridge.tileop_label =
+        remap.wire_label_by_raw_root[static_cast<std::size_t>(raw_root)];
+    if (bridge.tileop_label == 0) {
+      bridge.diagnostic = "coordinate component is not TileOp-visible";
+      continue;
+    }
+    const auto ports_it = ports_by_label.find(bridge.tileop_label);
+    if (ports_it == ports_by_label.end() || ports_it->second.empty()) {
+      bridge.diagnostic =
+          "visible coordinate component has no encoded face ports";
+      continue;
+    }
+    bridge.port_atoms = ports_it->second;
   }
-  return result;
+  return batch;
 }
 
 }  // namespace lb_source

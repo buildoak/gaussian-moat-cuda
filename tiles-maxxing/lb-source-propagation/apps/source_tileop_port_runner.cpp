@@ -2,6 +2,7 @@
 #include "lb_source/tileop_port_graph.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +17,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -25,10 +27,6 @@
 #include "campaign/sieve.h"
 #include "campaign/tileop.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 namespace {
 
 struct Config {
@@ -36,6 +34,7 @@ struct Config {
   std::uint64_t r_final = 512;
   std::uint64_t band_width = 128;
   std::size_t max_atoms = 1000000;
+  std::size_t tileop_threads = 0;
   bool seed_inner_flags = false;
   bool require_full_bridge = false;
   std::vector<std::uint64_t> schedule_radii;
@@ -97,7 +96,11 @@ struct RunnerInventorySummary {
 std::uint64_t norm_sq_i64(std::int64_t a, std::int64_t b);
 lb_source::AtomId checked_coordinate_atom_id(std::int64_t a, std::int64_t b);
 std::uint64_t dist_sq(const Point& lhs, const Point& rhs);
-std::uint64_t tileop_worker_threads();
+std::size_t resolve_tileop_threads(std::size_t requested,
+                                   std::size_t work_items);
+bool norm_in_radial_segment(std::uint64_t norm_sq,
+                            std::uint64_t r_start,
+                            std::uint64_t r_outer);
 
 bool parse_uint64(std::string_view text, std::uint64_t& out) {
   try {
@@ -154,6 +157,8 @@ void usage(const char* prog) {
       << "                        first must equal --r-start and last --r-final\n"
       << "  --max-atoms N         hard atom cap for sidecar process_band\n"
       << "                        (default 1000000)\n"
+      << "  --tileop-threads N    worker threads for sidecar TileOp build;\n"
+      << "                        0 means hardware auto (default 0)\n"
       << "  --seed-inner-flags    seed first band from TileOp inner flags\n"
       << "                        (geo-I diagnostic only)\n"
       << "  --require-full-bridge\n"
@@ -226,6 +231,14 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.max_atoms = static_cast<std::size_t>(parsed);
+    } else if (take_value("--tileop-threads", value)) {
+      std::uint64_t parsed = 0;
+      if (!parse_uint64(value, parsed) ||
+          parsed > std::numeric_limits<std::size_t>::max()) {
+        std::cerr << "invalid --tileop-threads: " << value << "\n";
+        return false;
+      }
+      config.tileop_threads = static_cast<std::size_t>(parsed);
     } else if (arg == "--seed-inner-flags") {
       config.seed_inner_flags = true;
     } else if (arg == "--require-full-bridge") {
@@ -586,6 +599,15 @@ std::uint64_t dist_sq(const Point& lhs, const Point& rhs) {
   return static_cast<std::uint64_t>(da * da + db * db);
 }
 
+bool norm_in_radial_segment(std::uint64_t norm_sq,
+                            std::uint64_t r_start,
+                            std::uint64_t r_outer) {
+  return static_cast<unsigned __int128>(norm_sq) >
+             static_cast<unsigned __int128>(r_start) * r_start &&
+         static_cast<unsigned __int128>(norm_sq) <=
+             static_cast<unsigned __int128>(r_outer) * r_outer;
+}
+
 std::uint64_t elapsed_ms(std::chrono::steady_clock::time_point begin,
                          std::chrono::steady_clock::time_point end) {
   return static_cast<std::uint64_t>(
@@ -757,7 +779,8 @@ void emit_tileop_build_begin(std::ofstream& progress,
                              std::uint64_t band_index,
                              std::uint64_t r_start,
                              std::uint64_t r_outer,
-                             std::uint64_t tiles) {
+                             std::uint64_t tiles,
+                             std::uint64_t worker_threads) {
   if (!progress) {
     return;
   }
@@ -768,7 +791,7 @@ void emit_tileop_build_begin(std::ofstream& progress,
            << ",\"r_start\":" << r_start
            << ",\"r_outer\":" << r_outer
            << ",\"tiles\":" << tiles
-           << ",\"tileop_worker_threads\":" << tileop_worker_threads()
+           << ",\"tileop_worker_threads\":" << worker_threads
            << "}\n";
   progress.flush();
 }
@@ -880,41 +903,79 @@ std::vector<campaign::TileOp> build_tileops(
     const std::vector<campaign::TileCoord>& coords,
     const campaign::CampaignConstants& constants,
     const campaign::Grid& grid,
-    std::uint64_t& overflow_tiles) {
+    std::uint64_t& overflow_tiles,
+    std::size_t worker_threads) {
   std::vector<campaign::TileOp> tileops;
   tileops.resize(coords.size());
-#ifdef _OPENMP
-  std::uint64_t overflow_count = 0;
-#pragma omp parallel for schedule(dynamic, 1) reduction(+ : overflow_count)
-  for (std::ptrdiff_t i = 0;
-       i < static_cast<std::ptrdiff_t>(coords.size()); ++i) {
-    const std::size_t index = static_cast<std::size_t>(i);
-    campaign::TileOp op = campaign::process_tile(coords[index], constants,
-                                                 grid);
-    if ((op.tile_flags & campaign::OVERFLOW_BIT) != 0) {
-      ++overflow_count;
-    }
-    tileops[index] = op;
+  worker_threads = std::max<std::size_t>(1, worker_threads);
+  if (coords.empty()) {
+    return tileops;
   }
-  overflow_tiles += overflow_count;
-#else
-  for (std::size_t i = 0; i < coords.size(); ++i) {
-    campaign::TileOp op = campaign::process_tile(coords[i], constants, grid);
-    if ((op.tile_flags & campaign::OVERFLOW_BIT) != 0) {
-      ++overflow_tiles;
+  worker_threads = std::min(worker_threads, coords.size());
+  if (worker_threads == 1) {
+    for (std::size_t i = 0; i < coords.size(); ++i) {
+      campaign::TileOp op = campaign::process_tile(coords[i], constants, grid);
+      if ((op.tile_flags & campaign::OVERFLOW_BIT) != 0) {
+        ++overflow_tiles;
+      }
+      tileops[i] = op;
     }
-    tileops[i] = op;
+    return tileops;
   }
-#endif
+
+  std::atomic<std::size_t> next_index{0};
+  std::vector<std::uint64_t> overflow_by_worker(worker_threads, 0);
+  std::vector<std::exception_ptr> errors(worker_threads);
+  std::vector<std::thread> workers;
+  workers.reserve(worker_threads);
+  for (std::size_t worker = 0; worker < worker_threads; ++worker) {
+    workers.emplace_back([&, worker]() {
+      try {
+        while (true) {
+          const std::size_t index = next_index.fetch_add(1);
+          if (index >= coords.size()) {
+            break;
+          }
+          campaign::TileOp op =
+              campaign::process_tile(coords[index], constants, grid);
+          if ((op.tile_flags & campaign::OVERFLOW_BIT) != 0) {
+            ++overflow_by_worker[worker];
+          }
+          tileops[index] = op;
+        }
+      } catch (...) {
+        errors[worker] = std::current_exception();
+        next_index.store(coords.size());
+      }
+    });
+  }
+  for (std::thread& worker : workers) {
+    worker.join();
+  }
+  for (const std::exception_ptr& error : errors) {
+    if (error) {
+      std::rethrow_exception(error);
+    }
+  }
+  for (const std::uint64_t count : overflow_by_worker) {
+    overflow_tiles += count;
+  }
   return tileops;
 }
 
-std::uint64_t tileop_worker_threads() {
-#ifdef _OPENMP
-  return static_cast<std::uint64_t>(omp_get_max_threads());
-#else
-  return 1;
-#endif
+std::size_t resolve_tileop_threads(std::size_t requested,
+                                   std::size_t work_items) {
+  if (work_items == 0) {
+    return 1;
+  }
+  std::size_t threads = requested;
+  if (threads == 0) {
+    threads = std::thread::hardware_concurrency();
+  }
+  if (threads == 0) {
+    threads = 1;
+  }
+  return std::min(threads, work_items);
 }
 
 PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
@@ -922,7 +983,8 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     const campaign::CampaignConstants& constants,
     const std::vector<campaign::TileCoord>& coords,
     const std::vector<campaign::TileOp>& tileops,
-    lb_source::BandInput& graph_band) {
+    lb_source::BandInput& graph_band,
+    std::size_t worker_threads) {
   PortManifestBridgeResult result;
 
   std::map<lb_source::AtomId, std::uint64_t> port_norm_by_id;
@@ -934,6 +996,8 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
   }
 
   std::map<lb_source::AtomId, Point> carry_point_by_id;
+  std::map<std::pair<std::int64_t, std::int64_t>, lb_source::AtomId>
+      carry_id_by_point;
   std::set<lb_source::AtomId> source_carry_ids;
   for (const lb_source::CarryAtom& atom : manifest.separator.carry_atoms) {
     const std::optional<lb_source::CoordinateAtom> decoded =
@@ -942,8 +1006,15 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
       std::cerr << "manifest carry atom is not a stable coordinate atom\n";
       std::exit(EXIT_FAILURE);
     }
-    carry_point_by_id.emplace(
-        atom.id, Point{decoded->a, decoded->b, decoded->norm_sq});
+    const Point point{decoded->a, decoded->b, decoded->norm_sq};
+    carry_point_by_id.emplace(atom.id, point);
+    if (!carry_id_by_point
+             .emplace(std::pair<std::int64_t, std::int64_t>{point.a, point.b},
+                      atom.id)
+             .second) {
+      std::cerr << "manifest emitted duplicate coordinate carry point\n";
+      std::exit(EXIT_FAILURE);
+    }
   }
   for (std::size_t c = 0; c < manifest.separator.component_partition.size();
        ++c) {
@@ -961,47 +1032,159 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
       rejected_coord_ids_by_reason;
   std::map<lb_source::AtomId, std::set<std::string>>
       rejected_reasons_by_coord_id;
-  for (std::size_t t = 0; t < coords.size(); ++t) {
+  const std::int64_t bridge_radius = static_cast<std::int64_t>(
+      lb_source::ceil_sqrt(static_cast<std::uint64_t>(campaign::k_sq_value)));
+
+  struct LocalBridgeAccumulator {
+    std::map<lb_source::AtomId, std::set<lb_source::AtomId>> ports_by_coord_id;
+    std::set<lb_source::AtomId> candidate_coord_ids;
+    std::set<lb_source::AtomId> bridge_rejected_coord_ids;
+    std::map<std::string, std::set<lb_source::AtomId>>
+        rejected_coord_ids_by_reason;
+    std::map<lb_source::AtomId, std::set<std::string>>
+        rejected_reasons_by_coord_id;
+  };
+
+  const auto process_tile_bridge =
+      [&](std::size_t t, LocalBridgeAccumulator& local) {
     const std::vector<campaign::Prime> primes =
         campaign::sieve_tile(coords[t], constants);
-    for (const campaign::Prime& prime : primes) {
+    std::vector<std::size_t> target_prime_indices;
+    std::vector<std::vector<lb_source::AtomId>> adjacent_ids_by_target;
+    for (std::size_t p = 0; p < primes.size(); ++p) {
+      const campaign::Prime& prime = primes[p];
       const Point prime_point{prime.a, prime.b, prime.norm_sq};
       std::vector<lb_source::AtomId> adjacent_carry_ids;
-      for (const auto& [coord_id, carry_point] : carry_point_by_id) {
-        if (dist_sq(carry_point, prime_point) <=
-            static_cast<std::uint64_t>(campaign::k_sq_value)) {
-          adjacent_carry_ids.push_back(coord_id);
+      for (std::int64_t da = -bridge_radius; da <= bridge_radius; ++da) {
+        for (std::int64_t db = -bridge_radius; db <= bridge_radius; ++db) {
+          const __int128 offset_dist =
+              static_cast<__int128>(da) * da +
+              static_cast<__int128>(db) * db;
+          if (offset_dist >
+              static_cast<__int128>(campaign::k_sq_value)) {
+            continue;
+          }
+          const auto carry_it = carry_id_by_point.find(
+              {prime_point.a + da, prime_point.b + db});
+          if (carry_it == carry_id_by_point.end()) {
+            continue;
+          }
+          adjacent_carry_ids.push_back(carry_it->second);
         }
       }
       if (adjacent_carry_ids.empty()) {
         continue;
       }
-      candidate_coord_ids.insert(adjacent_carry_ids.begin(),
-                                 adjacent_carry_ids.end());
-      const lb_source::CoordinatePortBridgeResult bridge =
-          lb_source::bridge_coordinate_prime_to_ports({
-              .coord = coords[t],
-              .constants = constants,
-              .tileop = tileops[t],
-              .target = prime,
-              .primes = primes,
-          });
+      local.candidate_coord_ids.insert(adjacent_carry_ids.begin(),
+                                       adjacent_carry_ids.end());
+      target_prime_indices.push_back(p);
+      adjacent_ids_by_target.push_back(std::move(adjacent_carry_ids));
+    }
+    if (target_prime_indices.empty()) {
+      return;
+    }
+    const lb_source::CoordinatePortBridgeBatchResult batch =
+        lb_source::bridge_coordinate_prime_batch_to_ports({
+            .coord = coords[t],
+            .constants = constants,
+            .tileop = tileops[t],
+            .primes = primes,
+            .target_indices = target_prime_indices,
+        });
+    if (!batch.accepted()) {
+      std::cerr << "TileOp coordinate bridge rejected: "
+                << batch.diagnostic << "\n";
+      std::exit(EXIT_FAILURE);
+    }
+    if (batch.bridges.size() != adjacent_ids_by_target.size()) {
+      std::cerr << "TileOp coordinate bridge batch size mismatch\n";
+      std::exit(EXIT_FAILURE);
+    }
+    for (std::size_t b = 0; b < batch.bridges.size(); ++b) {
+      const lb_source::CoordinatePortBridgeResult& bridge = batch.bridges[b];
+      const std::vector<lb_source::AtomId>& adjacent_carry_ids =
+          adjacent_ids_by_target[b];
       if (!bridge.accepted()) {
-        bridge_rejected_coord_ids.insert(adjacent_carry_ids.begin(),
-                                         adjacent_carry_ids.end());
+        local.bridge_rejected_coord_ids.insert(adjacent_carry_ids.begin(),
+                                               adjacent_carry_ids.end());
         std::set<lb_source::AtomId>& rejected_for_reason =
-            rejected_coord_ids_by_reason[bridge.diagnostic];
+            local.rejected_coord_ids_by_reason[bridge.diagnostic];
         rejected_for_reason.insert(adjacent_carry_ids.begin(),
                                    adjacent_carry_ids.end());
         for (const lb_source::AtomId coord_id : adjacent_carry_ids) {
-          rejected_reasons_by_coord_id[coord_id].insert(bridge.diagnostic);
+          local.rejected_reasons_by_coord_id[coord_id].insert(
+              bridge.diagnostic);
         }
         continue;
       }
       for (const lb_source::AtomId coord_id : adjacent_carry_ids) {
-        std::set<lb_source::AtomId>& ports = ports_by_coord_id[coord_id];
+        std::set<lb_source::AtomId>& ports =
+            local.ports_by_coord_id[coord_id];
         ports.insert(bridge.port_atoms.begin(), bridge.port_atoms.end());
       }
+    }
+  };
+
+  const auto merge_local = [&](const LocalBridgeAccumulator& local) {
+    for (const auto& [coord_id, ports] : local.ports_by_coord_id) {
+      std::set<lb_source::AtomId>& merged_ports = ports_by_coord_id[coord_id];
+      merged_ports.insert(ports.begin(), ports.end());
+    }
+    candidate_coord_ids.insert(local.candidate_coord_ids.begin(),
+                               local.candidate_coord_ids.end());
+    bridge_rejected_coord_ids.insert(local.bridge_rejected_coord_ids.begin(),
+                                     local.bridge_rejected_coord_ids.end());
+    for (const auto& [reason, ids] : local.rejected_coord_ids_by_reason) {
+      std::set<lb_source::AtomId>& merged_ids =
+          rejected_coord_ids_by_reason[reason];
+      merged_ids.insert(ids.begin(), ids.end());
+    }
+    for (const auto& [coord_id, reasons] : local.rejected_reasons_by_coord_id) {
+      std::set<std::string>& merged_reasons =
+          rejected_reasons_by_coord_id[coord_id];
+      merged_reasons.insert(reasons.begin(), reasons.end());
+    }
+  };
+
+  worker_threads = resolve_tileop_threads(worker_threads, coords.size());
+  if (worker_threads == 1) {
+    LocalBridgeAccumulator local;
+    for (std::size_t t = 0; t < coords.size(); ++t) {
+      process_tile_bridge(t, local);
+    }
+    merge_local(local);
+  } else {
+    std::atomic<std::size_t> next_tile{0};
+    std::vector<LocalBridgeAccumulator> locals(worker_threads);
+    std::vector<std::exception_ptr> errors(worker_threads);
+    std::vector<std::thread> workers;
+    workers.reserve(worker_threads);
+    for (std::size_t worker = 0; worker < worker_threads; ++worker) {
+      workers.emplace_back([&, worker]() {
+        try {
+          while (true) {
+            const std::size_t tile_index = next_tile.fetch_add(1);
+            if (tile_index >= coords.size()) {
+              break;
+            }
+            process_tile_bridge(tile_index, locals[worker]);
+          }
+        } catch (...) {
+          errors[worker] = std::current_exception();
+          next_tile.store(coords.size());
+        }
+      });
+    }
+    for (std::thread& worker : workers) {
+      worker.join();
+    }
+    for (const std::exception_ptr& error : errors) {
+      if (error) {
+        std::rethrow_exception(error);
+      }
+    }
+    for (const LocalBridgeAccumulator& local : locals) {
+      merge_local(local);
     }
   }
 
@@ -1328,6 +1511,7 @@ int main(int argc, char** argv) {
   std::uint64_t bands_processed = 0;
   std::uint64_t campaign_tiles_processed = 0;
   std::uint64_t tileop_overflows = 0;
+  std::uint64_t max_tileop_worker_threads = 0;
   std::uint64_t port_atoms = 0;
   std::uint64_t internal_edges = 0;
   std::uint64_t seam_edges = 0;
@@ -1375,10 +1559,15 @@ int main(int argc, char** argv) {
     emit_phase_progress(progress, "active_tile_enumerate", "end", segment,
                         previous_outer, outer,
                         elapsed_ms(grid_done, enumerate_done));
+    const std::size_t tileop_threads =
+        resolve_tileop_threads(config.tileop_threads, coords.size());
+    max_tileop_worker_threads =
+        std::max<std::uint64_t>(max_tileop_worker_threads, tileop_threads);
     emit_tileop_build_begin(progress, segment, previous_outer, outer,
-                            coords.size());
+                            coords.size(), tileop_threads);
     std::vector<campaign::TileOp> tileops =
-        build_tileops(coords, constants, grid, tileop_overflows);
+        build_tileops(coords, constants, grid, tileop_overflows,
+                      tileop_threads);
     const auto tileop_done = std::chrono::steady_clock::now();
     emit_phase_progress(progress, "tileop_build", "end", segment,
                         previous_outer, outer,
@@ -1414,7 +1603,8 @@ int main(int argc, char** argv) {
     emit_phase_progress(progress, "target_bridge", "begin", segment,
                         previous_outer, outer,
                         std::numeric_limits<std::uint64_t>::max());
-    if (target.has_value() && !target_seen) {
+    if (target.has_value() && !target_seen &&
+        norm_in_radial_segment(target->norm_sq, previous_outer, outer)) {
       const TargetBridgeResult target_bridge =
           bridge_target_coordinate_to_ports(*target, constants, coords, tileops,
                                             band);
@@ -1447,7 +1637,8 @@ int main(int argc, char** argv) {
                           std::numeric_limits<std::uint64_t>::max());
       const PortManifestBridgeResult bridge =
           bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
-                                              coords, tileops, bridged_band);
+                                              coords, tileops, bridged_band,
+                                              tileop_threads);
       bridge_done = std::chrono::steady_clock::now();
       emit_phase_progress(progress, "manifest_bridge", "end", segment,
                           previous_outer, outer,
@@ -1549,7 +1740,7 @@ int main(int argc, char** argv) {
                << ",\"r_start\":" << previous_outer
                << ",\"r_outer\":" << outer
                << ",\"tiles\":" << coords.size()
-               << ",\"tileop_worker_threads\":" << tileop_worker_threads()
+               << ",\"tileop_worker_threads\":" << tileop_threads
                << ",\"port_atoms\":" << graph.port_atoms
                << ",\"internal_edges\":" << graph.internal_edges
                << ",\"seam_edges\":" << graph.seam_edges
@@ -1707,7 +1898,7 @@ int main(int argc, char** argv) {
             << ",\"schedule_max_width\":"
             << max_schedule_width(schedule_radii)
             << ",\"bands_processed\":" << bands_processed
-            << ",\"tileop_worker_threads\":" << tileop_worker_threads()
+            << ",\"tileop_worker_threads\":" << max_tileop_worker_threads
             << ",\"campaign_tiles_processed\":" << campaign_tiles_processed
             << ",\"tileop_overflows\":" << tileop_overflows
             << ",\"port_atoms\":" << port_atoms

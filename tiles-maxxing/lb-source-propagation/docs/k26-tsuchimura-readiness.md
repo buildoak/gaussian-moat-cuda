@@ -97,15 +97,18 @@ if `endpoint_atom_id` is not the stable coordinate atom id
 if `metadata.artifact_hash` is not exactly the SHA-256 hash of
 `k26-continuation-result.json`, or if the independent
 `source_dead_cert_check` does not accept a listed source-dead draft. The
-`k26-source-dead-gap.json` layer also machine-checks three explicit
-obligation objects: `bridge_safety` must show
+`k26-source-dead-gap.json` layer also machine-checks explicit obligation
+objects: `bridge_safety` must show
 `source_unbridged_unsafe_candidate_atoms=0`; `coordinate_path_obligation`
-must record that the observed target path is still
-`mixed_coordinate_port_atom_chain_non_claim`, not
-`coordinate_gaussian_prime_path`; and `terminal_inventory_obligation` must
-record that the observed inventory is `summary_digest_only_non_claim`, not
-claim-grade listed/proven terminal inventory. A `summary_only_non_claim` cert
-remains useful diagnostic shape evidence, but the bundle checker reports
+must record why the observed target evidence is not
+`coordinate_gaussian_prime_path`; `terminal_inventory_obligation` must record
+that the observed inventory is `summary_digest_only_non_claim`, not
+claim-grade listed/proven terminal inventory; and the BZ schedule is bound as
+accepted-for-schedule but not accepted-for-claim evidence. A reached diagnostic
+target is blocked by `mixed_coordinate_port_atom_chain_non_claim`; the current
+local K26 run is blocked earlier by `SOURCE_DEAD_CERT_TARGET_NOT_REACHED`. A
+`summary_only_non_claim` cert remains useful diagnostic shape evidence, but the
+bundle checker reports
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM` instead
 of accepting the bundle.
 
@@ -127,14 +130,14 @@ writes `k26-prefix-progress.jsonl`, `k26-continuation-progress.jsonl`,
 `k26-full-run-artifacts.sha256` manifest, and stops with
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. The gap artifact binds
 the continuation artifact and records the exact remaining certificate
-obligations: bridge safety, coordinate path, terminal inventory, and repaired
-K26 BZ schedule evidence. The bridge obligation can pass as diagnostic evidence
-when every source-connected carry atom either bridges, has no legal next-band
-candidate, or has only dead-end candidates; the coordinate path obligation
-remains blocked until the mixed coordinate/port atom chain is expanded into a
-coordinate Gaussian-prime source path from the origin prefix to the canonical
-endpoint; the terminal inventory obligation remains blocked until the summary
-digest/count/max-norm evidence is promoted to claim-grade inventory
+obligations: bridge safety, target/coordinate path, terminal inventory, and
+repaired K26 BZ schedule evidence. The bridge obligation can pass as diagnostic
+evidence when every source-connected carry atom either bridges, has no legal
+next-band candidate, or has only dead-end candidates; the target/coordinate
+path obligation remains blocked until the canonical endpoint is positively
+reached and represented by a coordinate Gaussian-prime source path from the
+origin prefix; the terminal inventory obligation remains blocked until the
+summary digest/count/max-norm evidence is promoted to claim-grade inventory
 provenance. The BZ digest is bound as accepted-for-schedule but not
 accepted-for-claim evidence. When
 invoked with
@@ -149,13 +152,19 @@ counts, source carry/death state, and timings. They also include flushed phase
 rows before and after expensive stages such as `prefix_witness_read`,
 `tileop_build`, `manifest_bridge`, and `source_process`, so a timeout before
 the first completed continuation band still leaves evidence for the active
-runtime phase. The current local K26 probe completes the prefix row in about 24
-seconds and times out during the first continuation band's `tileop_build` phase
-for `8192 -> 16384`. The sidecar runner parallelizes this TileOp build loop
-when OpenMP is available, while preserving output order and reporting
-`tileop_worker_threads`; this is a sidecar execution optimization and does not
-change production TileOp semantics. Neither progress artifact relaxes the
-`SOURCE_DEAD_CERT` gate.
+runtime phase. The current local K26 bundle completes the prefix row in about
+25 seconds and the first continuation band `8192 -> 16384` in about 32 seconds
+with 12 local worker threads. That continuation reports
+`terminal_source_dead=true`, `target.seen=false`, `target.source_reached=false`,
+`source_inventory_count=2022302`, `max_source_norm_sq=279511040`, and
+`source_unbridged_unsafe_candidate_atoms=0`, then emits a checked
+`SOURCE_DEAD_CERT_TARGET_NOT_REACHED` diagnostic gap. The sidecar runner
+parallelizes this TileOp build loop with standard C++ worker threads, while
+preserving output order and reporting `tileop_worker_threads`;
+`--tileop-threads N` can pin the count, while `--tileop-threads 0` uses
+hardware auto. This is a sidecar execution optimization and does not change
+production TileOp semantics. Neither progress artifact nor the
+target-not-reached gap relaxes the `SOURCE_DEAD_CERT` gate.
 With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/progress/continuation/gap artifacts before the
 checker runs.

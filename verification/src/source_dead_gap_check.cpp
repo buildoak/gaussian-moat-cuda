@@ -178,7 +178,7 @@ std::vector<std::int64_t> require_i64_array(const nlohmann::json& object,
   return values;
 }
 
-void verify_gap(const nlohmann::json& gap) {
+std::string verify_gap(const nlohmann::json& gap) {
   if (!gap.is_object()) {
     throw std::runtime_error("gap artifact must be object");
   }
@@ -191,8 +191,11 @@ void verify_gap(const nlohmann::json& gap) {
   if (require_string(gap, "proof_status") != "DIAGNOSTIC_NON_CLAIM") {
     throw std::runtime_error("gap artifact must remain DIAGNOSTIC_NON_CLAIM");
   }
-  if (require_string(gap, "blocker") !=
-      "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING") {
+  const std::string blocker = require_string(gap, "blocker");
+  const bool target_not_reached =
+      blocker == "SOURCE_DEAD_CERT_TARGET_NOT_REACHED";
+  if (blocker != "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING" &&
+      !target_not_reached) {
     throw std::runtime_error("unexpected source-dead blocker");
   }
   if (!sane_text(require_string(gap, "non_claim"))) {
@@ -268,18 +271,31 @@ void verify_gap(const nlohmann::json& gap) {
     throw std::runtime_error("bridge safety has unsafe source unbridged candidates");
   }
 
-  if (require_string(gap, "target_path_provenance") !=
-      "mixed_coordinate_port_atom_chain_non_claim") {
+  const std::string target_path_provenance =
+      require_string(gap, "target_path_provenance");
+  if (target_not_reached) {
+    if (target_path_provenance != "component_reachability_only") {
+      throw std::runtime_error(
+          "target-not-reached gap has wrong target path provenance");
+    }
+  } else if (target_path_provenance !=
+             "mixed_coordinate_port_atom_chain_non_claim") {
     throw std::runtime_error("target path provenance is not the mixed non-claim chain");
   }
   const std::vector<std::int64_t> atom_path =
       require_i64_array(gap, "target_atom_path");
   const std::uint64_t atom_path_length =
       require_u64(gap, "target_atom_path_length");
-  if (atom_path.empty() || atom_path.size() != atom_path_length) {
+  if (atom_path.size() != atom_path_length) {
     throw std::runtime_error("target atom path length mismatch");
   }
-  if (atom_path.back() != kEndpointAtomId) {
+  if (target_not_reached && !atom_path.empty()) {
+    throw std::runtime_error("target-not-reached gap must have empty atom path");
+  }
+  if (!target_not_reached && atom_path.empty()) {
+    throw std::runtime_error("target atom path must be nonempty");
+  }
+  if (!target_not_reached && atom_path.back() != kEndpointAtomId) {
     throw std::runtime_error("target atom path does not end at K26 endpoint atom");
   }
   std::size_t coordinate_atoms = 0;
@@ -295,18 +311,20 @@ void verify_gap(const nlohmann::json& gap) {
     }
     ++port_atoms;
   }
-  if (coordinate_atoms < 2) {
+  if (!target_not_reached && coordinate_atoms < 2) {
     throw std::runtime_error("target atom path needs coordinate source and endpoint atoms");
   }
-  if (port_atoms == 0) {
+  if (!target_not_reached && port_atoms == 0) {
     throw std::runtime_error("target atom path has no TileOp port atom");
   }
-  const std::optional<PortAtom> endpoint_port =
-      decode_port_atom_id(atom_path[atom_path.size() - 2]);
-  if (!endpoint_port.has_value() ||
-      endpoint_port->tile_i != kEndpointTileI ||
-      endpoint_port->tile_j != kEndpointTileJ) {
-    throw std::runtime_error("target atom path does not enter endpoint through the K26 endpoint tile");
+  if (!target_not_reached) {
+    const std::optional<PortAtom> endpoint_port =
+        decode_port_atom_id(atom_path[atom_path.size() - 2]);
+    if (!endpoint_port.has_value() ||
+        endpoint_port->tile_i != kEndpointTileI ||
+        endpoint_port->tile_j != kEndpointTileJ) {
+      throw std::runtime_error("target atom path does not enter endpoint through the K26 endpoint tile");
+    }
   }
 
   const nlohmann::json& path_obligation =
@@ -316,7 +334,7 @@ void verify_gap(const nlohmann::json& gap) {
     throw std::runtime_error("coordinate path obligation has wrong required provenance");
   }
   if (require_string(path_obligation, "observed_provenance") !=
-      "mixed_coordinate_port_atom_chain_non_claim") {
+      target_path_provenance) {
     throw std::runtime_error("coordinate path obligation has wrong observed provenance");
   }
   if (require_u64(path_obligation, "observed_coordinate_atom_count") !=
@@ -326,7 +344,7 @@ void verify_gap(const nlohmann::json& gap) {
   if (require_u64(path_obligation, "observed_port_atom_count") != port_atoms) {
     throw std::runtime_error("coordinate path obligation port count mismatch");
   }
-  if (port_atoms == 0) {
+  if (!target_not_reached && port_atoms == 0) {
     throw std::runtime_error("coordinate path obligation needs a port expansion gap");
   }
   if (require_string(path_obligation, "per_port_coordinate_expansion") !=
@@ -339,8 +357,12 @@ void verify_gap(const nlohmann::json& gap) {
 
   const nlohmann::json& summary =
       require_object(gap, "terminal_source_inventory_summary");
-  if (require_u64(summary, "count") != kExpectedComponentSize) {
+  const std::uint64_t inventory_count = require_u64(summary, "count");
+  if (!target_not_reached && inventory_count != kExpectedComponentSize) {
     throw std::runtime_error("terminal inventory count does not match Tsuchimura");
+  }
+  if (target_not_reached && inventory_count == 0) {
+    throw std::runtime_error("target-not-reached inventory count is zero");
   }
   if (require_string(summary, "digest_algorithm") !=
       "sha256:lb_source_inventory_v1") {
@@ -349,19 +371,31 @@ void verify_gap(const nlohmann::json& gap) {
   if (!sha256_hex(require_string(summary, "digest_hex"))) {
     throw std::runtime_error("inventory digest is not sha256 hex");
   }
-  if (require_u64(summary, "max_norm_sq") != kEndpointNormSq) {
+  const std::uint64_t max_norm_sq = require_u64(summary, "max_norm_sq");
+  if (!target_not_reached && max_norm_sq != kEndpointNormSq) {
     throw std::runtime_error("max source norm does not match K26 endpoint");
+  }
+  if (target_not_reached && max_norm_sq >= kEndpointNormSq) {
+    throw std::runtime_error(
+        "target-not-reached max source norm reaches K26 endpoint norm");
   }
   const std::vector<std::int64_t> ties =
       require_i64_array(summary, "max_norm_atom_ids");
   if (ties.empty()) {
     throw std::runtime_error("max_norm_atom_ids is empty");
   }
-  if (std::find(ties.begin(), ties.end(), kEndpointAtomId) == ties.end()) {
+  if (!target_not_reached &&
+      std::find(ties.begin(), ties.end(), kEndpointAtomId) == ties.end()) {
     throw std::runtime_error("max_norm_atom_ids omits K26 endpoint atom");
   }
   for (const std::int64_t id : ties) {
-    if (coordinate_atom_norm_sq(id) != kEndpointNormSq) {
+    if (target_not_reached) {
+      if (id >= 0) {
+        (void)coordinate_atom_norm_sq(id);
+      } else if (!decode_port_atom_id(id).has_value()) {
+        throw std::runtime_error("target-not-reached max_norm_atom_ids has invalid port atom");
+      }
+    } else if (coordinate_atom_norm_sq(id) != kEndpointNormSq) {
       throw std::runtime_error("max_norm_atom_ids norm mismatch");
     }
   }
@@ -383,7 +417,7 @@ void verify_gap(const nlohmann::json& gap) {
     throw std::runtime_error("terminal inventory obligation must not accept summary-only inventory");
   }
   if (require_u64(inventory_obligation, "observed_count") !=
-      kExpectedComponentSize) {
+      inventory_count) {
     throw std::runtime_error("terminal inventory obligation count mismatch");
   }
   if (require_string(inventory_obligation, "observed_digest_algorithm") !=
@@ -395,13 +429,14 @@ void verify_gap(const nlohmann::json& gap) {
     throw std::runtime_error("terminal inventory obligation digest binding mismatch");
   }
   if (require_u64(inventory_obligation, "observed_max_norm_sq") !=
-      kEndpointNormSq) {
+      max_norm_sq) {
     throw std::runtime_error("terminal inventory obligation max norm mismatch");
   }
 
   const nlohmann::json& missing =
       require_array(gap, "missing_for_source_dead_cert");
   bool has_coordinate_path_gap = false;
+  bool has_target_reachability_gap = false;
   bool has_terminal_inventory_gap = false;
   bool has_bz_schedule_gap = false;
   bool has_verifier_gap = false;
@@ -413,6 +448,9 @@ void verify_gap(const nlohmann::json& gap) {
     if (text.find("coordinate Gaussian-prime source_path") !=
         std::string::npos) {
       has_coordinate_path_gap = true;
+    }
+    if (text.find("target reachability") != std::string::npos) {
+      has_target_reachability_gap = true;
     }
     if (text.find("terminal inventory") != std::string::npos) {
       has_terminal_inventory_gap = true;
@@ -430,6 +468,12 @@ void verify_gap(const nlohmann::json& gap) {
         "missing gap list omits coordinate path, terminal inventory, BZ "
         "schedule, or verifier gap");
   }
+  if (target_not_reached && !has_target_reachability_gap) {
+    throw std::runtime_error(
+        "target-not-reached gap omits target reachability blocker");
+  }
+  return target_not_reached ? "blocked_target_not_reached"
+                            : "blocked_coordinate_gaussian_prime_path";
 }
 
 }  // namespace
@@ -446,10 +490,11 @@ int main(int argc, char** argv) {
       throw std::runtime_error("cannot open gap artifact");
     }
     const nlohmann::json gap = nlohmann::json::parse(in);
-    verify_gap(gap);
+    const std::string coordinate_path_obligation = verify_gap(gap);
     std::cout << "{\"status\":\"SOURCE_DEAD_GAP_NON_CLAIM_PASS\","
               << "\"bridge_safety\":\"accepted_non_claim\","
-              << "\"coordinate_path_obligation\":\"blocked_coordinate_gaussian_prime_path\","
+              << "\"coordinate_path_obligation\":\""
+              << coordinate_path_obligation << "\","
               << "\"bz_schedule_obligation\":\"blocked_schedule_only_non_claim\","
               << "\"terminal_inventory_obligation\":\"blocked_claim_grade_terminal_inventory\","
               << "\"claim_grade\":false}\n";

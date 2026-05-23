@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -48,10 +49,28 @@ struct CoordinatePortBridgeResult {
   bool accepted() const noexcept { return diagnostic.empty(); }
 };
 
+struct CoordinatePortBridgeBatchInput {
+  campaign::TileCoord coord;
+  campaign::CampaignConstants constants;
+  campaign::TileOp tileop;
+  std::vector<campaign::Prime> primes;
+  std::vector<std::size_t> target_indices;
+};
+
+struct CoordinatePortBridgeBatchResult {
+  std::vector<CoordinatePortBridgeResult> bridges;
+  std::string diagnostic;
+
+  bool accepted() const noexcept { return diagnostic.empty(); }
+};
+
 TileOpPortGraphResult make_tileop_port_band(
     const TileOpPortGraphInput& input);
 
 CoordinatePortBridgeResult bridge_coordinate_prime_to_ports(
     const CoordinatePortBridgeInput& input);
+
+CoordinatePortBridgeBatchResult bridge_coordinate_prime_batch_to_ports(
+    const CoordinatePortBridgeBatchInput& input);
 
 }  // namespace lb_source
