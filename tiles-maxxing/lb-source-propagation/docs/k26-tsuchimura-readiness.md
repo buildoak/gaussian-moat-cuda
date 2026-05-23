@@ -416,6 +416,21 @@ budget margin `-1151s`. This confirms that one-band remote timing probes can
 reject this host shape in about one continuation band instead of burning a
 whole eight-band chunk.
 
+After that rejection, the first sidecar-only runtime fix targets the measured
+`manifest_bridge` hotspot without changing TileOp bytes, CUDA kernels,
+certificate semantics, or final sorted bridge output. The coordinate carry
+lookup inside `source_tileop_port_runner` now uses a reserved hash table keyed
+by stable `(a,b)` coordinates and precomputes the finite K-neighborhood
+offsets once per bridge. This removes ordered-tree lookup and repeated
+distance filtering from every prime candidate in the first continuation band.
+Local verification after the change: full sidecar CTest passed `28/28`, the
+Phase 1 diff-scope guard passed, a matching-K36 progress smoke emitted
+`manifest_bridge` and `source_process` phase rows, and a local K26-compiled
+progress smoke over `248 -> 512` completed with live source carry. This is a
+runtime optimization only; it does not yet prove that the full K26 continuation
+fits the paid budget gate, so another paid timing probe still requires the same
+one-band default, price cap, and runtime checker.
+
 After any partial continuation, run:
 
 ```bash

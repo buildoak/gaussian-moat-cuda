@@ -18,6 +18,8 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -51,6 +53,28 @@ struct Point {
   std::int64_t a = 0;
   std::int64_t b = 0;
   std::uint64_t norm_sq = 0;
+};
+
+struct PointKey {
+  std::int64_t a = 0;
+  std::int64_t b = 0;
+
+  friend bool operator==(const PointKey&, const PointKey&) = default;
+};
+
+struct PointKeyHash {
+  std::size_t operator()(const PointKey& key) const noexcept {
+    const std::uint64_t a = static_cast<std::uint64_t>(key.a);
+    const std::uint64_t b = static_cast<std::uint64_t>(key.b);
+    std::uint64_t x = a + 0x9e3779b97f4a7c15ULL;
+    x ^= b + 0xbf58476d1ce4e5b9ULL + (x << 6) + (x >> 2);
+    x ^= x >> 30;
+    x *= 0xbf58476d1ce4e5b9ULL;
+    x ^= x >> 27;
+    x *= 0x94d049bb133111ebULL;
+    x ^= x >> 31;
+    return static_cast<std::size_t>(x);
+  }
 };
 
 struct PrefixWitness {
@@ -1032,7 +1056,8 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     std::size_t worker_threads) {
   PortManifestBridgeResult result;
 
-  std::map<lb_source::AtomId, std::uint64_t> port_norm_by_id;
+  std::unordered_map<lb_source::AtomId, std::uint64_t> port_norm_by_id;
+  port_norm_by_id.reserve(graph_band.atoms.size());
   for (const lb_source::BandAtom& atom : graph_band.atoms) {
     if (!port_norm_by_id.emplace(atom.id, atom.norm_sq).second) {
       std::cerr << "TileOp port graph emitted duplicate atom id\n";
@@ -1041,9 +1066,11 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
   }
 
   std::map<lb_source::AtomId, Point> carry_point_by_id;
-  std::map<std::pair<std::int64_t, std::int64_t>, lb_source::AtomId>
+  std::unordered_map<PointKey, lb_source::AtomId, PointKeyHash>
       carry_id_by_point;
-  std::set<lb_source::AtomId> source_carry_ids;
+  carry_id_by_point.reserve(manifest.separator.carry_atoms.size());
+  std::unordered_set<lb_source::AtomId> source_carry_ids;
+  source_carry_ids.reserve(manifest.separator.carry_atoms.size());
   for (const lb_source::CarryAtom& atom : manifest.separator.carry_atoms) {
     const std::optional<lb_source::CoordinateAtom> decoded =
         lb_source::decode_coordinate_atom_id(atom.id);
@@ -1054,8 +1081,7 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
     const Point point{decoded->a, decoded->b, decoded->norm_sq};
     carry_point_by_id.emplace(atom.id, point);
     if (!carry_id_by_point
-             .emplace(std::pair<std::int64_t, std::int64_t>{point.a, point.b},
-                      atom.id)
+             .emplace(PointKey{point.a, point.b}, atom.id)
              .second) {
       std::cerr << "manifest emitted duplicate coordinate carry point\n";
       std::exit(EXIT_FAILURE);
@@ -1079,6 +1105,19 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
       rejected_reasons_by_coord_id;
   const std::int64_t bridge_radius = static_cast<std::int64_t>(
       lb_source::ceil_sqrt(static_cast<std::uint64_t>(campaign::k_sq_value)));
+  std::vector<PointKey> bridge_offsets;
+  bridge_offsets.reserve(static_cast<std::size_t>((2 * bridge_radius + 1) *
+                                                  (2 * bridge_radius + 1)));
+  for (std::int64_t da = -bridge_radius; da <= bridge_radius; ++da) {
+    for (std::int64_t db = -bridge_radius; db <= bridge_radius; ++db) {
+      const __int128 offset_dist =
+          static_cast<__int128>(da) * da + static_cast<__int128>(db) * db;
+      if (offset_dist > static_cast<__int128>(campaign::k_sq_value)) {
+        continue;
+      }
+      bridge_offsets.push_back(PointKey{da, db});
+    }
+  }
 
   struct LocalBridgeAccumulator {
     std::map<lb_source::AtomId, std::set<lb_source::AtomId>> ports_by_coord_id;
@@ -1100,22 +1139,13 @@ PortManifestBridgeResult bridge_coordinate_manifest_to_ports(
       const campaign::Prime& prime = primes[p];
       const Point prime_point{prime.a, prime.b, prime.norm_sq};
       std::vector<lb_source::AtomId> adjacent_carry_ids;
-      for (std::int64_t da = -bridge_radius; da <= bridge_radius; ++da) {
-        for (std::int64_t db = -bridge_radius; db <= bridge_radius; ++db) {
-          const __int128 offset_dist =
-              static_cast<__int128>(da) * da +
-              static_cast<__int128>(db) * db;
-          if (offset_dist >
-              static_cast<__int128>(campaign::k_sq_value)) {
-            continue;
-          }
-          const auto carry_it = carry_id_by_point.find(
-              {prime_point.a + da, prime_point.b + db});
-          if (carry_it == carry_id_by_point.end()) {
-            continue;
-          }
-          adjacent_carry_ids.push_back(carry_it->second);
+      for (const PointKey& offset : bridge_offsets) {
+        const auto carry_it = carry_id_by_point.find(
+            PointKey{prime_point.a + offset.a, prime_point.b + offset.b});
+        if (carry_it == carry_id_by_point.end()) {
+          continue;
         }
+        adjacent_carry_ids.push_back(carry_it->second);
       }
       if (adjacent_carry_ids.empty()) {
         continue;
