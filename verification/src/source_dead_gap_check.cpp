@@ -295,6 +295,22 @@ std::string verify_gap(const nlohmann::json& gap) {
     if (!sha256_hex(require_string(*chunk_ledger_it, "sha256"))) {
       throw std::runtime_error("chunk ledger artifact hash is not sha256 hex");
     }
+    const auto bridge_source_it = gap.find("bridge_source_artifact");
+    if (bridge_source_it == gap.end()) {
+      throw std::runtime_error(
+          "chunked gap artifact must bind bridge_source_artifact");
+    }
+    if (!bridge_source_it->is_object()) {
+      throw std::runtime_error("bridge_source_artifact must be object");
+    }
+    if (require_string(*bridge_source_it, "name") !=
+        "k26-continuation-chunk-000.json") {
+      throw std::runtime_error("unexpected bridge source artifact name");
+    }
+    if (!sha256_hex(require_string(*bridge_source_it, "sha256"))) {
+      throw std::runtime_error(
+          "bridge source artifact hash is not sha256 hex");
+    }
   }
 
   const nlohmann::json& bz_evidence = require_object(gap, "bz_evidence");

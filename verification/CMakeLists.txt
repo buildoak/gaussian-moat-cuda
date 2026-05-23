@@ -89,6 +89,12 @@ add_test(NAME source_dead_gap_fixture_target_not_reached_valid
 set_tests_properties(source_dead_gap_fixture_target_not_reached_valid PROPERTIES
   PASS_REGULAR_EXPRESSION
     "\"status\":\"SOURCE_DEAD_GAP_NON_CLAIM_PASS\".*\"bridge_safety\":\"accepted_non_claim\".*\"coordinate_path_obligation\":\"blocked_target_not_reached\".*\"bz_schedule_obligation\":\"blocked_schedule_only_non_claim\".*\"terminal_inventory_obligation\":\"blocked_claim_grade_terminal_inventory\".*\"claim_grade\":false")
+add_test(NAME source_dead_gap_fixture_chunked_valid
+  COMMAND source_dead_gap_check
+    ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/source_prop/dead-gap-chunked-valid.json)
+set_tests_properties(source_dead_gap_fixture_chunked_valid PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"status\":\"SOURCE_DEAD_GAP_NON_CLAIM_PASS\".*\"bridge_safety\":\"accepted_non_claim\".*\"coordinate_path_obligation\":\"blocked_coordinate_gaussian_prime_path\".*\"bz_schedule_obligation\":\"blocked_schedule_only_non_claim\".*\"terminal_inventory_obligation\":\"blocked_claim_grade_terminal_inventory\".*\"claim_grade\":false")
 foreach(bad_source_dead_cert
     dead-cert-bad-accumulator-claim
     dead-cert-bad-artifact-hash
@@ -120,6 +126,7 @@ endforeach()
 foreach(bad_source_dead_gap
     dead-gap-bad-bridge-candidate-total
     dead-gap-bad-bridge-counts
+    dead-gap-bad-bridge-source-artifact
     dead-gap-bad-bridge-unsafe
     dead-gap-bad-bz-digest
     dead-gap-bad-bz-evidence
