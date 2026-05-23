@@ -164,6 +164,10 @@ int main() {
       "--continuation-chunk-bands 8 --resume-existing "
       "--timeout-seconds 1200 --source-dead-gap-checker "
       "source_dead_gap_check";
+  const std::string checked_bundle_command =
+      bundle_command +
+      " --cert-in k26-source-dead-cert.json "
+      "--source-dead-checker source_dead_cert_check";
 
   std::cout << "{"
             << "\"schema\":\"lb_source_k26_run_commands_v1\","
@@ -216,9 +220,13 @@ int main() {
             << ",\"resume_existing_supported\":true,"
             << "\"chunk_ledger\":\"k26-continuation-chunks.jsonl\","
             << "\"chunk_ledger_required_for_checked_bundle\":true,"
+            << "\"source_dead_gap_checker\":\"source_dead_gap_check\","
+            << "\"source_dead_checker\":\"source_dead_cert_check\","
             << "\"timeout_seconds\":1200,"
             << "\"command\":";
   emit_json_string(bundle_command);
+  std::cout << ",\"checked_bundle_command\":";
+  emit_json_string(checked_bundle_command);
   std::cout << "},\"repaired_boundaries\":["
             << "{\"nominal\":122880,\"repaired\":122879},"
             << "{\"nominal\":475136,\"repaired\":475135},"

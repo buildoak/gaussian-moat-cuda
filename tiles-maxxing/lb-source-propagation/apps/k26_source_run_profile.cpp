@@ -171,6 +171,8 @@ int main() {
             << "\"resume_existing_flag\":\"--resume-existing\","
             << "\"chunk_ledger\":\"k26-continuation-chunks.jsonl\","
             << "\"chunk_ledger_required_for_checked_bundle\":true,"
+            << "\"source_dead_gap_checker\":\"source_dead_gap_check\","
+            << "\"source_dead_checker\":\"source_dead_cert_check\","
             << "\"timeout_status_prefix\":\"K26_FULL_RUN_BUNDLE_BLOCKED_\"},";
   emit_string_array("runner_requirements", kRunnerRequirements,
                     sizeof(kRunnerRequirements) /
