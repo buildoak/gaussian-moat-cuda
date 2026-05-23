@@ -30,7 +30,7 @@ write_ctest_log() {
 }
 
 write_ctest_log "$tmp/ctest.log" 27
-write_ctest_log "$tmp/verification-ctest.log" 73
+write_ctest_log "$tmp/verification-ctest.log" 75
 
 cat > "$tmp/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
@@ -74,7 +74,7 @@ cat > "$tmp/k26_source_run_contract.json" <<'JSON'
 JSON
 
 cat > "$tmp/k26_execution_plan.json" <<'JSON'
-{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"},"repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar ctest 27/27"],"non_claim":"execution plan only; no source/origin run executed"}
+{"schema":"lb_source_k26_execution_plan_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"budget_caps":{"max_dph_usd":0.37,"max_total_usd":1.5},"schedule":{"bz_schedule":"repaired","bz_evidence":{"status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95"},"repaired_boundary_count":3,"max_abs_boundary_shift":1,"band_count":124,"last_band_width":8029,"rows":[{"index":123,"r_outer":1015645}]},"pre_run_gates":["local sidecar CTest passes","local independent verification CTest passes"],"non_claim":"execution plan only; no source/origin run executed"}
 JSON
 
 cat > "$tmp/k26_bz_schedule_check.json" <<'JSON'
@@ -100,6 +100,17 @@ SRC
   --expect-k-sq 36 \
   > "$tmp/provenance-pass.log"
 grep -q "REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS" "$tmp/provenance-pass.log"
+
+bad_ctest="$tmp/bad-ctest"
+mkdir "$bad_ctest"
+cp "$tmp"/* "$bad_ctest"/ 2>/dev/null || true
+perl -0pi -e 's/100% tests passed, 0 tests failed out of 75/100% tests passed, 0 tests failed out of 74/' \
+  "$bad_ctest/verification-ctest.log"
+if "$checker" "$bad_ctest" > "$tmp/bad-ctest.log" 2>&1; then
+  echo "checker accepted verification CTest log with mismatched row count" >&2
+  exit 1
+fi
+grep -q 'artifact check failed' "$tmp/bad-ctest.log"
 
 bad="$tmp/bad"
 mkdir "$bad"

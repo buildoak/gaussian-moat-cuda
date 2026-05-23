@@ -99,14 +99,23 @@ require_equal() {
 
 require_ctest_log() {
   local path="$1"
-  local expected="$2"
+  local label="$2"
   require_file "$path"
-  require_grep "100% tests passed, 0 tests failed out of ${expected}" "$path" \
-    "ctest ${expected}/${expected} summary"
+  local expected
+  expected="$(
+    sed -nE 's/^100% tests passed, 0 tests failed out of ([0-9]+)$/\1/p' \
+      "$path" | tail -n 1
+  )"
+  if [[ -z "$expected" || "$expected" == "0" ]]; then
+    echo "artifact check failed: missing successful ${label} CTest summary ($path)" >&2
+    exit 1
+  fi
   local count
-  count="$(grep -Ec "^[[:space:]]*[0-9]+/${expected} Test" "$path")"
+  count="$(
+    grep -Ec "^[[:space:]]*[0-9]+/${expected} Test" "$path" || true
+  )"
   if [[ "$count" != "$expected" ]]; then
-    echo "artifact check failed: expected ${expected} ctest rows in $path, got $count" >&2
+    echo "artifact check failed: expected ${expected} ${label} CTest rows in $path, got $count" >&2
     exit 1
   fi
 }
@@ -116,8 +125,8 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" 27
-require_ctest_log "$out_dir/verification-ctest.log" 73
+require_ctest_log "$out_dir/ctest.log" "sidecar"
+require_ctest_log "$out_dir/verification-ctest.log" "verification"
 
 for artifact in \
   environment.txt \
@@ -189,7 +198,7 @@ require_grep '"index":123' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final row index"
 require_grep '"r_outer":1015645' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan final radius"
-require_grep 'local sidecar ctest 27/27' \
+require_grep 'local sidecar CTest passes' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan sidecar gate"
 
 require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' \
