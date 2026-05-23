@@ -958,6 +958,172 @@ require_equal "$continuation_max_norm" "$cert_max_norm" \
 require_equal "$continuation_max_ties" "$cert_max_ties" \
   "K26 cert max-norm tie binding"
 
+python3 - "$continuation" "$prefix_witness" "$cert" <<'PY'
+import json
+import pathlib
+import sys
+
+continuation_path = pathlib.Path(sys.argv[1])
+prefix_witness_path = pathlib.Path(sys.argv[2])
+cert_path = pathlib.Path(sys.argv[3])
+
+
+def reject(message: str) -> None:
+    print(
+        f"K26_FULL_RUN_BUNDLE_REJECT: K26 cert source path binding {message}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
+def normalize_point(point):
+    if not isinstance(point, dict):
+        reject("contains a non-object point")
+    try:
+        return {
+            "a": int(point["a"]),
+            "b": int(point["b"]),
+            "norm_sq": int(point["norm_sq"]),
+        }
+    except (KeyError, TypeError, ValueError):
+        reject("contains a malformed point")
+
+
+def parse_prefix_witness(path: pathlib.Path, wanted_atom: int):
+    current = None
+    for raw in path.read_text().splitlines():
+        parts = raw.strip().split()
+        if not parts:
+            continue
+        if parts[0] == "witness":
+            if current is not None:
+                break
+            if len(parts) != 6:
+                reject("has malformed prefix witness row")
+            atom_id = int(parts[1])
+            if atom_id == wanted_atom:
+                current = {
+                    "atom_id": atom_id,
+                    "a": int(parts[2]),
+                    "b": int(parts[3]),
+                    "norm_sq": int(parts[4]),
+                    "expected_points": int(parts[5]),
+                    "points": [],
+                }
+        elif parts[0] == "point" and current is not None:
+            if len(parts) != 4:
+                reject("has malformed prefix witness point")
+            current["points"].append(
+                {"a": int(parts[1]), "b": int(parts[2]), "norm_sq": int(parts[3])}
+            )
+        elif parts[0] == "END" and current is not None:
+            break
+    if current is None:
+        reject(f"prefix witness omits target atom {wanted_atom}")
+    if len(current["points"]) != current["expected_points"]:
+        reject("prefix witness point count mismatch")
+    if not current["points"]:
+        reject("prefix witness path is empty")
+    last = current["points"][-1]
+    if (last["a"], last["b"], last["norm_sq"]) != (
+        current["a"],
+        current["b"],
+        current["norm_sq"],
+    ):
+        reject("prefix witness path does not end at witness atom")
+    return current["points"]
+
+
+def append_points(source_path, points):
+    for point in points:
+        if source_path and source_path[-1] == point:
+            continue
+        source_path.append(point)
+
+
+try:
+    continuation = json.loads(continuation_path.read_text())
+    cert = json.loads(cert_path.read_text())
+except Exception as exc:  # noqa: BLE001
+    reject(f"could not parse JSON: {exc}")
+
+target = continuation.get("target", {})
+atom_path = target.get("atom_path")
+if not isinstance(atom_path, list) or not atom_path:
+    reject("continuation target atom_path is missing")
+first_coordinate_atom = next(
+    (item for item in atom_path if isinstance(item, int) and item >= 0),
+    None,
+)
+if first_coordinate_atom is None:
+    reject("continuation target atom_path has no coordinate atom")
+
+assembled = parse_prefix_witness(prefix_witness_path, first_coordinate_atom)
+port_expansions = target.get("coordinate_port_expansions")
+if not isinstance(port_expansions, dict):
+    reject("continuation coordinate_port_expansions object is missing")
+expansion_rows = port_expansions.get("expansions")
+if not isinstance(expansion_rows, list):
+    reject("continuation coordinate_port_expansions.expansions is missing")
+
+expansions = {}
+for row in expansion_rows:
+    if not isinstance(row, dict):
+        reject("coordinate-port expansion row is not object")
+    coordinate_atom_id = row.get("coordinate_atom_id")
+    port_atom_id = row.get("port_atom_id")
+    raw_path = row.get("path")
+    if not isinstance(coordinate_atom_id, int) or coordinate_atom_id < 0:
+        reject("coordinate-port expansion has invalid coordinate atom")
+    if not isinstance(port_atom_id, int) or port_atom_id >= 0:
+        reject("coordinate-port expansion has invalid port atom")
+    if not isinstance(raw_path, list) or not raw_path:
+        reject("coordinate-port expansion has no path")
+    if row.get("path_points") != len(raw_path):
+        reject("coordinate-port expansion path_points mismatch")
+    key = (coordinate_atom_id, port_atom_id)
+    if key in expansions:
+        reject("coordinate-port expansion contains duplicate edge")
+    expansions[key] = [normalize_point(point) for point in raw_path]
+
+required_edges = 0
+for previous, current in zip(atom_path, atom_path[1:]):
+    if not isinstance(previous, int) or not isinstance(current, int):
+        reject("continuation target atom_path contains non-integer atom")
+    if previous >= 0 and current < 0:
+        required_edges += 1
+        key = (previous, current)
+        if key not in expansions:
+            reject(f"missing coordinate-port path for {previous}->{current}")
+        append_points(assembled, expansions[key])
+    elif previous < 0 and current >= 0:
+        required_edges += 1
+        key = (current, previous)
+        if key not in expansions:
+            reject(f"missing coordinate-port path for {previous}->{current}")
+        append_points(assembled, reversed(expansions[key]))
+
+if required_edges == 0:
+    reject("continuation target atom_path has no coordinate-port edges")
+if int(port_expansions.get("required_edges", -1)) != required_edges:
+    reject("coordinate-port required edge count disagrees with atom_path")
+if int(port_expansions.get("available_edges", -1)) != required_edges:
+    reject("coordinate-port expansion evidence is incomplete")
+
+endpoint = {"a": 376039, "b": 943460, "norm_sq": 1031522101121}
+if assembled[-1] != endpoint:
+    reject("assembled source path does not terminate at canonical endpoint")
+
+cert_source_path = cert.get("source_path")
+if not isinstance(cert_source_path, list) or not cert_source_path:
+    reject("cert source_path is missing")
+normalized_cert_source_path = [
+    normalize_point(point) for point in cert_source_path
+]
+if normalized_cert_source_path != assembled:
+    reject("does not match prefix witness plus coordinate-port expansions")
+PY
+
 if grep -q '"proof_status":"SUMMARY_ONLY_NON_CLAIM"' "$cert"; then
   require_grep '"terminal_source_inventory_mode":"summary_only_non_claim"' "$cert" \
     "K26 summary-only cert inventory mode"
