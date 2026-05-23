@@ -598,6 +598,13 @@ returned `[]`. This satisfies the Phase 1 remote build/smoke gate for the
 auto-summary certificate contract, but remains non-claim: it is not a
 sqrt(26) source/origin run and not a moat result.
 
+After recording the successful remote smoke at local head `bbc20d7`, a guarded
+one-band K26 timing-probe attempt used the same cap and excluded host `53663`.
+No RTX 4090 offer satisfied `$0.37/hr`; the nearest observed
+qualifying-market offer was `$0.4000/hr`, `0.0300/hr` over cap. No Vast
+instance was created, the failure ledger recorded the capped stop, and
+`vastai show instances --raw` returned `[]`.
+
 After any partial continuation, run:
 
 ```bash
