@@ -720,6 +720,33 @@ void append_count_object(
   out << '}';
 }
 
+void emit_phase_progress(std::ofstream& progress,
+                         std::string_view phase,
+                         std::string_view event,
+                         std::uint64_t band_index,
+                         std::uint64_t r_start,
+                         std::uint64_t r_outer,
+                         std::uint64_t elapsed_ms_value) {
+  if (!progress) {
+    return;
+  }
+  progress << "{\"schema\":\"lb_source_tileop_port_phase_v1\""
+           << ",\"phase\":";
+  append_json_string(progress, phase);
+  progress << ",\"event\":";
+  append_json_string(progress, event);
+  if (band_index != std::numeric_limits<std::uint64_t>::max()) {
+    progress << ",\"band_index\":" << band_index
+             << ",\"r_start\":" << r_start
+             << ",\"r_outer\":" << r_outer;
+  }
+  if (elapsed_ms_value != std::numeric_limits<std::uint64_t>::max()) {
+    progress << ",\"elapsed_ms\":" << elapsed_ms_value;
+  }
+  progress << "}\n";
+  progress.flush();
+}
+
 bool all_rejected_candidates_are_dead_end(
     const std::set<std::string>& reasons) {
   return !reasons.empty() &&
@@ -1116,6 +1143,16 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
+  std::ofstream progress;
+  if (config.progress_out.has_value()) {
+    progress.open(*config.progress_out);
+    if (!progress) {
+      std::cerr << "cannot open --progress-out path: " << *config.progress_out
+                << "\n";
+      return EXIT_FAILURE;
+    }
+  }
+
   std::optional<lb_source::CarryManifest> coordinate_manifest;
   std::optional<PrefixWitness> prefix_witness;
   std::optional<Point> target;
@@ -1157,7 +1194,15 @@ int main(int argc, char** argv) {
   std::map<lb_source::AtomId, std::vector<lb_source::AtomId>>
       provenance_adjacency;
   if (config.manifest_in.has_value()) {
+    const auto manifest_read_begin = std::chrono::steady_clock::now();
+    emit_phase_progress(progress, "manifest_read", "begin",
+                        std::numeric_limits<std::uint64_t>::max(), 0, 0,
+                        std::numeric_limits<std::uint64_t>::max());
     coordinate_manifest = read_manifest_or_die(*config.manifest_in);
+    emit_phase_progress(progress, "manifest_read", "end",
+                        std::numeric_limits<std::uint64_t>::max(), 0, 0,
+                        elapsed_ms(manifest_read_begin,
+                                   std::chrono::steady_clock::now()));
     if (coordinate_manifest->k_sq !=
         static_cast<std::uint64_t>(campaign::k_sq_value)) {
       std::cerr << "manifest k_sq does not match compiled K_SQ\n";
@@ -1186,7 +1231,15 @@ int main(int argc, char** argv) {
           coordinate_manifest->separator.component_partition[c].end());
     }
     if (config.prefix_witness_in.has_value()) {
+      const auto prefix_witness_read_begin = std::chrono::steady_clock::now();
+      emit_phase_progress(progress, "prefix_witness_read", "begin",
+                          std::numeric_limits<std::uint64_t>::max(), 0, 0,
+                          std::numeric_limits<std::uint64_t>::max());
       prefix_witness = read_prefix_witness_or_die(*config.prefix_witness_in);
+      emit_phase_progress(progress, "prefix_witness_read", "end",
+                          std::numeric_limits<std::uint64_t>::max(), 0, 0,
+                          elapsed_ms(prefix_witness_read_begin,
+                                     std::chrono::steady_clock::now()));
       if (prefix_witness->k_sq !=
           static_cast<std::uint64_t>(campaign::k_sq_value)) {
         std::cerr << "prefix witness k_sq does not match compiled K_SQ\n";
@@ -1229,23 +1282,20 @@ int main(int argc, char** argv) {
   std::uint64_t internal_edges = 0;
   std::uint64_t seam_edges = 0;
   std::map<lb_source::AtomId, std::uint64_t> norm_by_id;
-  std::ofstream progress;
-  if (config.progress_out.has_value()) {
-    progress.open(*config.progress_out);
-    if (!progress) {
-      std::cerr << "cannot open --progress-out path: " << *config.progress_out
-                << "\n";
-      return EXIT_FAILURE;
-    }
-  }
 
   for (std::size_t segment = 0; segment + 1 < schedule_radii.size();
        ++segment) {
     const auto band_begin = std::chrono::steady_clock::now();
     const std::uint64_t previous_outer = schedule_radii[segment];
     const std::uint64_t outer = schedule_radii[segment + 1];
+    emit_phase_progress(progress, "band", "begin", segment, previous_outer,
+                        outer, std::numeric_limits<std::uint64_t>::max());
     campaign::CampaignConstants constants;
     campaign::Grid grid;
+    const auto grid_begin = std::chrono::steady_clock::now();
+    emit_phase_progress(progress, "grid_build", "begin", segment,
+                        previous_outer, outer,
+                        std::numeric_limits<std::uint64_t>::max());
     try {
       constants = campaign::CampaignConstants::from_radii(
           previous_outer, outer, campaign::k_sq_value);
@@ -1261,15 +1311,33 @@ int main(int argc, char** argv) {
       return EXIT_FAILURE;
     }
     const auto grid_done = std::chrono::steady_clock::now();
+    emit_phase_progress(progress, "grid_build", "end", segment,
+                        previous_outer, outer,
+                        elapsed_ms(grid_begin, grid_done));
 
+    emit_phase_progress(progress, "active_tile_enumerate", "begin", segment,
+                        previous_outer, outer,
+                        std::numeric_limits<std::uint64_t>::max());
     const std::vector<campaign::TileCoord> coords =
         grid.enumerate_active_tiles();
     campaign_tiles_processed += coords.size();
     const auto enumerate_done = std::chrono::steady_clock::now();
+    emit_phase_progress(progress, "active_tile_enumerate", "end", segment,
+                        previous_outer, outer,
+                        elapsed_ms(grid_done, enumerate_done));
+    emit_phase_progress(progress, "tileop_build", "begin", segment,
+                        previous_outer, outer,
+                        std::numeric_limits<std::uint64_t>::max());
     std::vector<campaign::TileOp> tileops =
         build_tileops(coords, constants, grid, tileop_overflows);
     const auto tileop_done = std::chrono::steady_clock::now();
+    emit_phase_progress(progress, "tileop_build", "end", segment,
+                        previous_outer, outer,
+                        elapsed_ms(enumerate_done, tileop_done));
 
+    emit_phase_progress(progress, "port_graph", "begin", segment,
+                        previous_outer, outer,
+                        std::numeric_limits<std::uint64_t>::max());
     const lb_source::TileOpPortGraphResult graph =
         lb_source::make_tileop_port_band({
             .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
@@ -1284,6 +1352,9 @@ int main(int argc, char** argv) {
       return EXIT_FAILURE;
     }
     const auto graph_done = std::chrono::steady_clock::now();
+    emit_phase_progress(progress, "port_graph", "end", segment,
+                        previous_outer, outer,
+                        elapsed_ms(tileop_done, graph_done));
     for (const lb_source::BandAtom& atom : graph.band.atoms) {
       norm_by_id.emplace(atom.id, atom.norm_sq);
     }
@@ -1291,6 +1362,9 @@ int main(int argc, char** argv) {
     bool segment_target_seen = false;
     std::uint64_t segment_target_port_atoms = 0;
     std::uint64_t segment_target_bridge_edges = 0;
+    emit_phase_progress(progress, "target_bridge", "begin", segment,
+                        previous_outer, outer,
+                        std::numeric_limits<std::uint64_t>::max());
     if (target.has_value() && !target_seen) {
       const TargetBridgeResult target_bridge =
           bridge_target_coordinate_to_ports(*target, constants, coords, tileops,
@@ -1306,6 +1380,10 @@ int main(int argc, char** argv) {
       }
     }
     const auto target_bridge_done = std::chrono::steady_clock::now();
+    emit_phase_progress(progress, "target_bridge", "end", segment,
+                        previous_outer, outer,
+                        elapsed_ms(graph_done, target_bridge_done));
+    auto bridge_done = target_bridge_done;
     PortManifestBridgeResult segment_bridge;
     if (coordinate_manifest.has_value() && bands_processed == 0) {
       lb_source::BandInput bridged_band = band;
@@ -1315,9 +1393,16 @@ int main(int argc, char** argv) {
       }
       add_partition_adjacency(provenance_adjacency,
                               coordinate_manifest->separator);
+      emit_phase_progress(progress, "manifest_bridge", "begin", segment,
+                          previous_outer, outer,
+                          std::numeric_limits<std::uint64_t>::max());
       const PortManifestBridgeResult bridge =
           bridge_coordinate_manifest_to_ports(*coordinate_manifest, constants,
                                               coords, tileops, bridged_band);
+      bridge_done = std::chrono::steady_clock::now();
+      emit_phase_progress(progress, "manifest_bridge", "end", segment,
+                          previous_outer, outer,
+                          elapsed_ms(target_bridge_done, bridge_done));
       segment_bridge = bridge;
       if (config.require_full_bridge &&
           bridge.unbridged_coordinate_carry_atoms != 0) {
@@ -1328,11 +1413,18 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
       }
       incoming = coordinate_manifest->separator;
+      emit_phase_progress(progress, "source_process", "begin", segment,
+                          previous_outer, outer,
+                          std::numeric_limits<std::uint64_t>::max());
       last = lb_source::process_band(
           bridged_band, incoming,
           {.max_atoms = config.max_atoms,
            .max_carry_atoms = config.max_atoms,
            .max_components = config.max_atoms});
+      const auto source_process_done = std::chrono::steady_clock::now();
+      emit_phase_progress(progress, "source_process", "end", segment,
+                          previous_outer, outer,
+                          elapsed_ms(bridge_done, source_process_done));
       add_band_adjacency(provenance_adjacency, bridged_band);
       coordinate_carry_atoms_with_next_band_candidates =
           bridge.coordinate_carry_atoms_with_next_band_candidates;
@@ -1371,11 +1463,18 @@ int main(int argc, char** argv) {
       bridged_port_carry_atoms = bridge.bridged_port_carry_atoms;
       bridge_edges = bridge.bridge_edges;
     } else {
+      emit_phase_progress(progress, "source_process", "begin", segment,
+                          previous_outer, outer,
+                          std::numeric_limits<std::uint64_t>::max());
       last = lb_source::process_band(
           band, incoming,
           {.max_atoms = config.max_atoms,
            .max_carry_atoms = config.max_atoms,
            .max_components = config.max_atoms});
+      const auto source_process_done = std::chrono::steady_clock::now();
+      emit_phase_progress(progress, "source_process", "end", segment,
+                          previous_outer, outer,
+                          elapsed_ms(bridge_done, source_process_done));
       add_band_adjacency(provenance_adjacency, band);
       if (config.seed_inner_flags && bands_processed == 0) {
         for (const lb_source::BandAtom& atom : band.atoms) {
@@ -1484,6 +1583,8 @@ int main(int argc, char** argv) {
                << elapsed_ms(band_begin, process_done) << "}\n";
       progress.flush();
     }
+    emit_phase_progress(progress, "band", "end", segment, previous_outer,
+                        outer, elapsed_ms(band_begin, process_done));
     if (!last.accepted()) {
       break;
     }

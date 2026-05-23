@@ -145,8 +145,14 @@ band radii, generated atom counts, edge counts, source carry/death state, and
 phase timings so a paid run can be stopped with evidence instead of guesswork.
 The continuation-progress JSONL rows do the same for TileOp-port continuation
 bands, including tile counts, port graph counts, overflow totals, seam bridge
-counts, source carry/death state, and timings. Neither progress artifact
-relaxes the `SOURCE_DEAD_CERT` gate.
+counts, source carry/death state, and timings. They also include flushed phase
+rows before and after expensive stages such as `prefix_witness_read`,
+`tileop_build`, `manifest_bridge`, and `source_process`, so a timeout before
+the first completed continuation band still leaves evidence for the active
+runtime phase. The current local K26 probe completes the prefix row in about 24
+seconds and times out during the first continuation band's `tileop_build` phase
+for `8192 -> 16384`. Neither progress artifact relaxes the
+`SOURCE_DEAD_CERT` gate.
 With a supplied cert, the manifest binds the cert with the
 command/profile/BZ/prefix/progress/continuation/gap artifacts before the
 checker runs.

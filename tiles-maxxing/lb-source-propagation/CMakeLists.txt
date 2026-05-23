@@ -347,3 +347,9 @@ set_tests_properties(source_tileop_port_runner_manifest_schedule_smoke PROPERTIE
     "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\""
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
+
+add_test(NAME source_tileop_port_runner_phase_progress_smoke
+  COMMAND bash -c
+    "progress='${CMAKE_CURRENT_BINARY_DIR}/source_tileop_port_phase_progress.jsonl'; rm -f \"$progress\"; $<TARGET_FILE:source_tileop_port_runner> --r-start 248 --r-final 512 --band-width 128 --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt --progress-out \"$progress\" >/tmp/source_tileop_port_phase_progress.out && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"manifest_read\".*\"event\":\"begin\"' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"prefix_witness_read\".*\"event\":\"end\".*\"elapsed_ms\"' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"tileop_build\".*\"event\":\"begin\".*\"band_index\":0' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_progress_v1\".*\"band_index\":0' \"$progress\"")
+set_tests_properties(source_tileop_port_runner_phase_progress_smoke PROPERTIES
+  DEPENDS source_origin_prefix_manifest_smoke)

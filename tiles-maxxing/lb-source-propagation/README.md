@@ -341,7 +341,15 @@ prefix-progress, continuation, continuation-progress, manifest, witness, gap,
 and any supplied cert artifacts by SHA-256.
 Use `--timeout-seconds` on paid runs so prefix or continuation work stops with
 a status-level timeout blocker instead of silently exceeding the runtime
-budget.
+budget. `source_tileop_port_runner --progress-out` writes phase rows before and
+after expensive continuation stages (`manifest_read`, `prefix_witness_read`,
+`grid_build`, `tileop_build`, `port_graph`, `target_bridge`,
+`manifest_bridge`, and `source_process`) as well as completed-band rows. A
+timeout can therefore identify the active phase even when no continuation band
+has finished yet. The current local K26 probe completes the prefix row in about
+24 seconds and times out in the first continuation band's `tileop_build` phase
+for `8192 -> 16384`; this is diagnostic runtime evidence, not a
+`SOURCE_ORIGIN_K26` claim.
 If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
 the hash manifest, and runs the full bundle checker with the supplied
 `--source-dead-checker`.
