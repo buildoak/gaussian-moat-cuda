@@ -106,6 +106,7 @@ foreach(bad_source_dead_cert
     dead-cert-bad-pending-metadata
     dead-cert-bad-summary-extrema
     dead-cert-bad-summary-mode-claim
+    dead-cert-bad-summary-source-step
     dead-cert-bad-source-path)
   add_test(NAME source_dead_cert_fixture_${bad_source_dead_cert}_reject
     COMMAND source_dead_cert_check

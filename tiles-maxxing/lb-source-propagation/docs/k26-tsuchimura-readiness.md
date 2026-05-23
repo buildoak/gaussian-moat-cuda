@@ -267,11 +267,13 @@ required evidence, and current blocking gaps. It must keep
 - an accepted full-scale `SOURCE_DEAD_CERT` artifact. The current independent
   draft checker has two deliberately separate modes: a listed-inventory mode
   that recomputes the count/digest/max-norm/tie-set from the explicit terminal
-  inventory, and a `summary_only_non_claim` mode that only validates a
-  Tsuchimura-scale accumulator shape plus extrema witnesses and emits
-  `SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS`. The latter is the scalable
-  K26 contract shape, not a certificate acceptance; the real K26 chain,
-  accumulator provenance, and full-run BZ digest binding are still missing.
+  inventory, and a `summary_only_non_claim` mode that still validates the
+  positive Gaussian-prime source path and negative guard but treats the
+  terminal inventory as a Tsuchimura-scale accumulator shape plus extrema
+  witnesses. It emits `SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS` only for
+  that narrower non-claim case. The latter is the scalable K26 contract shape,
+  not a certificate acceptance; the real K26 chain, accumulator provenance,
+  and full-run BZ digest binding are still missing.
 
 The exact command contract is:
 

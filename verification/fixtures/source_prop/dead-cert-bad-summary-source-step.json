@@ -1,0 +1,34 @@
+{
+  "schema": "lb_source_dead_cert_draft_v1",
+  "certificate_id": "cert-bad-summary-source-step",
+  "profile_id": "profile-bad-summary-source-step",
+  "metadata": {
+    "source_mode": "CERTIFIED_SEED",
+    "source_id": "diagnostic-seed",
+    "geometry_id": "SOURCE_ORIGIN_DIAGNOSTIC",
+    "commit_id": "abc123",
+    "build_id": "local-test",
+    "bz_status": "BZ_CLEAN_DIAGNOSTIC",
+    "artifact_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "proof_status": "SUMMARY_ONLY_NON_CLAIM",
+  "non_claim": "summary-only accumulator shape check with invalid source step",
+  "terminal_source_inventory_mode": "summary_only_non_claim",
+  "k_sq": 3,
+  "terminal_radius": 20,
+  "negative_guard_pass": true,
+  "endpoint": { "a": 7, "b": 2, "norm_sq": 53 },
+  "endpoint_atom_id": 30064771074,
+  "source_path_provenance": "coordinate_gaussian_prime_path",
+  "source_path": [
+    { "a": 5, "b": 2, "norm_sq": 29 },
+    { "a": 7, "b": 2, "norm_sq": 53 }
+  ],
+  "terminal_source_inventory_summary": {
+    "count": 14542615005,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "max_norm_sq": 53,
+    "max_norm_atom_ids": [30064771074]
+  }
+}
