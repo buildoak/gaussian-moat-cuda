@@ -399,6 +399,14 @@ instead of restarting the paid continuation from row 0.
 completed TileOp-port band timings, projects the full 123-segment continuation
 against the `14000` second wall-clock budget, reports the last completed radius
 and active phase context, and emits only diagnostic non-claim status.
+The bundle harness now runs this checker automatically whenever a continuation
+command times out, hits the whole-bundle runtime limit, or completes. It writes
+`k26-runtime-budget-check.log`, `k26-runtime-budget-check.err`, and
+`k26-runtime-budget-check.meta`, then mirrors the runtime-budget status,
+completed-band count, projection, margin, last completed radius, progress
+artifact, and checker exit code into `status.txt` when available. This makes a
+paid stop/retry decision reproducible without treating runtime evidence as
+source/origin proof.
 The TileOp build loop is parallelized only inside this sidecar runner with
 standard C++ worker threads, preserving the deterministic output order and
 reporting

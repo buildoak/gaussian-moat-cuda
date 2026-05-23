@@ -118,6 +118,7 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bundle_checker="$script_dir/check_k26_full_run_bundle.sh"
+runtime_budget_checker="$script_dir/check_k26_runtime_budget.py"
 
 required_bins=(
   k26_source_run_commands
@@ -179,6 +180,53 @@ status_file="$out_dir/status.txt"
 artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
 source_dead_gap="$out_dir/k26-source-dead-gap.json"
 chunk_ledger="$out_dir/k26-continuation-chunks.jsonl"
+
+record_runtime_budget_diagnostic() {
+  local label="$1"
+  local progress="$2"
+  if [[ ! -x "$runtime_budget_checker" || ! -f "$progress" ]]; then
+    return
+  fi
+
+  local args=(
+    "$runtime_budget_checker"
+    --progress "$progress"
+    --schedule-segment-count 123
+  )
+  if [[ "$max_runtime_seconds" != "0" ]]; then
+    args+=(--max-runtime-seconds "$max_runtime_seconds")
+  fi
+  if [[ -f "$chunk_ledger" ]]; then
+    args+=(--chunk-ledger "$chunk_ledger")
+  fi
+
+  set +e
+  "${args[@]}" \
+    > "$out_dir/k26-runtime-budget-check.log" \
+    2> "$out_dir/k26-runtime-budget-check.err"
+  local checker_status=$?
+  set -e
+  {
+    echo "label=$label"
+    echo "progress=$(basename "$progress")"
+    echo "exit_code=$checker_status"
+  } > "$out_dir/k26-runtime-budget-check.meta"
+}
+
+record_runtime_budget_for_run() {
+  local label="$1"
+  local output="$2"
+  case "$label" in
+    K26_CONTINUATION)
+      record_runtime_budget_diagnostic \
+        "$label" "$out_dir/k26-continuation-progress.jsonl"
+      ;;
+    K26_CONTINUATION_CHUNK_*)
+      record_runtime_budget_diagnostic "$label" "${output%.json}.progress.jsonl"
+      ;;
+  esac
+}
+
 write_status() {
   local status="$1"
   {
@@ -206,6 +254,26 @@ write_status() {
         "$out_dir/k26-source-dead-gap-check.log" | head -n 1
       sed -nE 's/.*"claim_grade":(true|false).*/source_dead_gap_claim_grade=\1/p' \
         "$out_dir/k26-source-dead-gap-check.log" | head -n 1
+    fi
+    if [[ -f "$out_dir/k26-runtime-budget-check.log" ]]; then
+      sed -nE 's/.*"status":"([^"]+)".*/runtime_budget_check_status=\1/p' \
+        "$out_dir/k26-runtime-budget-check.log" | head -n 1
+      sed -nE 's/.*"completed_band_count":([0-9]+).*/runtime_budget_completed_band_count=\1/p' \
+        "$out_dir/k26-runtime-budget-check.log" | head -n 1
+      sed -nE 's/.*"projected_total_seconds":([0-9]+).*/runtime_budget_projected_total_seconds=\1/p' \
+        "$out_dir/k26-runtime-budget-check.log" | head -n 1
+      sed -nE 's/.*"budget_margin_seconds":(-?[0-9]+).*/runtime_budget_margin_seconds=\1/p' \
+        "$out_dir/k26-runtime-budget-check.log" | head -n 1
+      sed -nE 's/.*"last_completed_r_outer":([0-9]+).*/runtime_budget_last_completed_r_outer=\1/p' \
+        "$out_dir/k26-runtime-budget-check.log" | head -n 1
+    fi
+    if [[ -f "$out_dir/k26-runtime-budget-check.meta" ]]; then
+      sed -nE 's/^label=(.*)$/runtime_budget_label=\1/p' \
+        "$out_dir/k26-runtime-budget-check.meta" | head -n 1
+      sed -nE 's/^progress=(.*)$/runtime_budget_progress=\1/p' \
+        "$out_dir/k26-runtime-budget-check.meta" | head -n 1
+      sed -nE 's/^exit_code=([0-9]+)$/runtime_budget_exit_code=\1/p' \
+        "$out_dir/k26-runtime-budget-check.meta" | head -n 1
     fi
   } > "$status_file"
 }
@@ -328,6 +396,7 @@ PY
   fi
   set -e
   if [[ "$status" == "124" ]]; then
+    record_runtime_budget_for_run "$label" "$output"
     if [[ "$timeout_kind" == "runtime" ]]; then
       write_status "K26_FULL_RUN_BUNDLE_BLOCKED_${label}_RUNTIME_LIMIT"
       echo "$label exceeded K26 bundle max runtime ${max_runtime_seconds}s" >&2
@@ -338,6 +407,7 @@ PY
     exit 124
   fi
   if [[ "$status" != "0" ]]; then
+    record_runtime_budget_for_run "$label" "$output"
     write_status "K26_FULL_RUN_BUNDLE_BLOCKED_${label}_FAILED"
     cat "$stderr_file" >&2
     exit 1
@@ -773,6 +843,8 @@ else
 fi
 
 run_k26_continuation
+record_runtime_budget_diagnostic \
+  K26_CONTINUATION_COMPLETE "$out_dir/k26-continuation-progress.jsonl"
 
 continuation_terminal_dead="$(
   json_bool_value "$out_dir/k26-continuation-result.json" terminal_source_dead

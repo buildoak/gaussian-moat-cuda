@@ -363,6 +363,15 @@ check_k26_runtime_budget.py \
 This emits `K26_RUNTIME_BUDGET_PASS`, `K26_RUNTIME_BUDGET_REJECT`, or
 `K26_RUNTIME_BUDGET_INSUFFICIENT_PROGRESS` as diagnostic non-claim evidence.
 It is a stop/continue guard for budgeted execution, not source/origin proof.
+The full bundle harness also invokes this checker automatically after a
+continuation timeout, whole-bundle runtime-limit stop, failed continuation with
+progress, or completed continuation. The harness stores the raw checker output
+as `k26-runtime-budget-check.log` plus stderr/meta sidecars, and copies the
+checker status, projection, margin, last completed radius, progress artifact,
+and exit code into `status.txt` when those fields exist. A paid attempt should
+therefore leave enough runtime evidence to decide whether to resume, reduce
+chunk size, or stop under the `$1.50` cap without weakening the
+`SOURCE_DEAD_CERT` gate.
 
 ## Stop Conditions
 
