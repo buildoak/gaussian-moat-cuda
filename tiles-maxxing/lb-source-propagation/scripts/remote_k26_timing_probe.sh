@@ -24,7 +24,7 @@ Defaults:
   --repo                current working directory
   --build-dir           /tmp/gm-lbsp-remote-k26
   --out-dir             /workspace/lb-source-k26-timing-probe
-  --chunk-bands         8
+  --chunk-bands         1
   --timeout-seconds     1200
   --max-runtime-seconds 14000
   --tileop-threads      0 (source_tileop_port_runner hardware auto)
@@ -34,7 +34,7 @@ USAGE
 repo_dir="$(pwd)"
 build_dir="/tmp/gm-lbsp-remote-k26"
 out_dir="/workspace/lb-source-k26-timing-probe"
-chunk_bands="8"
+chunk_bands="1"
 timeout_seconds="1200"
 max_runtime_seconds="14000"
 tileop_threads="0"

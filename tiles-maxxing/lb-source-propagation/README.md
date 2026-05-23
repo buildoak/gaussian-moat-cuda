@@ -294,14 +294,16 @@ tiles-maxxing/lb-source-propagation/scripts/remote_k26_timing_probe.sh \
   --repo /workspace/gaussian-moat-cuda \
   --build-dir /tmp/gm-lbsp-remote-k26 \
   --out-dir /workspace/lb-source-k26-timing-probe \
-  --chunk-bands 8 \
+  --chunk-bands 1 \
   --timeout-seconds 1200 \
   --max-runtime-seconds 14000 \
   --tileop-threads 0
 ```
 
 This builds the sidecar with `-DK_SQ=26`, runs the chunked K26 bundle harness,
-keeps resume artifacts, and records runtime-budget diagnostics. A
+keeps resume artifacts, and records runtime-budget diagnostics. The remote
+timing default uses one-band chunks so the per-chunk budget gate can stop a
+bad paid host after the first completed continuation band. A
 `K26_FULL_RUN_BUNDLE_BLOCKED_*` status is acceptable timing evidence for this
 probe. It is not a `SOURCE_DEAD_CERT`, not a sqrt(26) reproduction, and not a
 moat result.

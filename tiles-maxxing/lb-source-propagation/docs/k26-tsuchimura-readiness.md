@@ -436,6 +436,9 @@ completed chunk against the cumulative appended progress. If the projection is
 already over budget, it stops with
 `K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_<id>_RUNTIME_BUDGET_REJECT`
 before launching the next chunk.
+Remote timing probes therefore default to `--chunk-bands 1`, while the full
+bundle command contract can still use larger chunks such as `8` for resumable
+execution when the runtime profile is already known to be acceptable.
 
 ## Stop Conditions
 

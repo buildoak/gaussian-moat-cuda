@@ -89,6 +89,8 @@ grep -q 'QUALIFYING_OFFER id=12345 host_id=777 dph=0.29' \
   "$tmp/dry-run-k26-timing.log"
 grep -q 'REMOTE_K26_TIMING_PROBE:' "$tmp/dry-run-k26-timing.log"
 grep -q -- '--run-k26-timing-probe' "$tmp/dry-run-k26-timing.log"
+grep -q -- '--chunk-bands 1' "$tmp/dry-run-k26-timing.log"
+grep -q -- '--k26-timing-chunk-bands 1' "$tmp/dry-run-k26-timing.log"
 grep -q -- '--tileop-threads 6' "$tmp/dry-run-k26-timing.log"
 grep -q -- '--k26-tileop-threads 6' "$tmp/dry-run-k26-timing.log"
 grep -q 'DRY_RUN_ONLY' "$tmp/dry-run-k26-timing.log"
