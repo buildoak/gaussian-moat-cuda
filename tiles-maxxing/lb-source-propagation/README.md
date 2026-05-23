@@ -345,14 +345,18 @@ tiles-maxxing/lb-source-propagation/scripts/run_k26_full_source_bundle.sh \
 ```
 
 It runs the exact K26 command/profile/BZ emitters, then executes the row-0
-coordinate prefix and diagnostic-bridge TileOp-port continuation. It does not
-manufacture a source-dead certificate. If terminal source death occurs but the
-canonical Tsuchimura endpoint was not source-reached, it writes
+coordinate prefix and diagnostic-bridge TileOp-port continuation. If terminal
+source death occurs but the canonical Tsuchimura endpoint was not
+source-reached, it writes
 `K26_FULL_RUN_BUNDLE_BLOCKED_TARGET_NOT_REACHED` to `status.txt`; that is a
 terminal diagnostic blocker, not a missing-cert case. If the endpoint was
-reached but no `k26-source-dead-cert.json` is available, it writes
-`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt` after
-the prefix and continuation artifacts are produced. It also writes
+reached and both independent source-dead checkers are supplied, it synthesizes
+a `SUMMARY_ONLY_NON_CLAIM` `k26-source-dead-cert.json` from the prefix witness
+and full coordinate-port expansion paths, then lets the bundle checker report
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM`. If the
+endpoint was reached but no supplied cert or cert checker is available, it
+writes `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING` to `status.txt`
+after the prefix and continuation artifacts are produced. It also writes
 `k26-prefix-progress.jsonl`, one JSON row per processed coordinate-prefix band,
 with atom/edge counts, source carry/death state, and timing fields. This is
 paid-run observability, not claim evidence. The harness also writes
@@ -386,21 +390,21 @@ until a claim-grade BZ gate exists. When the mixed target atom chain is present,
 `coordinate_path_obligation` also binds its first coordinate atom to a target
 row in `k26-prefix-witness.txt`. The TileOp-port continuation also reports a
 compact `prefix_witness_path` summary for that first coordinate atom and a
-`coordinate_port_expansions` summary for every coordinate/port edge in the
-mixed target atom chain. Those expansions are reconstructed from the exact
-per-tile Gaussian-prime graph after the TileOp byte check passes, so the gap
-checker can verify that the origin-to-row-0 prefix segment and the local
-TileOp-port segments are backed by coordinate-path evidence. This remains
-non-claim until a claim-grade verifier binds the full coordinate path,
-terminal inventory, and BZ schedule into one certificate.
+`coordinate_port_expansions` object for every coordinate/port edge in the
+mixed target atom chain. Those expansions include full local Gaussian-prime
+paths reconstructed from the exact per-tile graph after the TileOp byte check
+passes. The gap checker binds the counts, while the harness uses the full paths
+to assemble the summary-only positive `source_path`. This remains non-claim
+until a claim-grade verifier binds the full coordinate path, terminal
+inventory, and BZ schedule into one certificate.
 `target_bridge_obligation` mirrors the continuation target bridge, so the gap
 also records whether the canonical endpoint was seen, bridged to TileOp ports,
 and source-reached.
-When
-`--source-dead-gap-checker` is supplied, the harness runs the independent gap
-checker before stopping on either a target-not-reached gap or the missing cert,
-and mirrors the checker status fields into `status.txt` so remote logs show
-whether bridge safety passed and which certificate obligations remain blocked.
+When `--source-dead-gap-checker` is supplied, the harness runs the independent
+gap checker before stopping on either a target-not-reached gap, a missing cert,
+or the generated summary-only non-claim cert. It mirrors the checker status
+fields into `status.txt` so remote logs show whether bridge safety passed and
+which certificate obligations remain blocked.
 It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
 prefix-progress, continuation, continuation-progress, manifest, witness, gap,

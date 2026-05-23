@@ -138,11 +138,17 @@ source death is reached, and a partial `k26-full-run-artifacts.sha256`
 manifest. If terminal source death occurs before the canonical Tsuchimura
 endpoint is source-reached, the harness stops with
 `K26_FULL_RUN_BUNDLE_BLOCKED_TARGET_NOT_REACHED`. If the endpoint is reached
-but no cert is supplied, it stops with
-`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. If the continuation
-finishes with live source carry instead of terminal death, the harness stops
-with `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE` because there is no
-source-dead gap to certify. The gap artifact binds the continuation artifact
+and both independent source-dead checkers are supplied, the harness now
+synthesizes `k26-source-dead-cert.json` as a
+`SUMMARY_ONLY_NON_CLAIM` artifact from the row-0 prefix witness plus the full
+coordinate-port expansion paths in the continuation JSON, then lets the bundle
+checker report
+`K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM`. If the
+endpoint is reached but no cert or cert checkers are supplied, it still stops
+with `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING`. If the
+continuation finishes with live source carry instead of terminal death, the
+harness stops with `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE` because
+there is no source-dead gap to certify. The gap artifact binds the continuation artifact
 plus the prefix manifest and prefix witness, and records the exact remaining
 certificate obligations: bridge safety, target/coordinate path, terminal
 inventory, and repaired K26 BZ schedule evidence. `bz_schedule_obligation`
@@ -152,12 +158,14 @@ until the cert layer has a claim-grade BZ gate. When the mixed target atom chain
 is present, the gap also requires the first coordinate atom to be a target row
 in `k26-prefix-witness.txt`; the origin-prefix side is then bound. The
 continuation now preserves a compact `prefix_witness_path` summary for that
-first coordinate atom plus a `coordinate_port_expansions` summary for every
-coordinate/port edge in the mixed atom chain. The gap binds these into
-`coordinate_path_obligation`, verifying that the row-0 prefix segment starts
-from an origin source seed and that the TileOp-port edges have local
-Gaussian-prime expansion evidence. This is still non-claim until a verifier
-binds the full coordinate path, terminal inventory, and BZ schedule.
+first coordinate atom plus a `coordinate_port_expansions` object for every
+coordinate/port edge in the mixed atom chain. Each expansion includes the full
+local Gaussian-prime path between the coordinate atom and the representative
+TileOp-port witness. The gap binds the counts into
+`coordinate_path_obligation`, and the harness uses the full expansion paths to
+assemble the summary-only positive source path. This is still non-claim until
+a claim-grade verifier binds the full coordinate path, terminal inventory, and
+BZ schedule.
 The same gap records a `target_bridge_obligation`
 that mirrors whether the canonical endpoint was seen, bridged to TileOp ports,
 and source-reached. For chunked runs it also binds

@@ -114,8 +114,8 @@ if [[ -n "$manifest" ]]; then
 JSON
   exit 0
 fi
-cat <<'JSON' | python3 -c 'import json, os, sys; doc = json.load(sys.stdin); doc.pop("terminal_source_inventory_accumulator", None) if os.environ.get("OMIT_TERMINAL_ACCUMULATOR") else None; print(json.dumps(doc, separators=(",", ":")))'
-{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true,"path_provenance":"mixed_coordinate_port_atom_chain_non_claim","atom_path_length":3,"atom_path":[1615075207963900,-25220051735553,1615075207964004],"prefix_witness_path":{"available":true,"target_atom_id":1615075207963900,"path_points":2,"seed_norm_sq":9,"target_norm_sq":1031325872257},"coordinate_port_expansions":{"required_edges":2,"available_edges":2,"path_points_total":4,"expansions":[{"coordinate_atom_id":1615075207963900,"port_atom_id":-25220051735553,"path_points":2,"coordinate_norm_sq":1031325872257,"port_witness_norm_sq":1031325872257},{"coordinate_atom_id":1615075207964004,"port_atom_id":-25220051735553,"path_points":2,"coordinate_norm_sq":1031522101121,"port_witness_norm_sq":1031325872257}]}},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615075207964004],"terminal_source_inventory_accumulator":{"mode":"summary_digest_only_non_claim","provenance":"terminal_component_inventory_accumulator","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]}}
+cat <<'JSON' | python3 -c 'import json, os, sys; doc = json.load(sys.stdin); doc.pop("terminal_source_inventory_accumulator", None) if os.environ.get("OMIT_TERMINAL_ACCUMULATOR") else None; [row.pop("path", None) for row in doc.get("target", {}).get("coordinate_port_expansions", {}).get("expansions", [])] if os.environ.get("OMIT_PORT_EXPANSION_PATH") else None; print(json.dumps(doc, separators=(",", ":")))'
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":1015645,"schedule_mode":"explicit_radii","schedule_boundary_count":124,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":true,"port_atoms":9,"bridge_edges":9,"source_reached":true,"path_provenance":"mixed_coordinate_port_atom_chain_non_claim","atom_path_length":3,"atom_path":[1615075207963900,-25220051735553,1615075207964004],"prefix_witness_path":{"available":true,"target_atom_id":1615075207963900,"path_points":2,"seed_norm_sq":9,"target_norm_sq":1031325872257},"coordinate_port_expansions":{"required_edges":2,"available_edges":2,"path_points_total":4,"expansions":[{"coordinate_atom_id":1615075207963900,"port_atom_id":-25220051735553,"path_points":2,"coordinate_norm_sq":1031325872257,"port_witness_norm_sq":1031325872257,"path":[{"a":376039,"b":943356,"norm_sq":1031325872257},{"a":376039,"b":943356,"norm_sq":1031325872257}]},{"coordinate_atom_id":1615075207964004,"port_atom_id":-25220051735553,"path_points":2,"coordinate_norm_sq":1031522101121,"port_witness_norm_sq":1031325872257,"path":[{"a":376039,"b":943460,"norm_sq":1031522101121},{"a":376039,"b":943356,"norm_sq":1031325872257}]}]}},"accepted":true,"terminal_source_dead":true,"has_source_carry":false,"source_inventory_count":14542615005,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":1031522101121,"max_source_norm_atom_ids":[1615075207964004],"terminal_source_inventory_accumulator":{"mode":"summary_digest_only_non_claim","provenance":"terminal_component_inventory_accumulator","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]}}
 JSON
 SH
 
@@ -507,6 +507,73 @@ if grep -q 'k26-source-dead-cert.json' \
   echo "blocked partial manifest unexpectedly included missing cert" >&2
   exit 1
 fi
+
+auto_source_dead_checker="$tmp/auto-source-dead-checker"
+cat > "$auto_source_dead_checker" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+python3 - "$1" <<'PY'
+import json
+import sys
+
+cert = json.loads(open(sys.argv[1]).read())
+if cert.get("proof_status") != "SUMMARY_ONLY_NON_CLAIM":
+    print("SOURCE_DEAD_CERT_DRAFT_REJECT: expected summary-only cert", file=sys.stderr)
+    raise SystemExit(1)
+if cert.get("terminal_source_inventory_mode") != "summary_only_non_claim":
+    print("SOURCE_DEAD_CERT_DRAFT_REJECT: missing summary mode", file=sys.stderr)
+    raise SystemExit(1)
+if cert.get("terminal_source_inventory_accumulator", {}).get("mode") != "summary_digest_only_non_claim":
+    print("SOURCE_DEAD_CERT_DRAFT_REJECT: missing accumulator", file=sys.stderr)
+    raise SystemExit(1)
+source_path = cert.get("source_path", [])
+if len(source_path) < 2 or source_path[0].get("norm_sq", 10**30) > 26:
+    print("SOURCE_DEAD_CERT_DRAFT_REJECT: bad generated source path", file=sys.stderr)
+    raise SystemExit(1)
+if source_path[-1] != {"a": 376039, "b": 943460, "norm_sq": 1031522101121}:
+    print("SOURCE_DEAD_CERT_DRAFT_REJECT: generated path misses endpoint", file=sys.stderr)
+    raise SystemExit(1)
+print('{"status":"SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS"}')
+PY
+SH
+chmod +x "$auto_source_dead_checker"
+
+generated_summary_out="$tmp/generated-summary"
+if "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$generated_summary_out" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    --source-dead-checker "$auto_source_dead_checker" \
+    >/tmp/k26-harness-generated-summary.out \
+    2>/tmp/k26-harness-generated-summary.err; then
+  echo "harness accepted generated summary-only non-claim cert as checked K26 bundle" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM' \
+  "$generated_summary_out/status.txt"
+test -f "$generated_summary_out/k26-source-dead-cert.json"
+grep -q '"proof_status":"SUMMARY_ONLY_NON_CLAIM"' \
+  "$generated_summary_out/k26-source-dead-cert.json"
+grep -q '"source_path":\[{"a":0,"b":3,"norm_sq":9},{"a":376039,"b":943356,"norm_sq":1031325872257},{"a":376039,"b":943460,"norm_sq":1031522101121}\]' \
+  "$generated_summary_out/k26-source-dead-cert.json"
+grep -q 'k26-source-dead-cert.json' \
+  "$generated_summary_out/k26-full-run-artifacts.sha256"
+
+missing_expansion_path_out="$tmp/missing-expansion-path"
+if OMIT_PORT_EXPANSION_PATH=1 "$harness" \
+    --build-dir "$build_dir" \
+    --out-dir "$missing_expansion_path_out" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    --source-dead-checker "$auto_source_dead_checker" \
+    >/tmp/k26-harness-missing-expansion-path.out \
+    2>/tmp/k26-harness-missing-expansion-path.err; then
+  echo "harness generated a source-dead cert without coordinate-port paths" >&2
+  exit 1
+fi
+grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_GENERATION' \
+  "$missing_expansion_path_out/status.txt"
+grep -q 'has no path' /tmp/k26-harness-missing-expansion-path.err
+test ! -f "$missing_expansion_path_out/k26-source-dead-cert.json"
 
 missing_accumulator_out="$tmp/missing-terminal-accumulator"
 if OMIT_TERMINAL_ACCUMULATOR=1 "$harness" \

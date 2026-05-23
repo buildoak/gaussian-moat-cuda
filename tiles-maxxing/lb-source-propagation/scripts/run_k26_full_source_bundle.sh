@@ -41,8 +41,11 @@ bundle checker is run. Without terminal source death, the script stops after
 the continuation with K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_STILL_LIVE. With
 terminal source death but no target reachability, it writes the source-dead gap
 and stops with K26_FULL_RUN_BUNDLE_BLOCKED_TARGET_NOT_REACHED. With terminal
-source death and target reachability but no cert, it writes the source-dead gap
-and stops with K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING.
+source death, target reachability, and both independent checkers supplied, it
+synthesizes a summary-only non-claim k26-source-dead-cert.json from the prefix
+witness and coordinate-port expansion paths, then lets the bundle checker name
+the remaining SOURCE_DEAD_CERT blocker. Without checkers or --cert-in, it stops
+with K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING.
 USAGE
 }
 
@@ -1026,6 +1029,227 @@ PY
 JSON
 }
 
+write_summary_source_dead_cert() {
+  local cert_tmp="$out_dir/k26-source-dead-cert.json.tmp"
+  local cert_err="$out_dir/k26-source-dead-cert-generation.err"
+  set +e
+  python3 - \
+    "$out_dir/k26-continuation-result.json" \
+    "$out_dir/k26-prefix-witness.txt" \
+    "$out_dir/k26_source_run_profile.json" \
+    "$out_dir/k26_bz_schedule_check.json" \
+    > "$cert_tmp" 2> "$cert_err" <<'PY'
+import json
+import sys
+
+continuation_path, witness_path, profile_path, bz_path = sys.argv[1:]
+
+with open(continuation_path, "r", encoding="utf-8") as fh:
+    continuation = json.load(fh)
+with open(profile_path, "r", encoding="utf-8") as fh:
+    profile = json.load(fh)
+with open(bz_path, "r", encoding="utf-8") as fh:
+    bz = json.load(fh)
+
+target = continuation.get("target")
+if not isinstance(target, dict):
+    raise SystemExit("continuation target object is missing")
+if target.get("source_reached") is not True:
+    raise SystemExit("target is not source-reached")
+atom_path = target.get("atom_path")
+if not isinstance(atom_path, list) or not atom_path:
+    raise SystemExit("target atom_path is missing")
+
+first_coordinate_atom = next((item for item in atom_path if isinstance(item, int) and item >= 0), None)
+if first_coordinate_atom is None:
+    raise SystemExit("target atom_path has no coordinate atom")
+
+def parse_prefix_witness(path, wanted_atom):
+    current = None
+    with open(path, "r", encoding="utf-8") as fh:
+        for raw in fh:
+            parts = raw.strip().split()
+            if not parts:
+                continue
+            if parts[0] == "witness":
+                if current is not None:
+                    break
+                if len(parts) != 6:
+                    raise SystemExit("malformed prefix witness row")
+                atom_id = int(parts[1])
+                if atom_id == wanted_atom:
+                    current = {
+                        "atom_id": atom_id,
+                        "a": int(parts[2]),
+                        "b": int(parts[3]),
+                        "norm_sq": int(parts[4]),
+                        "expected_points": int(parts[5]),
+                        "points": [],
+                    }
+            elif parts[0] == "point" and current is not None:
+                if len(parts) != 4:
+                    raise SystemExit("malformed prefix witness point")
+                current["points"].append(
+                    {"a": int(parts[1]), "b": int(parts[2]), "norm_sq": int(parts[3])}
+                )
+            elif parts[0] == "END" and current is not None:
+                break
+    if current is None:
+        raise SystemExit(f"prefix witness omits target atom {wanted_atom}")
+    if len(current["points"]) != current["expected_points"]:
+        raise SystemExit("prefix witness point count mismatch")
+    if not current["points"]:
+        raise SystemExit("prefix witness path is empty")
+    last = current["points"][-1]
+    if (last["a"], last["b"], last["norm_sq"]) != (
+        current["a"],
+        current["b"],
+        current["norm_sq"],
+    ):
+        raise SystemExit("prefix witness path does not end at witness atom")
+    return current["points"]
+
+source_path = parse_prefix_witness(witness_path, first_coordinate_atom)
+
+port_expansions = target.get("coordinate_port_expansions")
+if not isinstance(port_expansions, dict):
+    raise SystemExit("coordinate_port_expansions object is missing")
+expansion_rows = port_expansions.get("expansions")
+if not isinstance(expansion_rows, list):
+    raise SystemExit("coordinate_port_expansions.expansions is missing")
+
+expansions = {}
+for row in expansion_rows:
+    if not isinstance(row, dict):
+        raise SystemExit("coordinate-port expansion row is not object")
+    coordinate_atom_id = row.get("coordinate_atom_id")
+    port_atom_id = row.get("port_atom_id")
+    path = row.get("path")
+    if not isinstance(coordinate_atom_id, int) or coordinate_atom_id < 0:
+        raise SystemExit("coordinate-port expansion has invalid coordinate atom")
+    if not isinstance(port_atom_id, int) or port_atom_id >= 0:
+        raise SystemExit("coordinate-port expansion has invalid port atom")
+    if not isinstance(path, list) or not path:
+        raise SystemExit(
+            f"coordinate-port expansion {coordinate_atom_id}->{port_atom_id} has no path"
+        )
+    if row.get("path_points") != len(path):
+        raise SystemExit(
+            f"coordinate-port expansion {coordinate_atom_id}->{port_atom_id} path_points mismatch"
+        )
+    normalized = []
+    for point in path:
+        if not isinstance(point, dict):
+            raise SystemExit("coordinate-port expansion point is not object")
+        normalized.append(
+            {
+                "a": int(point["a"]),
+                "b": int(point["b"]),
+                "norm_sq": int(point["norm_sq"]),
+            }
+        )
+    expansions[(coordinate_atom_id, port_atom_id)] = normalized
+
+def append_points(points):
+    for point in points:
+        if source_path and source_path[-1] == point:
+            continue
+        source_path.append(point)
+
+required_edges = 0
+for previous, current in zip(atom_path, atom_path[1:]):
+    if not isinstance(previous, int) or not isinstance(current, int):
+        raise SystemExit("target atom_path contains non-integer atom")
+    if previous >= 0 and current < 0:
+        required_edges += 1
+        key = (previous, current)
+        if key not in expansions:
+            raise SystemExit(f"missing coordinate-port path for {previous}->{current}")
+        append_points(expansions[key])
+    elif previous < 0 and current >= 0:
+        required_edges += 1
+        key = (current, previous)
+        if key not in expansions:
+            raise SystemExit(f"missing coordinate-port path for {previous}->{current}")
+        append_points(reversed(expansions[key]))
+
+if required_edges == 0:
+    raise SystemExit("target atom_path has no coordinate-port edges")
+if int(port_expansions.get("required_edges", -1)) != required_edges:
+    raise SystemExit("coordinate-port required edge count disagrees with atom_path")
+if int(port_expansions.get("available_edges", -1)) != required_edges:
+    raise SystemExit("coordinate-port expansion evidence is incomplete")
+
+endpoint = {"a": 376039, "b": 943460, "norm_sq": 1031522101121}
+if source_path[-1] != endpoint:
+    raise SystemExit("assembled source_path does not terminate at canonical endpoint")
+
+inventory_summary = {
+    "count": int(continuation["source_inventory_count"]),
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": continuation["source_inventory_digest_hex"],
+    "max_norm_sq": int(continuation["max_source_norm_sq"]),
+    "max_norm_atom_ids": continuation["max_source_norm_atom_ids"],
+}
+accumulator = continuation.get("terminal_source_inventory_accumulator")
+if not isinstance(accumulator, dict):
+    raise SystemExit("terminal_source_inventory_accumulator is missing")
+for key, value in inventory_summary.items():
+    if accumulator.get(key) != value:
+        raise SystemExit(f"terminal accumulator {key} disagrees with summary")
+if accumulator.get("mode") != "summary_digest_only_non_claim":
+    raise SystemExit("terminal accumulator mode is not summary_digest_only_non_claim")
+if accumulator.get("claim_grade_inventory_accepted") is not False:
+    raise SystemExit("terminal accumulator unexpectedly claims grade")
+
+continuation_digest = continuation.get("_sha256")
+if continuation_digest is None:
+    import hashlib
+
+    with open(continuation_path, "rb") as fh:
+        continuation_digest = hashlib.sha256(fh.read()).hexdigest()
+
+cert = {
+    "schema": "lb_source_dead_cert_draft_v1",
+    "certificate_id": "k26-source-dead-cert-summary-nonclaim",
+    "profile_id": profile.get("profile_id", "k26-source-run-profile"),
+    "proof_status": "SUMMARY_ONLY_NON_CLAIM",
+    "non_claim": "summary-only diagnostic inventory, not a SOURCE_DEAD_CERT",
+    "terminal_source_inventory_mode": "summary_only_non_claim",
+    "metadata": {
+        "source_mode": "ORIGIN_SOURCE",
+        "source_id": "omega",
+        "geometry_id": "SOURCE_ORIGIN_K26",
+        "commit_id": "lb-source-propagation-bundle",
+        "build_id": "k26-source-bundle",
+        "bz_status": bz.get("proof_status", "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE"),
+        "artifact_hash": f"sha256:{continuation_digest}",
+    },
+    "k_sq": 26,
+    "terminal_radius": 1015645,
+    "negative_guard_pass": True,
+    "endpoint": endpoint,
+    "endpoint_atom_id": 1615075207964004,
+    "source_path_provenance": "coordinate_gaussian_prime_path",
+    "source_path": source_path,
+    "terminal_source_inventory_summary": inventory_summary,
+    "terminal_source_inventory_accumulator": accumulator,
+}
+
+json.dump(cert, sys.stdout, separators=(",", ":"))
+sys.stdout.write("\n")
+PY
+  local cert_status=$?
+  set -e
+  if [[ "$cert_status" -ne 0 ]]; then
+    rm -f "$cert_tmp"
+    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_GENERATION"
+    cat "$cert_err" >&2
+    exit 1
+  fi
+  mv "$cert_tmp" "$out_dir/k26-source-dead-cert.json"
+}
+
 run_json K26_COMMANDS "$out_dir/k26_source_run_commands.json" \
   "$build_dir/k26_source_run_commands"
 run_json K26_BZ_SCHEDULE "$out_dir/k26_bz_schedule_check.json" \
@@ -1091,6 +1315,12 @@ if [[ "$gap_blocker" == "SOURCE_DEAD_CERT_TARGET_NOT_REACHED" ]]; then
   echo "K26 full-run prefix and continuation artifacts were produced, and source death was reached, but the canonical Tsuchimura endpoint was not source-reached." >&2
   echo "This is not a SOURCE_DEAD_CERT state; inspect k26-source-dead-gap.json for target reachability evidence." >&2
   exit 3
+fi
+
+if [[ -z "$cert_in" && -n "$source_dead_checker" &&
+      -n "$source_dead_gap_checker" ]]; then
+  write_summary_source_dead_cert
+  write_artifact_manifest
 fi
 
 if [[ -n "$cert_in" ]]; then

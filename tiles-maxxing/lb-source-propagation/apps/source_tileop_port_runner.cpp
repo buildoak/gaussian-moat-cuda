@@ -131,6 +131,7 @@ struct CoordinatePortExpansionSummary {
   std::uint64_t path_points = 0;
   std::uint64_t coordinate_norm_sq = 0;
   std::uint64_t port_witness_norm_sq = 0;
+  std::vector<lb_source::CoordinateAtom> path;
 };
 
 struct CoordinatePortExpansionStatus {
@@ -1078,7 +1079,16 @@ void append_coordinate_port_expansion_status(
         << ",\"path_points\":" << summary.path_points
         << ",\"coordinate_norm_sq\":" << summary.coordinate_norm_sq
         << ",\"port_witness_norm_sq\":" << summary.port_witness_norm_sq
-        << '}';
+        << ",\"path\":[";
+    for (std::size_t j = 0; j < summary.path.size(); ++j) {
+      if (j != 0) {
+        out << ',';
+      }
+      const lb_source::CoordinateAtom& point = summary.path[j];
+      out << "{\"a\":" << point.a << ",\"b\":" << point.b
+          << ",\"norm_sq\":" << point.norm_sq << '}';
+    }
+    out << "]}";
   }
   out << "]}";
 }
@@ -1114,6 +1124,7 @@ CoordinatePortExpansionStatus summarize_coordinate_port_expansions(
         .path_points = path.size(),
         .coordinate_norm_sq = path.front().norm_sq,
         .port_witness_norm_sq = path.back().norm_sq,
+        .path = path,
     });
   }
   return status;
