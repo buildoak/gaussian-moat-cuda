@@ -100,6 +100,16 @@ require_grep() {
   fi
 }
 
+require_fixed() {
+  local text="$1"
+  local path="$2"
+  local label="$3"
+  if ! grep -Fq -- "$text" "$path"; then
+    echo "K26_FULL_RUN_BUNDLE_REJECT: $label ($path)" >&2
+    exit 1
+  fi
+}
+
 json_string_value() {
   local path="$1"
   local field="$2"
@@ -716,6 +726,12 @@ require_equal "$continuation_inventory_digest" "$gap_observed_inventory_digest" 
   "K26 gap terminal inventory obligation digest binding"
 require_equal "$continuation_max_norm" "$gap_observed_max_norm" \
   "K26 gap terminal inventory obligation max-norm binding"
+require_grep '"terminal_source_inventory_accumulator":.*"mode":"summary_digest_only_non_claim".*"provenance":"terminal_component_inventory_accumulator".*"listed_inventory_present":false.*"claim_grade_inventory_accepted":false' "$gap" \
+  "K26 gap non-claim terminal accumulator"
+require_grep "\"terminal_source_inventory_accumulator\":.*\"count\":${continuation_inventory_count}.*\"digest_hex\":\"${continuation_inventory_digest}\".*\"max_norm_sq\":${continuation_max_norm}" "$gap" \
+  "K26 gap terminal accumulator summary binding"
+require_fixed "\"max_norm_atom_ids\":${continuation_max_ties}" "$gap" \
+  "K26 gap terminal accumulator max-norm tie binding"
 
 gap_checker_output="$("$source_dead_gap_checker" "$gap")"
 if ! grep -q '"status":"SOURCE_DEAD_GAP_NON_CLAIM_PASS"' \
@@ -788,6 +804,17 @@ require_equal "$continuation_max_norm" "$cert_max_norm" \
   "K26 cert max source norm binding"
 require_equal "$continuation_max_ties" "$cert_max_ties" \
   "K26 cert max-norm tie binding"
+
+if grep -q '"proof_status":"SUMMARY_ONLY_NON_CLAIM"' "$cert"; then
+  require_grep '"terminal_source_inventory_mode":"summary_only_non_claim"' "$cert" \
+    "K26 summary-only cert inventory mode"
+  require_grep '"terminal_source_inventory_accumulator":.*"mode":"summary_digest_only_non_claim".*"provenance":"terminal_component_inventory_accumulator".*"listed_inventory_present":false.*"claim_grade_inventory_accepted":false' "$cert" \
+    "K26 summary-only cert non-claim terminal accumulator"
+  require_grep "\"terminal_source_inventory_accumulator\":.*\"count\":${continuation_inventory_count}.*\"digest_hex\":\"${continuation_inventory_digest}\".*\"max_norm_sq\":${continuation_max_norm}" "$cert" \
+    "K26 summary-only cert terminal accumulator summary binding"
+  require_fixed "\"max_norm_atom_ids\":${continuation_max_ties}" "$cert" \
+    "K26 summary-only cert terminal accumulator max-norm tie binding"
+fi
 
 if checker_output="$("$source_dead_checker" "$cert" 2>&1)"; then
   if grep -q '"status":"SOURCE_DEAD_CERT_DRAFT_PASS"' <<<"$checker_output"; then
