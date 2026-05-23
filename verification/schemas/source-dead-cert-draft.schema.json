@@ -35,11 +35,60 @@
           "terminal_source_inventory_accumulator"
         ],
         "properties": {
-          "proof_status": { "const": "SUMMARY_ONLY_NON_CLAIM" }
+          "proof_status": { "const": "SUMMARY_ONLY_NON_CLAIM" },
+          "terminal_source_inventory_accumulator": {
+            "properties": {
+              "mode": { "const": "summary_digest_only_non_claim" },
+              "claim_grade_inventory_accepted": { "const": false }
+            }
+          }
         },
         "not": { "required": ["terminal_source_inventory"] }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "terminal_source_inventory_mode": {
+            "const": "claim_grade_accumulator"
+          }
+        },
+        "required": ["terminal_source_inventory_mode"]
       },
-      "else": {
+      "then": {
+        "required": ["terminal_source_inventory_accumulator"],
+        "properties": {
+          "terminal_source_inventory_accumulator": {
+            "properties": {
+              "mode": { "const": "claim_grade_digest_accumulator" },
+              "claim_grade_inventory_accepted": { "const": true }
+            }
+          }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["proof_status"] },
+            { "required": ["non_claim"] },
+            { "required": ["terminal_source_inventory"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "properties": {
+            "terminal_source_inventory_mode": {
+              "enum": [
+                "summary_only_non_claim",
+                "claim_grade_accumulator"
+              ]
+            }
+          },
+          "required": ["terminal_source_inventory_mode"]
+        }
+      },
+      "then": {
         "required": ["terminal_source_inventory"],
         "not": {
           "anyOf": [
@@ -127,7 +176,7 @@
     },
     "non_claim": { "type": "string", "minLength": 1 },
     "terminal_source_inventory_mode": {
-      "enum": ["listed", "summary_only_non_claim"]
+      "enum": ["listed", "summary_only_non_claim", "claim_grade_accumulator"]
     },
     "metadata": {
       "type": "object",
@@ -198,24 +247,26 @@
     "terminal_source_inventory_accumulator": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "mode",
-        "provenance",
-        "listed_inventory_present",
-        "claim_grade_inventory_accepted",
-        "count",
-        "digest_algorithm",
-        "digest_hex",
-        "max_norm_sq",
-        "max_norm_atom_ids"
-      ],
       "properties": {
-        "mode": { "const": "summary_digest_only_non_claim" },
+        "mode": {
+          "enum": [
+            "summary_digest_only_non_claim",
+            "claim_grade_digest_accumulator"
+          ]
+        },
         "provenance": {
           "const": "terminal_component_inventory_accumulator"
         },
+        "accumulator_algorithm": {
+          "const": "sha256:lb_source_inventory_v1"
+        },
+        "complete_stream_observed": { "type": "boolean" },
+        "canonical_order": { "type": "boolean" },
+        "duplicate_free": { "type": "boolean" },
+        "retired_component_finalized": { "type": "boolean" },
+        "overflow_checked": { "type": "boolean" },
         "listed_inventory_present": { "const": false },
-        "claim_grade_inventory_accepted": { "const": false },
+        "claim_grade_inventory_accepted": { "type": "boolean" },
         "count": { "type": "integer", "minimum": 1 },
         "digest_algorithm": {
           "const": "sha256:lb_source_inventory_v1"
@@ -230,7 +281,67 @@
           "minItems": 1,
           "items": { "type": "integer" }
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "mode",
+            "provenance",
+            "listed_inventory_present",
+            "claim_grade_inventory_accepted",
+            "count",
+            "digest_algorithm",
+            "digest_hex",
+            "max_norm_sq",
+            "max_norm_atom_ids"
+          ],
+          "properties": {
+            "mode": { "const": "summary_digest_only_non_claim" },
+            "claim_grade_inventory_accepted": { "const": false }
+          },
+          "not": {
+            "anyOf": [
+              { "required": ["accumulator_algorithm"] },
+              { "required": ["complete_stream_observed"] },
+              { "required": ["canonical_order"] },
+              { "required": ["duplicate_free"] },
+              { "required": ["retired_component_finalized"] },
+              { "required": ["overflow_checked"] }
+            ]
+          }
+        },
+        {
+          "required": [
+            "mode",
+            "provenance",
+            "accumulator_algorithm",
+            "complete_stream_observed",
+            "canonical_order",
+            "duplicate_free",
+            "retired_component_finalized",
+            "overflow_checked",
+            "listed_inventory_present",
+            "claim_grade_inventory_accepted",
+            "count",
+            "digest_algorithm",
+            "digest_hex",
+            "max_norm_sq",
+            "max_norm_atom_ids"
+          ],
+          "properties": {
+            "mode": { "const": "claim_grade_digest_accumulator" },
+            "accumulator_algorithm": {
+              "const": "sha256:lb_source_inventory_v1"
+            },
+            "complete_stream_observed": { "const": true },
+            "canonical_order": { "const": true },
+            "duplicate_free": { "const": true },
+            "retired_component_finalized": { "const": true },
+            "overflow_checked": { "const": true },
+            "claim_grade_inventory_accepted": { "const": true }
+          }
+        }
+      ]
     },
     "terminal_source_inventory": {
       "type": "array",

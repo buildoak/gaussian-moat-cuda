@@ -294,10 +294,15 @@ class SourcePropSchemaContractTest(unittest.TestCase):
         self.assertEqual(source_path_target["b"]["const"], 943460)
         self.assertEqual(source_path_target["norm_sq"]["const"], 1031522101121)
 
-    def test_source_dead_cert_schema_keeps_summary_only_non_claim_conditional(
+    def test_source_dead_cert_schema_keeps_accumulator_mode_conditionals(
         self,
     ) -> None:
         schema = load_json(DEAD_CERT_SCHEMA_PATH)
+        self.assertEqual(
+            set(schema["properties"]["terminal_source_inventory_mode"]["enum"]),
+            {"listed", "summary_only_non_claim", "claim_grade_accumulator"},
+        )
+
         summary_rules = [
             rule
             for rule in schema["allOf"]
@@ -317,12 +322,62 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             "terminal_source_inventory_accumulator",
             summary_rule["then"]["required"],
         )
+        summary_accumulator = summary_rule["then"]["properties"][
+            "terminal_source_inventory_accumulator"
+        ]["properties"]
+        self.assertEqual(
+            summary_accumulator["mode"]["const"],
+            "summary_digest_only_non_claim",
+        )
+        self.assertFalse(
+            summary_accumulator["claim_grade_inventory_accepted"]["const"],
+        )
         self.assertIn(
             "terminal_source_inventory",
             summary_rule["then"]["not"]["required"],
         )
-        self.assertIn("terminal_source_inventory", summary_rule["else"]["required"])
-        listed_forbidden = summary_rule["else"]["not"]["anyOf"]
+
+        claim_rules = [
+            rule
+            for rule in schema["allOf"]
+            if rule.get("if", {})
+            .get("properties", {})
+            .get("terminal_source_inventory_mode", {})
+            .get("const")
+            == "claim_grade_accumulator"
+        ]
+        self.assertEqual(len(claim_rules), 1)
+        claim_rule = claim_rules[0]
+        self.assertIn(
+            "terminal_source_inventory_accumulator",
+            claim_rule["then"]["required"],
+        )
+        claim_accumulator = claim_rule["then"]["properties"][
+            "terminal_source_inventory_accumulator"
+        ]["properties"]
+        self.assertEqual(
+            claim_accumulator["mode"]["const"],
+            "claim_grade_digest_accumulator",
+        )
+        self.assertTrue(
+            claim_accumulator["claim_grade_inventory_accepted"]["const"],
+        )
+        claim_forbidden = claim_rule["then"]["not"]["anyOf"]
+        self.assertIn({"required": ["proof_status"]}, claim_forbidden)
+        self.assertIn({"required": ["non_claim"]}, claim_forbidden)
+        self.assertIn({"required": ["terminal_source_inventory"]}, claim_forbidden)
+
+        listed_rules = [
+            rule
+            for rule in schema["allOf"]
+            if "not" in rule.get("if", {})
+            and "terminal_source_inventory_mode"
+            in rule["if"]["not"].get("properties", {})
+        ]
+        self.assertEqual(len(listed_rules), 1)
+        listed_rule = listed_rules[0]
+        self.assertIn("terminal_source_inventory", listed_rule["then"]["required"])
+        listed_forbidden = listed_rule["then"]["not"]["anyOf"]
         self.assertIn({"required": ["proof_status"]}, listed_forbidden)
         self.assertIn({"required": ["non_claim"]}, listed_forbidden)
         self.assertIn(
@@ -332,12 +387,31 @@ class SourcePropSchemaContractTest(unittest.TestCase):
 
         accumulator = schema["properties"]["terminal_source_inventory_accumulator"]
         self.assertEqual(
-            accumulator["properties"]["mode"]["const"],
-            "summary_digest_only_non_claim",
+            set(accumulator["properties"]["mode"]["enum"]),
+            {"summary_digest_only_non_claim", "claim_grade_digest_accumulator"},
         )
-        self.assertEqual(
-            accumulator["properties"]["claim_grade_inventory_accepted"]["const"],
-            False,
+        claim_shapes = [
+            shape
+            for shape in accumulator["oneOf"]
+            if shape["properties"]["mode"]["const"]
+            == "claim_grade_digest_accumulator"
+        ]
+        self.assertEqual(len(claim_shapes), 1)
+        claim_shape = claim_shapes[0]
+        for field in (
+            "accumulator_algorithm",
+            "complete_stream_observed",
+            "canonical_order",
+            "duplicate_free",
+            "retired_component_finalized",
+            "overflow_checked",
+        ):
+            self.assertIn(field, claim_shape["required"])
+        self.assertTrue(
+            claim_shape["properties"]["complete_stream_observed"]["const"],
+        )
+        self.assertTrue(
+            claim_shape["properties"]["claim_grade_inventory_accepted"]["const"],
         )
 
 
