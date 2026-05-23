@@ -58,7 +58,7 @@ PATH="$tmp/bin:$PATH" "$guard" \
   --k-sq 26 \
   > "$tmp/dry-run.log"
 
-grep -q 'QUALIFYING_OFFER id=12345 dph=0.29' "$tmp/dry-run.log"
+grep -q 'QUALIFYING_OFFER id=12345 host_id=777 dph=0.29' "$tmp/dry-run.log"
 grep -q 'ONE_SHOT_REMOTE_SMOKE:' "$tmp/dry-run.log"
 grep -q -- '--run-remote-smoke' "$tmp/dry-run.log"
 grep -q -- '--destroy-on-exit' "$tmp/dry-run.log"
@@ -80,7 +80,7 @@ PATH="$tmp/bin:$PATH" "$guard" \
   --max-budget 1.50 \
   --k-sq 26 \
   > "$tmp/excluded.log"
-grep -q 'QUALIFYING_OFFER id=23456 dph=0.31' "$tmp/excluded.log"
+grep -q 'QUALIFYING_OFFER id=23456 host_id=888 dph=0.31' "$tmp/excluded.log"
 grep -q 'EXCLUDED_OFFER_IDS 12345' "$tmp/excluded.log"
 grep -q 'EXCLUDED_HOST_IDS 777' "$tmp/excluded.log"
 grep -q -- '--exclude-offer-id 12345' "$tmp/excluded.log"
@@ -120,6 +120,7 @@ if [[ "$retry_status" != "5" ]]; then
 fi
 grep -q 'RETRYING_AFTER_SSH_TIMEOUT offer_id=12345 next_attempt=2' "$tmp/retry.log"
 grep -q 'EXCLUDED_OFFER_IDS 12345' "$tmp/retry.log"
+grep -q 'EXCLUDED_HOST_IDS 777' "$tmp/retry.log"
 grep -q '^create instance 12345 ' "$VAST_MOCK_LOG"
 grep -q '^create instance 23456 ' "$VAST_MOCK_LOG"
 grep -q '^destroy instance 90001 -y' "$VAST_MOCK_LOG"
@@ -146,6 +147,7 @@ fi
 grep -q 'CREATE_REPORTED_FAILURE id=90001 offer_id=12345' "$tmp/create-failure-retry.log"
 grep -q 'RETRYING_AFTER_CREATE_FAILURE offer_id=12345 next_attempt=2' "$tmp/create-failure-retry.log"
 grep -q 'EXCLUDED_OFFER_IDS 12345' "$tmp/create-failure-retry.log"
+grep -q 'EXCLUDED_HOST_IDS 777' "$tmp/create-failure-retry.log"
 grep -q '^create instance 12345 ' "$VAST_MOCK_LOG"
 grep -q '^create instance 23456 ' "$VAST_MOCK_LOG"
 grep -q '^destroy instance 90001 -y' "$VAST_MOCK_LOG"

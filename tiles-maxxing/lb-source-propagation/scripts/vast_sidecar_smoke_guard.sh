@@ -387,6 +387,33 @@ selected_offer_id=""
 selected_offer_json=""
 selected_offer_dph=""
 selected_soft_hours=""
+selected_host_id=""
+
+add_failed_selection_exclusions() {
+  local id seen
+  seen=0
+  for id in "${exclude_offer_ids[@]+"${exclude_offer_ids[@]}"}"; do
+    if [[ "$id" == "$selected_offer_id" ]]; then
+      seen=1
+      break
+    fi
+  done
+  if [[ "$seen" -eq 0 ]]; then
+    exclude_offer_ids+=("$selected_offer_id")
+  fi
+  if [[ -n "$selected_host_id" ]]; then
+    seen=0
+    for id in "${exclude_host_ids[@]+"${exclude_host_ids[@]}"}"; do
+      if [[ "$id" == "$selected_host_id" ]]; then
+        seen=1
+        break
+      fi
+    done
+    if [[ "$seen" -eq 0 ]]; then
+      exclude_host_ids+=("$selected_host_id")
+    fi
+  fi
+}
 
 select_capped_offer() {
   refresh_exclude_joins
@@ -440,6 +467,7 @@ print(json.dumps(filtered))
   fi
 
   selected_offer_dph="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["dph_total"])' <<<"$selected_offer_json")"
+  selected_host_id="$(python3 -c 'import json,sys; value=json.load(sys.stdin).get("host_id", ""); print("" if value is None else value)' <<<"$selected_offer_json")"
   python3 - "$selected_offer_dph" "$max_dph" <<'PY'
 import sys
 dph=float(sys.argv[1])
@@ -459,7 +487,7 @@ PY
 
 print_offer_plan() {
   refresh_exclude_joins
-  echo "QUALIFYING_OFFER id=${selected_offer_id} dph=${selected_offer_dph} budget_hours=${selected_soft_hours}"
+  echo "QUALIFYING_OFFER id=${selected_offer_id} host_id=${selected_host_id:-unknown} dph=${selected_offer_dph} budget_hours=${selected_soft_hours}"
   echo "LOCAL_SOURCE branch=${local_branch} head=${local_head} k_sq=${k_sq}"
   if [[ -n "$exclude_offer_ids_joined" ]]; then
     echo "EXCLUDED_OFFER_IDS ${exclude_offer_ids_joined}"
@@ -565,8 +593,8 @@ while (( attempt <= max_create_attempts )); do
       created_instance_id=""
     fi
     if (( attempt < max_create_attempts )); then
-      echo "RETRYING_AFTER_CREATE_FAILURE offer_id=${selected_offer_id} next_attempt=$((attempt + 1))"
-      exclude_offer_ids+=("$selected_offer_id")
+      echo "RETRYING_AFTER_CREATE_FAILURE offer_id=${selected_offer_id} next_attempt=$((attempt + 1)) host_id=${selected_host_id:-unknown}"
+      add_failed_selection_exclusions
       attempt=$((attempt + 1))
       continue
     fi
@@ -585,8 +613,8 @@ while (( attempt <= max_create_attempts )); do
         created_instance_id=""
       fi
       if (( attempt < max_create_attempts )); then
-        echo "RETRYING_AFTER_SSH_TIMEOUT offer_id=${selected_offer_id} next_attempt=$((attempt + 1))"
-        exclude_offer_ids+=("$selected_offer_id")
+        echo "RETRYING_AFTER_SSH_TIMEOUT offer_id=${selected_offer_id} next_attempt=$((attempt + 1)) host_id=${selected_host_id:-unknown}"
+        add_failed_selection_exclusions
         attempt=$((attempt + 1))
         continue
       fi
