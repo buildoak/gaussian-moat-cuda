@@ -36,7 +36,13 @@
         "not": { "required": ["terminal_source_inventory"] }
       },
       "else": {
-        "required": ["terminal_source_inventory"]
+        "required": ["terminal_source_inventory"],
+        "not": {
+          "anyOf": [
+            { "required": ["proof_status"] },
+            { "required": ["non_claim"] }
+          ]
+        }
       }
     },
     {

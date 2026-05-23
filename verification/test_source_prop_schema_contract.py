@@ -235,6 +235,9 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             summary_rule["then"]["not"]["required"],
         )
         self.assertIn("terminal_source_inventory", summary_rule["else"]["required"])
+        listed_forbidden = summary_rule["else"]["not"]["anyOf"]
+        self.assertIn({"required": ["proof_status"]}, listed_forbidden)
+        self.assertIn({"required": ["non_claim"]}, listed_forbidden)
 
 
 if __name__ == "__main__":

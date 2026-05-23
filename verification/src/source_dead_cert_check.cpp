@@ -692,6 +692,11 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
     return CertStatus::kSummaryOnlyNonClaimPass;
   }
 
+  if (has_field(cert, "proof_status") || has_field(cert, "non_claim")) {
+    throw std::runtime_error(
+        "listed terminal inventory cert must not carry non-claim markers");
+  }
+
   const std::vector<std::int64_t> inventory = require_inventory(cert);
   if (inventory.empty()) {
     throw std::runtime_error("terminal_source_inventory must be nonempty");
