@@ -73,9 +73,12 @@ if [[ "$*" != *"--target-a 376039 --target-b 943460"* ]]; then
 fi
 progress=""
 manifest=""
+r_start="8192"
 r_final="1015645"
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --r-start)
+      r_start="$2"; shift 2 ;;
     --r-final)
       r_final="$2"; shift 2 ;;
     --manifest-out)
@@ -87,10 +90,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 band_index=0
-if [[ "$original_args" == *"--r-start 475135"* ]]; then
-  band_index=1
-fi
-[[ -n "$progress" ]] && printf '{"schema":"lb_source_tileop_port_progress_v1","accepted":true,"band_index":%s,"r_outer":%s,"total_ms":1000,"has_source_carry":true,"terminal_source_dead":false}\n' "$band_index" "$r_final" > "$progress"
+[[ -n "$progress" ]] && printf '{"schema":"lb_source_tileop_port_progress_v1","accepted":true,"band_index":%s,"r_start":%s,"r_outer":%s,"total_ms":1000,"has_source_carry":true,"terminal_source_dead":false}\n' "$band_index" "$r_start" "$r_final" > "$progress"
 if [[ -n "$manifest" ]]; then
   echo "port-manifest-${r_final}" > "$manifest"
   cat <<JSON
@@ -429,6 +429,11 @@ fi
 grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_MISSING' \
   "$chunked_out/status.txt"
 grep -q 'continuation_chunk_bands=2' "$chunked_out/status.txt"
+grep -q 'runtime_budget_check_status=K26_RUNTIME_BUDGET_PASS' \
+  "$chunked_out/status.txt"
+grep -q 'runtime_budget_completed_band_count=2' "$chunked_out/status.txt"
+grep -q 'runtime_budget_progress=k26-continuation-progress.jsonl' \
+  "$chunked_out/status.txt"
 test -f "$chunked_out/k26-continuation-result.json"
 test -f "$chunked_out/k26-continuation-progress.jsonl"
 test -f "$chunked_out/k26-continuation-chunks.jsonl"

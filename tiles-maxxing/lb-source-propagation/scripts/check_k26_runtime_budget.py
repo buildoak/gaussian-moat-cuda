@@ -50,7 +50,7 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def completed_band_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    seen: set[int] = set()
+    seen: set[tuple[str, int, int] | tuple[str, int]] = set()
     for row in rows:
         if row.get("schema") != "lb_source_tileop_port_progress_v1":
             continue
@@ -62,11 +62,29 @@ def completed_band_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
         if not isinstance(total_ms, int) or total_ms <= 0:
             continue
-        if band_index in seen:
-            raise ValueError(f"duplicate completed progress band_index={band_index}")
-        seen.add(band_index)
+        r_start = row.get("r_start")
+        r_outer = row.get("r_outer")
+        if (
+            isinstance(r_start, int)
+            and isinstance(r_outer, int)
+            and r_start >= 0
+            and r_outer > r_start
+        ):
+            key: tuple[str, int, int] | tuple[str, int] = ("interval", r_start, r_outer)
+            duplicate = f"duplicate completed progress interval={r_start}->{r_outer}"
+        else:
+            key = ("band_index", band_index)
+            duplicate = f"duplicate completed progress band_index={band_index}"
+        if key in seen:
+            raise ValueError(duplicate)
+        seen.add(key)
         out.append(row)
-    out.sort(key=lambda item: item["band_index"])
+    out.sort(
+        key=lambda item: (
+            item.get("r_outer") if isinstance(item.get("r_outer"), int) else -1,
+            item["band_index"],
+        )
+    )
     return out
 
 
@@ -150,6 +168,7 @@ def main(argv: list[str]) -> int:
         "max_runtime_seconds": args.max_runtime_seconds,
         "budget_margin_seconds": math.floor(margin),
         "last_completed_band_index": last["band_index"],
+        "last_completed_r_start": last.get("r_start"),
         "last_completed_r_outer": last.get("r_outer"),
         "last_completed_has_source_carry": last.get("has_source_carry"),
         "last_completed_terminal_source_dead": last.get("terminal_source_dead"),

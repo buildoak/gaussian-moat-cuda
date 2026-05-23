@@ -398,7 +398,10 @@ instead of restarting the paid continuation from row 0.
 `k26-continuation-progress.jsonl` after any partial continuation. It reads the
 completed TileOp-port band timings, projects the full 123-segment continuation
 against the `14000` second wall-clock budget, reports the last completed radius
-and active phase context, and emits only diagnostic non-claim status.
+and active phase context, and emits only diagnostic non-claim status. For
+chunked runs, completed progress rows are keyed by radial interval rather than
+local per-process `band_index`, so appended chunk progress remains valid even
+when each resumed runner starts its local band counter at zero.
 The bundle harness now runs this checker automatically whenever a continuation
 command times out, hits the whole-bundle runtime limit, or completes. It writes
 `k26-runtime-budget-check.log`, `k26-runtime-budget-check.err`, and

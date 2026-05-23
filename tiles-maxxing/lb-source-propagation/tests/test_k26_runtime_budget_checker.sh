@@ -31,6 +31,29 @@ grep -q '"projected_total_seconds":185' "$tmp/pass.out"
 grep -q '"chunk_ledger_rows":1' "$tmp/pass.out"
 grep -q '"claim_grade":false' "$tmp/pass.out"
 
+cat > "$tmp/chunked-reset-progress.jsonl" <<'JSONL'
+{"schema":"lb_source_tileop_port_progress_v1","band_index":0,"r_start":8192,"r_outer":16384,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":1200,"total_ms":1000}
+{"schema":"lb_source_tileop_port_progress_v1","band_index":0,"r_start":16384,"r_outer":24576,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":2337,"total_ms":2000}
+JSONL
+
+cat > "$tmp/two-chunks.jsonl" <<'JSONL'
+{"schema":"lb_source_k26_continuation_chunk_v1","chunk_index":0,"chunk_id":"000","action":"executed"}
+{"schema":"lb_source_k26_continuation_chunk_v1","chunk_index":1,"chunk_id":"001","action":"executed"}
+JSONL
+
+"$checker" \
+  --progress "$tmp/chunked-reset-progress.jsonl" \
+  --chunk-ledger "$tmp/two-chunks.jsonl" \
+  --schedule-segment-count 123 \
+  --max-runtime-seconds 14000 \
+  > "$tmp/chunked-reset.out"
+grep -q '"status":"K26_RUNTIME_BUDGET_PASS"' "$tmp/chunked-reset.out"
+grep -q '"completed_band_count":2' "$tmp/chunked-reset.out"
+grep -q '"last_completed_band_index":0' "$tmp/chunked-reset.out"
+grep -q '"last_completed_r_start":16384' "$tmp/chunked-reset.out"
+grep -q '"last_completed_r_outer":24576' "$tmp/chunked-reset.out"
+grep -q '"chunk_ledger_rows":2' "$tmp/chunked-reset.out"
+
 cat > "$tmp/slow-progress.jsonl" <<'JSONL'
 {"schema":"lb_source_tileop_port_progress_v1","band_index":0,"r_start":8192,"r_outer":16384,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":1200,"total_ms":200000}
 {"schema":"lb_source_tileop_port_progress_v1","band_index":1,"r_start":16384,"r_outer":24576,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":2337,"total_ms":200000}

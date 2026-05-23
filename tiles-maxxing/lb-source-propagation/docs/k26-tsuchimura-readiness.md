@@ -363,6 +363,9 @@ check_k26_runtime_budget.py \
 This emits `K26_RUNTIME_BUDGET_PASS`, `K26_RUNTIME_BUDGET_REJECT`, or
 `K26_RUNTIME_BUDGET_INSUFFICIENT_PROGRESS` as diagnostic non-claim evidence.
 It is a stop/continue guard for budgeted execution, not source/origin proof.
+For chunked continuation, the checker treats radial intervals as the stable
+identity of completed rows; local `band_index` values may restart inside each
+resumed `source_tileop_port_runner` process.
 The full bundle harness also invokes this checker automatically after a
 continuation timeout, whole-bundle runtime-limit stop, failed continuation with
 progress, or completed continuation. The harness stores the raw checker output
