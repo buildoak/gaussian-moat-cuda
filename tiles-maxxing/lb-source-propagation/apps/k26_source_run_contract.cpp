@@ -98,7 +98,7 @@ int main() {
 
   constexpr const char* kBlockingGaps[] = {
       "full-run K26 bundle harness exists, but no accepted budgeted K26 source/origin execution has completed on the repaired schedule",
-      "source_tileop_port_runner supports explicit variable boundaries and the harness wires rows 1..123, but the repaired schedule has not produced accepted full-run artifacts",
+      "source_tileop_port_runner supports explicit variable boundaries and the harness wires rows 1..123 with chunk/resume support, but the repaired schedule has not produced accepted full-run artifacts",
       "current production compositors compute ANY-SPAN/ANY-SHELL-MOAT, not SOURCE_ORIGIN_K26",
       "diagnostic origin-prefix-to-port bridge exists; the tiny smoke has source_unbridged_with_next_band_candidates=0, but K26 row 0 to row 1 currently reports source_unbridged_with_next_band_candidates=57",
       "no accepted seam-bridge theorem or bridge-completeness fix yet proves the K26 source-connected candidate gaps are closed",

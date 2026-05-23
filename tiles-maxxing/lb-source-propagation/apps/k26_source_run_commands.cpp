@@ -20,6 +20,7 @@ constexpr std::uint64_t kEndpointNorm = 1031522101121ULL;
 constexpr std::uint64_t kTerminalRadius = 1015645;
 constexpr std::uint64_t kBandWidth = 8192;
 constexpr std::uint64_t kPrefixOuter = 8192;
+constexpr std::uint64_t kRecommendedChunkBands = 8;
 
 struct ScheduleStats {
   std::uint64_t min_width = std::numeric_limits<std::uint64_t>::max();
@@ -158,6 +159,11 @@ int main() {
       "--target-a 376039 --target-b 943460 "
       "--manifest-in k26-prefix-manifest.txt "
       "--prefix-witness-in k26-prefix-witness.txt";
+  const std::string bundle_command =
+      "run_k26_full_source_bundle.sh --build-dir BUILD_DIR --out-dir OUT_DIR "
+      "--continuation-chunk-bands 8 --resume-existing "
+      "--timeout-seconds 1200 --source-dead-gap-checker "
+      "source_dead_gap_check";
 
   std::cout << "{"
             << "\"schema\":\"lb_source_k26_run_commands_v1\","
@@ -199,8 +205,18 @@ int main() {
             << "\"target\":{\"a\":" << kCanonicalEndpointA
             << ",\"b\":" << kCanonicalEndpointB
             << ",\"norm_sq\":" << kEndpointNorm << "},"
+            << "\"recommended_chunk_bands\":" << kRecommendedChunkBands
+            << ",\"resume_existing_supported\":true,"
+            << "\"resume_existing_flag\":\"--resume-existing\","
             << "\"command\":";
   emit_json_string(continuation_command);
+  std::cout << "},\"bundle_harness\":{\"runner\":\"run_k26_full_source_bundle.sh\","
+            << "\"recommended_continuation_chunk_bands\":"
+            << kRecommendedChunkBands
+            << ",\"resume_existing_supported\":true,"
+            << "\"timeout_seconds\":1200,"
+            << "\"command\":";
+  emit_json_string(bundle_command);
   std::cout << "},\"repaired_boundaries\":["
             << "{\"nominal\":122880,\"repaired\":122879},"
             << "{\"nominal\":475136,\"repaired\":475135},"

@@ -116,13 +116,14 @@ int main() {
       "build sidecar with -DK_SQ=26 before campaign TileOp ingestion",
       "run exact coordinate prefix for row 0 and emit carry manifest plus prefix witness at radius 8192",
       "continue rows 1..123 with source_tileop_port_runner using the repaired variable boundary schedule",
+      "run paid continuation through run_k26_full_source_bundle.sh with bounded chunks and --resume-existing retry support",
       "seed continuation only from the origin-prefix carry manifest and prefix witness",
       "reject any TileOp overflow row",
       "bind repaired BZ schedule digest/evidence into profile metadata",
       "emit terminal inventory summary without explicit 14.5B-member JSON expansion",
       "emit SOURCE_DEAD_CERT only after positive endpoint path and negative final guard are both verified"};
   constexpr const char* kMissingRunnerFeatures[] = {
-      "full-run K26 bundle harness has not produced accepted artifacts for the repaired variable-boundary schedule",
+      "full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget",
       "coordinate-to-port seam bridge remains diagnostic",
       "TileOp-port target reachability has mixed coordinate/port atom-chain provenance, not a coordinate source-path witness",
       "terminal inventory has only a summary-only non-claim verifier; claim-grade full-run provenance is still missing",
@@ -163,7 +164,11 @@ int main() {
       << "\"prefix_row_index\":0,"
       << "\"tileop_port_first_row_index\":1,";
   emit_rows();
-  std::cout << "},";
+  std::cout << "},\"execution_protocol\":{\"bundle_harness\":\"run_k26_full_source_bundle.sh\","
+            << "\"recommended_continuation_chunk_bands\":8,"
+            << "\"resume_existing_supported\":true,"
+            << "\"resume_existing_flag\":\"--resume-existing\","
+            << "\"timeout_status_prefix\":\"K26_FULL_RUN_BUNDLE_BLOCKED_\"},";
   emit_string_array("runner_requirements", kRunnerRequirements,
                     sizeof(kRunnerRequirements) /
                         sizeof(kRunnerRequirements[0]));

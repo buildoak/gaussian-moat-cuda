@@ -249,7 +249,9 @@ require_grep '"prefix_row_index":0' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile prefix row"
 require_grep '"tileop_port_first_row_index":1' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile TileOp start row"
-require_grep 'full-run K26 bundle harness has not produced accepted artifacts for the repaired variable-boundary schedule' \
+require_grep '"execution_protocol":.*"recommended_continuation_chunk_bands":8.*"resume_existing_supported":true' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile chunked execution protocol"
+require_grep 'full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile runner gap"
 
 require_grep '"schema":"lb_source_k26_run_commands_v1"' \
@@ -266,6 +268,12 @@ require_grep '"blocked_if_unbridged_coordinate_carry_atoms":false' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands allow classified unbridged carry"
 require_grep '"claim_grade_requires_source_unbridged_unsafe_candidate_atoms":0' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands unsafe bridge stop condition"
+require_grep '"recommended_chunk_bands":8' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands chunk size"
+require_grep '"resume_existing_supported":true' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands resume support"
+require_grep '--continuation-chunk-bands 8 --resume-existing' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands resumable bundle harness"
 require_grep '--target-a 376039 --target-b 943460' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands target bridge flags"
 
