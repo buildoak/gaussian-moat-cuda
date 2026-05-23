@@ -536,6 +536,12 @@ CTest `84/84`, and `REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS`. This remains a
 build/smoke and small/medium verification gate only, not a sqrt(26) source run
 and not a moat result.
 
+After binding the K26 gap to origin-prefix path provenance at local head
+`da765d6`, a dry-run saw an RTX 4090 offer at `$0.3587/hr`, but the guarded
+execute path rechecked the market before creating and found no qualifying offer.
+The nearest observed qualifying-market offer was `$0.5081/hr`, `0.1381/hr`
+over cap. No Vast instance was created.
+
 After any partial continuation, run:
 
 ```bash
