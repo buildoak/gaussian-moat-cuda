@@ -402,6 +402,20 @@ effective projection `23084s`, and budget margin `-9084s`. This means thread
 pinning is useful execution control, but this cheap 4090/fractional-CPU host
 class still cannot justify a full K26 continuation under the active cap.
 
+A final one-band remote timing probe at deployed local head `9d4010f` validated
+the safer timing-probe default. It ran with `--chunk-bands 1` and
+`--tileop-threads 6` on instance `37442799`, pulled artifacts to
+`tiles-maxxing/lb-source-propagation/artifacts/vast-k26-timing-pull-t6-c1`,
+and destroyed the instance after exit. The harness stopped immediately after
+chunk `000` (`8192 -> 16384`) with
+`K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_000_RUNTIME_BUDGET_REJECT`.
+The single completed band had `tileop_overflows_total=0`, live source carry
+(`source_carry_atoms=1437`), and target not seen. The runtime checker reported
+`completed_band_count=1`, effective/cumulative/tail projection `15151s`, and
+budget margin `-1151s`. This confirms that one-band remote timing probes can
+reject this host shape in about one continuation band instead of burning a
+whole eight-band chunk.
+
 After any partial continuation, run:
 
 ```bash
