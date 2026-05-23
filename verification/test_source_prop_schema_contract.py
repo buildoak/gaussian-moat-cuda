@@ -10,6 +10,9 @@ import unittest
 
 VERIFICATION_ROOT = Path(__file__).resolve().parent
 SCHEMA_PATH = VERIFICATION_ROOT / "schemas" / "source-prop-fixture.schema.json"
+DEAD_GAP_SCHEMA_PATH = (
+    VERIFICATION_ROOT / "schemas" / "source-dead-gap.schema.json"
+)
 FIXTURE_ROOT = VERIFICATION_ROOT / "fixtures" / "source_prop"
 BAND_COUNT_GUARD = "composed_band_count_guard"
 
@@ -80,6 +83,93 @@ class SourcePropSchemaContractTest(unittest.TestCase):
                 self.assertIn("composed_equals_big", fixture["guards"])
                 self.assertNotIn(BAND_COUNT_GUARD, fixture["guards"])
                 self.assertLess(len(fixture["bands"]), 5)
+
+    def test_source_dead_gap_schema_covers_both_diagnostic_blockers(self) -> None:
+        schema = load_json(DEAD_GAP_SCHEMA_PATH)
+        blockers = set(schema["properties"]["blocker"]["enum"])
+        self.assertEqual(
+            blockers,
+            {
+                "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING",
+                "SOURCE_DEAD_CERT_TARGET_NOT_REACHED",
+            },
+        )
+
+        rules_by_blocker = {
+            rule["if"]["properties"]["blocker"]["const"]: rule["then"]
+            for rule in schema["allOf"]
+            if "blocker" in rule.get("if", {}).get("properties", {})
+        }
+        self.assertEqual(set(rules_by_blocker), blockers)
+
+        reached_rule = rules_by_blocker["SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"]
+        self.assertEqual(
+            reached_rule["properties"]["target_path_provenance"]["const"],
+            "mixed_coordinate_port_atom_chain_non_claim",
+        )
+        self.assertEqual(
+            reached_rule["properties"]["terminal_source_inventory_summary"][
+                "properties"
+            ]["count"]["const"],
+            14542615005,
+        )
+
+        target_not_reached_rule = rules_by_blocker[
+            "SOURCE_DEAD_CERT_TARGET_NOT_REACHED"
+        ]
+        self.assertEqual(
+            target_not_reached_rule["properties"]["target_path_provenance"][
+                "const"
+            ],
+            "component_reachability_only",
+        )
+        self.assertEqual(
+            target_not_reached_rule["properties"]["target_atom_path_length"][
+                "const"
+            ],
+            0,
+        )
+        self.assertEqual(
+            target_not_reached_rule["properties"]["target_atom_path"]["maxItems"],
+            0,
+        )
+        self.assertEqual(
+            target_not_reached_rule["properties"][
+                "terminal_source_inventory_summary"
+            ]["properties"]["max_norm_sq"]["maximum"],
+            1031522101120,
+        )
+
+    def test_source_dead_gap_schema_matches_target_not_reached_fixture_shape(
+        self,
+    ) -> None:
+        schema = load_json(DEAD_GAP_SCHEMA_PATH)
+        fixture = load_json(FIXTURE_ROOT / "dead-gap-target-not-reached-valid.json")
+        self.assertEqual(fixture["blocker"], "SOURCE_DEAD_CERT_TARGET_NOT_REACHED")
+        self.assertIn(
+            fixture["blocker"],
+            schema["properties"]["blocker"]["enum"],
+        )
+        self.assertEqual(fixture["target_path_provenance"], "component_reachability_only")
+        self.assertEqual(fixture["target_atom_path_length"], 0)
+        self.assertEqual(fixture["target_atom_path"], [])
+        self.assertLess(
+            fixture["terminal_source_inventory_summary"]["max_norm_sq"],
+            1031522101121,
+        )
+
+    def test_source_dead_gap_schema_allows_chunk_ledger_artifact_binding(self) -> None:
+        schema = load_json(DEAD_GAP_SCHEMA_PATH)
+        self.assertNotIn("chunk_ledger_artifact", schema["required"])
+        chunk_ledger = schema["properties"]["chunk_ledger_artifact"]
+        self.assertEqual(
+            chunk_ledger["properties"]["name"]["const"],
+            "k26-continuation-chunks.jsonl",
+        )
+        self.assertEqual(
+            chunk_ledger["properties"]["sha256"]["pattern"],
+            "^[0-9a-f]{64}$",
+        )
 
 
 if __name__ == "__main__":

@@ -28,7 +28,12 @@
     "schema": { "const": "lb_source_k26_source_dead_gap_v1" },
     "claim_label": { "const": "SOURCE_ORIGIN_K26" },
     "proof_status": { "const": "DIAGNOSTIC_NON_CLAIM" },
-    "blocker": { "const": "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING" },
+    "blocker": {
+      "enum": [
+        "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING",
+        "SOURCE_DEAD_CERT_TARGET_NOT_REACHED"
+      ]
+    },
     "non_claim": { "type": "string", "minLength": 1 },
     "k_sq": { "const": 26 },
     "terminal_radius": { "const": 1015645 },
@@ -47,6 +52,15 @@
       "required": ["name", "sha256"],
       "properties": {
         "name": { "const": "k26-continuation-result.json" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "chunk_ledger_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": { "const": "k26-continuation-chunks.jsonl" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
@@ -115,12 +129,14 @@
       }
     },
     "target_path_provenance": {
-      "const": "mixed_coordinate_port_atom_chain_non_claim"
+      "enum": [
+        "mixed_coordinate_port_atom_chain_non_claim",
+        "component_reachability_only"
+      ]
     },
-    "target_atom_path_length": { "type": "integer", "minimum": 1 },
+    "target_atom_path_length": { "type": "integer", "minimum": 0 },
     "target_atom_path": {
       "type": "array",
-      "minItems": 1,
       "items": { "type": "integer" }
     },
     "coordinate_path_obligation": {
@@ -139,15 +155,18 @@
           "const": "coordinate_gaussian_prime_path"
         },
         "observed_provenance": {
-          "const": "mixed_coordinate_port_atom_chain_non_claim"
+          "enum": [
+            "mixed_coordinate_port_atom_chain_non_claim",
+            "component_reachability_only"
+          ]
         },
         "observed_coordinate_atom_count": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 0
         },
         "observed_port_atom_count": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 0
         },
         "per_port_coordinate_expansion": { "const": "missing" },
         "claim_grade_path_accepted": { "const": false }
@@ -164,10 +183,14 @@
         "max_norm_atom_ids"
       ],
       "properties": {
-        "count": { "const": 14542615005 },
+        "count": { "type": "integer", "minimum": 1 },
         "digest_algorithm": { "const": "sha256:lb_source_inventory_v1" },
         "digest_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "max_norm_sq": { "const": 1031522101121 },
+        "max_norm_sq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1031522101121
+        },
         "max_norm_atom_ids": {
           "type": "array",
           "minItems": 1,
@@ -193,7 +216,7 @@
         "observed_mode": { "const": "summary_digest_only_non_claim" },
         "listed_inventory_present": { "const": false },
         "claim_grade_inventory_accepted": { "const": false },
-        "observed_count": { "const": 14542615005 },
+        "observed_count": { "type": "integer", "minimum": 1 },
         "observed_digest_algorithm": {
           "const": "sha256:lb_source_inventory_v1"
         },
@@ -201,7 +224,11 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },
-        "observed_max_norm_sq": { "const": 1031522101121 }
+        "observed_max_norm_sq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1031522101121
+        }
       }
     },
     "missing_for_source_dead_cert": {
@@ -236,6 +263,99 @@
       ]
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "blocker": {
+            "const": "SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_path_provenance": {
+            "const": "mixed_coordinate_port_atom_chain_non_claim"
+          },
+          "target_atom_path_length": { "type": "integer", "minimum": 1 },
+          "target_atom_path": { "type": "array", "minItems": 1 },
+          "coordinate_path_obligation": {
+            "properties": {
+              "observed_provenance": {
+                "const": "mixed_coordinate_port_atom_chain_non_claim"
+              },
+              "observed_coordinate_atom_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "observed_port_atom_count": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "terminal_source_inventory_summary": {
+            "properties": {
+              "count": { "const": 14542615005 },
+              "max_norm_sq": { "const": 1031522101121 }
+            }
+          },
+          "terminal_inventory_obligation": {
+            "properties": {
+              "observed_count": { "const": 14542615005 },
+              "observed_max_norm_sq": { "const": 1031522101121 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "blocker": {
+            "const": "SOURCE_DEAD_CERT_TARGET_NOT_REACHED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_path_provenance": {
+            "const": "component_reachability_only"
+          },
+          "target_atom_path_length": { "const": 0 },
+          "target_atom_path": { "type": "array", "maxItems": 0 },
+          "coordinate_path_obligation": {
+            "properties": {
+              "observed_provenance": {
+                "const": "component_reachability_only"
+              },
+              "observed_coordinate_atom_count": { "const": 0 },
+              "observed_port_atom_count": { "const": 0 }
+            }
+          },
+          "terminal_source_inventory_summary": {
+            "properties": {
+              "max_norm_sq": { "type": "integer", "maximum": 1031522101120 }
+            }
+          },
+          "terminal_inventory_obligation": {
+            "properties": {
+              "observed_max_norm_sq": {
+                "type": "integer",
+                "maximum": 1031522101120
+              }
+            }
+          },
+          "missing_for_source_dead_cert": {
+            "contains": {
+              "type": "string",
+              "pattern": "target reachability"
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "point": {
       "type": "object",
