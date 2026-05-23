@@ -13,6 +13,7 @@ constexpr std::uint64_t kTsuchimuraEndpointB = 376039;
 constexpr std::uint64_t kCanonicalEndpointA = 376039;
 constexpr std::uint64_t kCanonicalEndpointB = 943460;
 constexpr std::uint64_t kEndpointNorm = 1031522101121ULL;
+constexpr std::uint64_t kEndpointAtomId = 1615075207964004ULL;
 constexpr std::uint64_t kExpectedComponentSize = 14542615005ULL;
 constexpr std::uint64_t kConservativeTerminalRadius = 1015645;
 constexpr std::uint64_t kPreferredBandWidth = 8192;
@@ -124,6 +125,15 @@ int main() {
             << ",\"exact_guard_min_r_final\":1015644,"
             << "\"conservative_guard_min_r_final\":"
             << kConservativeTerminalRadius
+            << "},"
+            << "\"source_dead_cert_claim_gate\":{"
+            << "\"terminal_source_inventory_mode\":\"claim_grade_accumulator\","
+            << "\"terminal_source_inventory_accumulator_mode\":\"claim_grade_digest_accumulator\","
+            << "\"digest_algorithm\":\"sha256:lb_source_inventory_v1\","
+            << "\"required_true_flags\":[\"complete_stream_observed\",\"canonical_order\",\"duplicate_free\",\"retired_component_finalized\",\"overflow_checked\"],"
+            << "\"expected_count\":" << kExpectedComponentSize
+            << ",\"expected_max_norm_sq\":" << kEndpointNorm
+            << ",\"expected_max_norm_atom_ids\":[" << kEndpointAtomId << "]"
             << "},"
             << "\"band_schedule_hint\":{\"preferred_band_width\":"
             << kPreferredBandWidth

@@ -172,6 +172,8 @@ require_grep '"executable_now":false' \
   "$out_dir/k26_source_run_contract.json" "K26 contract non-executable"
 require_grep '"band_count":124' \
   "$out_dir/k26_source_run_contract.json" "K26 contract band count"
+require_grep '"source_dead_cert_claim_gate":.*"terminal_source_inventory_mode":"claim_grade_accumulator".*"terminal_source_inventory_accumulator_mode":"claim_grade_digest_accumulator".*"required_true_flags":\[.*complete_stream_observed.*canonical_order.*duplicate_free.*retired_component_finalized.*overflow_checked.*\]' \
+  "$out_dir/k26_source_run_contract.json" "K26 contract claim-grade inventory gate"
 
 require_grep '"schema":"lb_source_k26_execution_plan_v1"' \
   "$out_dir/k26_execution_plan.json" "K26 execution plan schema"
@@ -271,6 +273,8 @@ require_grep '"execution_protocol":.*"source_dead_gap_checker":"source_dead_gap_
   "$out_dir/k26_source_run_profile.json" "K26 run profile checked-bundle verifiers"
 require_grep '"execution_protocol":.*"auto_summary_nonclaim_cert":true.*"auto_summary_nonclaim_cert_artifact":"k26-source-dead-cert.json"' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile auto summary cert contract"
+require_grep '"source_dead_cert_claim_gate":.*"required_terminal_source_inventory_mode":"claim_grade_accumulator".*"required_accumulator_mode":"claim_grade_digest_accumulator".*"required_true_flags":\[.*complete_stream_observed.*canonical_order.*duplicate_free.*retired_component_finalized.*overflow_checked.*\]' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile claim-grade inventory gate"
 require_grep '"execution_protocol":.*"recommended_max_runtime_seconds":14000' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile runtime budget guard"
 require_grep 'full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget' \
@@ -304,6 +308,8 @@ require_grep '"bundle_harness":.*"auto_summary_nonclaim_cert":true.*"auto_summar
   "$out_dir/k26_source_run_commands.json" "K26 run commands auto summary cert contract"
 require_grep '"bundle_harness":.*"auto_summary_nonclaim_blocker":"K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM"' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands summary non-claim blocker"
+require_grep '"bundle_harness":.*"claim_grade_terminal_source_inventory_mode":"claim_grade_accumulator".*"claim_grade_accumulator_mode":"claim_grade_digest_accumulator".*"claim_grade_accumulator_required_true_flags":\[.*complete_stream_observed.*canonical_order.*duplicate_free.*retired_component_finalized.*overflow_checked.*\]' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands claim-grade inventory gate"
 require_grep '"bundle_harness":.*"timeout_seconds":1200.*"max_runtime_seconds":14000' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands runtime budget guard"
 require_grep '--timeout-seconds 1200 --max-runtime-seconds 14000' \

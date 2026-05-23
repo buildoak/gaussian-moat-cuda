@@ -16,6 +16,7 @@ constexpr std::uint64_t kTsuchimuraEndpointB = 376039;
 constexpr std::uint64_t kCanonicalEndpointA = 376039;
 constexpr std::uint64_t kCanonicalEndpointB = 943460;
 constexpr std::uint64_t kEndpointNorm = 1031522101121ULL;
+constexpr std::uint64_t kEndpointAtomId = 1615075207964004ULL;
 constexpr std::uint64_t kExpectedComponentSize = 14542615005ULL;
 constexpr std::uint64_t kConservativeTerminalRadius = 1015645;
 constexpr std::uint64_t kPreferredBandWidth = 8192;
@@ -128,7 +129,7 @@ int main() {
       "full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget",
       "coordinate-to-port seam bridge remains diagnostic",
       "generated coordinate source paths are accepted only as summary-only non-claim evidence until the full-run checker binds them to claim-grade inventory and BZ evidence",
-      "terminal runner output still emits a summary-only non-claim accumulator; claim-grade accumulator provenance is still missing",
+      "terminal runner output still emits a summary-only non-claim accumulator; claim-grade accumulator provenance flags are still missing",
       "no K26 full-run artifact hash or non-pending build metadata exists"};
 
   std::cout
@@ -179,6 +180,17 @@ int main() {
             << "\"auto_summary_nonclaim_cert_artifact\":\"k26-source-dead-cert.json\","
             << "\"recommended_max_runtime_seconds\":14000,"
             << "\"timeout_status_prefix\":\"K26_FULL_RUN_BUNDLE_BLOCKED_\"},";
+  std::cout << "\"source_dead_cert_claim_gate\":{"
+            << "\"accepted_now\":false,"
+            << "\"current_runner_accumulator_mode\":\"summary_digest_only_non_claim\","
+            << "\"required_terminal_source_inventory_mode\":\"claim_grade_accumulator\","
+            << "\"required_accumulator_mode\":\"claim_grade_digest_accumulator\","
+            << "\"required_accumulator_algorithm\":\"sha256:lb_source_inventory_v1\","
+            << "\"required_true_flags\":[\"complete_stream_observed\",\"canonical_order\",\"duplicate_free\",\"retired_component_finalized\",\"overflow_checked\"],"
+            << "\"expected_count\":" << kExpectedComponentSize
+            << ",\"expected_max_norm_sq\":" << kEndpointNorm
+            << ",\"expected_max_norm_atom_ids\":[" << kEndpointAtomId << "]"
+            << "},";
   emit_string_array("runner_requirements", kRunnerRequirements,
                     sizeof(kRunnerRequirements) /
                         sizeof(kRunnerRequirements[0]));

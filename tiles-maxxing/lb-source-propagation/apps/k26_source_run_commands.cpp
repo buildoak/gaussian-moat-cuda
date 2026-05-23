@@ -17,6 +17,8 @@ constexpr std::uint64_t kTsuchimuraEndpointB = 376039;
 constexpr std::uint64_t kCanonicalEndpointA = 376039;
 constexpr std::uint64_t kCanonicalEndpointB = 943460;
 constexpr std::uint64_t kEndpointNorm = 1031522101121ULL;
+constexpr std::uint64_t kEndpointAtomId = 1615075207964004ULL;
+constexpr std::uint64_t kExpectedComponentSize = 14542615005ULL;
 constexpr std::uint64_t kTerminalRadius = 1015645;
 constexpr std::uint64_t kBandWidth = 8192;
 constexpr std::uint64_t kPrefixOuter = 8192;
@@ -228,6 +230,14 @@ int main() {
             << "\"auto_summary_nonclaim_cert\":true,"
             << "\"auto_summary_nonclaim_cert_artifact\":\"k26-source-dead-cert.json\","
             << "\"auto_summary_nonclaim_blocker\":\"K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM\","
+            << "\"claim_grade_terminal_source_inventory_mode\":\"claim_grade_accumulator\","
+            << "\"claim_grade_accumulator_mode\":\"claim_grade_digest_accumulator\","
+            << "\"claim_grade_accumulator_algorithm\":\"sha256:lb_source_inventory_v1\","
+            << "\"claim_grade_accumulator_required_true_flags\":[\"complete_stream_observed\",\"canonical_order\",\"duplicate_free\",\"retired_component_finalized\",\"overflow_checked\"],"
+            << "\"claim_grade_expected_count\":" << kExpectedComponentSize
+            << ",\"claim_grade_expected_max_norm_sq\":" << kEndpointNorm
+            << ",\"claim_grade_expected_max_norm_atom_ids\":["
+            << kEndpointAtomId << "],"
             << "\"timeout_seconds\":1200,"
             << "\"max_runtime_seconds\":14000,"
             << "\"command\":";
