@@ -522,6 +522,16 @@ After binding the K26 gap to explicit target-bridge evidence at local head
 observed qualifying-market offer was `$0.4000/hr`, `0.0300/hr` over cap. No
 Vast instance was created.
 
+After binding the K26 gap to explicit BZ schedule obligations at local head
+`b50375c`, a capped Vast RTX 4090 offer appeared at `$0.3481/hr`, inside the
+`$0.37/hr` cap. Instance `37454361` ran the guarded one-shot remote smoke on
+2026-05-23, then `--destroy-on-exit` destroyed it. Pulled artifacts under
+`tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull/` record
+`REMOTE_SIDECAR_SMOKE_PASS`, sidecar CTest `28/28`, independent verification
+CTest `84/84`, and `REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS`. This remains a
+build/smoke and small/medium verification gate only, not a sqrt(26) source run
+and not a moat result.
+
 After any partial continuation, run:
 
 ```bash
