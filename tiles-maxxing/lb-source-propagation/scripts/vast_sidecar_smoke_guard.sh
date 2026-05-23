@@ -154,10 +154,15 @@ if ! command -v vastai >/dev/null 2>&1; then
   exit 2
 fi
 
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root"
-local_head="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-local_branch="$(git branch --show-current 2>/dev/null || echo unknown)"
+if repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+  cd "$repo_root"
+  local_head="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  local_branch="$(git branch --show-current 2>/dev/null || echo unknown)"
+else
+  repo_root="$PWD"
+  local_head="${LB_SOURCE_LOCAL_HEAD:-unknown}"
+  local_branch="${LB_SOURCE_LOCAL_BRANCH:-unknown}"
+fi
 
 shell_join() {
   local out=""

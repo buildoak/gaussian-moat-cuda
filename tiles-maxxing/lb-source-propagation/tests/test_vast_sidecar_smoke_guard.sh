@@ -6,7 +6,7 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 
-guard="$1"
+guard="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin"
@@ -71,6 +71,20 @@ if grep -q '^create instance ' "$VAST_MOCK_LOG"; then
   echo "dry-run unexpectedly created a Vast instance" >&2
   exit 1
 fi
+
+: > "$VAST_MOCK_LOG"
+mkdir -p "$tmp/non-git-source"
+(
+  cd "$tmp/non-git-source"
+  PATH="$tmp/bin:$PATH" "$guard" \
+    --max-dph 0.37 \
+    --max-budget 1.50 \
+    --k-sq 26 \
+    > "$tmp/non-git-dry-run.log"
+)
+grep -q 'LOCAL_SOURCE branch=unknown head=unknown k_sq=26' \
+  "$tmp/non-git-dry-run.log"
+grep -q 'DRY_RUN_ONLY' "$tmp/non-git-dry-run.log"
 
 : > "$VAST_MOCK_LOG"
 PATH="$tmp/bin:$PATH" "$guard" \
