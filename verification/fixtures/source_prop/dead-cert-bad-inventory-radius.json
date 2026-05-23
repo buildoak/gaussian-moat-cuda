@@ -1,0 +1,32 @@
+{
+  "schema": "lb_source_dead_cert_draft_v1",
+  "certificate_id": "cert-bad-inventory-radius",
+  "profile_id": "profile-bad-inventory-radius",
+  "metadata": {
+    "source_mode": "ORIGIN_SOURCE",
+    "source_id": "omega",
+    "geometry_id": "SOURCE_ORIGIN_DIAGNOSTIC",
+    "commit_id": "abc123",
+    "build_id": "local-test",
+    "bz_status": "BZ_CLEAN_DIAGNOSTIC",
+    "artifact_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "k_sq": 36,
+  "terminal_radius": 20,
+  "negative_guard_pass": true,
+  "endpoint": { "a": 7, "b": 2, "norm_sq": 53 },
+  "endpoint_atom_id": 30064771074,
+  "source_path_provenance": "coordinate_gaussian_prime_path",
+  "source_path": [
+    { "a": 5, "b": 2, "norm_sq": 29 },
+    { "a": 7, "b": 2, "norm_sq": 53 }
+  ],
+  "terminal_source_inventory_summary": {
+    "count": 5,
+    "digest_algorithm": "sha256:lb_source_inventory_v1",
+    "digest_hex": "fa19f1592dfad9360f8ecee189ab8d5e2a36f174118a95828f8a631d7ab6ff50",
+    "max_norm_sq": 441,
+    "max_norm_atom_ids": [90194313216]
+  },
+  "terminal_source_inventory": [1, 2, 21474836482, 30064771074, 90194313216]
+}

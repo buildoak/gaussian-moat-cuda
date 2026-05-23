@@ -814,6 +814,11 @@ CertStatus verify_source_dead_cert(const nlohmann::json& cert) {
   std::uint64_t actual_max_norm_sq = 0;
   const std::vector<std::int64_t> actual_ties =
       max_norm_atom_ids(inventory, actual_max_norm_sq);
+  if (static_cast<unsigned __int128>(actual_max_norm_sq) >
+      static_cast<unsigned __int128>(terminal_radius) * terminal_radius) {
+    throw std::runtime_error(
+        "terminal_source_inventory max_norm_sq exceeds terminal radius");
+  }
   if (require_u64(summary, "max_norm_sq") != actual_max_norm_sq) {
     throw std::runtime_error("inventory max_norm_sq mismatch");
   }
