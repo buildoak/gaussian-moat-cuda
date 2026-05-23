@@ -70,6 +70,16 @@
           },
           "endpoint_atom_id": { "const": 1615075207964004 },
           "source_path": {
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "object",
+                "required": ["a", "b", "norm_sq"],
+                "properties": {
+                  "norm_sq": { "maximum": 26 }
+                }
+              }
+            ],
             "contains": {
               "type": "object",
               "required": ["a", "b", "norm_sq"],

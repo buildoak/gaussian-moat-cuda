@@ -213,6 +213,13 @@ class SourcePropSchemaContractTest(unittest.TestCase):
             "BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE",
         )
         self.assertEqual(k26_rule["endpoint_atom_id"]["const"], 1615075207964004)
+        self.assertEqual(k26_rule["source_path"]["minItems"], 2)
+        self.assertEqual(
+            k26_rule["source_path"]["prefixItems"][0]["properties"]["norm_sq"][
+                "maximum"
+            ],
+            26,
+        )
 
         source_path_target = k26_rule["source_path"]["contains"]["properties"]
         self.assertEqual(source_path_target["a"]["const"], 376039)

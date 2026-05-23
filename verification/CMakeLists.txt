@@ -97,6 +97,7 @@ foreach(bad_source_dead_cert
     dead-cert-bad-inventory-extrema
     dead-cert-bad-k26-bz-status
     dead-cert-bad-k26-endpoint
+    dead-cert-bad-k26-origin-path
     dead-cert-bad-k26-source-mode
     dead-cert-bad-listed-nonclaim-status
     dead-cert-bad-negative-guard

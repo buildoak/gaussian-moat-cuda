@@ -30,7 +30,7 @@ write_ctest_log() {
 }
 
 write_ctest_log "$tmp/ctest.log" 27
-write_ctest_log "$tmp/verification-ctest.log" 75
+write_ctest_log "$tmp/verification-ctest.log" 76
 
 cat > "$tmp/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
@@ -104,7 +104,7 @@ grep -q "REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS" "$tmp/provenance-pass.log"
 bad_ctest="$tmp/bad-ctest"
 mkdir "$bad_ctest"
 cp "$tmp"/* "$bad_ctest"/ 2>/dev/null || true
-perl -0pi -e 's/100% tests passed, 0 tests failed out of 75/100% tests passed, 0 tests failed out of 74/' \
+perl -0pi -e 's/100% tests passed, 0 tests failed out of 76/100% tests passed, 0 tests failed out of 75/' \
   "$bad_ctest/verification-ctest.log"
 if "$checker" "$bad_ctest" > "$tmp/bad-ctest.log" 2>&1; then
   echo "checker accepted verification CTest log with mismatched row count" >&2
@@ -115,7 +115,7 @@ grep -q 'artifact check failed' "$tmp/bad-ctest.log"
 short_ctest="$tmp/short-ctest"
 mkdir "$short_ctest"
 cp "$tmp"/* "$short_ctest"/ 2>/dev/null || true
-write_ctest_log "$short_ctest/verification-ctest.log" 74
+write_ctest_log "$short_ctest/verification-ctest.log" 75
 if "$checker" "$short_ctest" > "$tmp/short-ctest.log" 2>&1; then
   echo "checker accepted verification CTest below Phase 1 baseline" >&2
   exit 1
