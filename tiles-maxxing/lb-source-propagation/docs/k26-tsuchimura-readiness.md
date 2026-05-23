@@ -117,6 +117,15 @@ useful diagnostic shape evidence only when it also carries an explicit
 `K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM` instead
 of accepting the bundle.
 
+The executable run contract now separates two checked harness paths. Without
+`--cert-in`, supplying both `--source-dead-gap-checker` and
+`--source-dead-checker` asks the harness to generate
+`k26-source-dead-cert.json` as a summary-only non-claim artifact from the
+prefix witness plus full coordinate-port expansion paths, then run the bundle
+checker. With `--cert-in`, the supplied cert is copied and checked instead.
+Both paths remain non-claim unless the cert checker returns a listed
+`SOURCE_DEAD_CERT_DRAFT_PASS` and the bundle checker accepts every binding.
+
 The executable harness for producing the bundle shape is:
 
 ```bash

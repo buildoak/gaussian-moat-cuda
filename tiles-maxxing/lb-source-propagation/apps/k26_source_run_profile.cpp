@@ -121,12 +121,13 @@ int main() {
       "seed continuation only from the origin-prefix carry manifest and prefix witness",
       "reject any TileOp overflow row",
       "bind repaired BZ schedule digest/evidence into profile metadata",
+      "synthesize summary-only non-claim k26-source-dead-cert.json from prefix witness plus full coordinate-port expansion paths when both independent checkers are supplied",
       "emit terminal inventory summary without explicit 14.5B-member JSON expansion",
       "emit SOURCE_DEAD_CERT only after positive endpoint path and negative final guard are both verified"};
   constexpr const char* kMissingRunnerFeatures[] = {
       "full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget",
       "coordinate-to-port seam bridge remains diagnostic",
-      "TileOp-port target reachability has mixed coordinate/port atom-chain provenance, not a coordinate source-path witness",
+      "generated coordinate source paths are accepted only as summary-only non-claim evidence until the full-run checker binds them to claim-grade inventory and BZ evidence",
       "terminal inventory has only a summary-only non-claim verifier; claim-grade full-run provenance is still missing",
       "no K26 full-run artifact hash or non-pending build metadata exists"};
 
@@ -174,6 +175,8 @@ int main() {
             << "\"runtime_budget_checker\":\"check_k26_runtime_budget.py\","
             << "\"source_dead_gap_checker\":\"source_dead_gap_check\","
             << "\"source_dead_checker\":\"source_dead_cert_check\","
+            << "\"auto_summary_nonclaim_cert\":true,"
+            << "\"auto_summary_nonclaim_cert_artifact\":\"k26-source-dead-cert.json\","
             << "\"recommended_max_runtime_seconds\":14000,"
             << "\"timeout_status_prefix\":\"K26_FULL_RUN_BUNDLE_BLOCKED_\"},";
   emit_string_array("runner_requirements", kRunnerRequirements,

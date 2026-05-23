@@ -166,8 +166,9 @@ int main() {
       "--source-dead-gap-checker "
       "source_dead_gap_check";
   const std::string checked_bundle_command =
-      bundle_command +
-      " --cert-in k26-source-dead-cert.json "
+      bundle_command + " --source-dead-checker source_dead_cert_check";
+  const std::string supplied_cert_bundle_command =
+      bundle_command + " --cert-in k26-source-dead-cert.json "
       "--source-dead-checker source_dead_cert_check";
 
   std::cout << "{"
@@ -224,17 +225,22 @@ int main() {
             << "\"runtime_budget_checker\":\"check_k26_runtime_budget.py\","
             << "\"source_dead_gap_checker\":\"source_dead_gap_check\","
             << "\"source_dead_checker\":\"source_dead_cert_check\","
+            << "\"auto_summary_nonclaim_cert\":true,"
+            << "\"auto_summary_nonclaim_cert_artifact\":\"k26-source-dead-cert.json\","
+            << "\"auto_summary_nonclaim_blocker\":\"K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM\","
             << "\"timeout_seconds\":1200,"
             << "\"max_runtime_seconds\":14000,"
             << "\"command\":";
   emit_json_string(bundle_command);
   std::cout << ",\"checked_bundle_command\":";
   emit_json_string(checked_bundle_command);
+  std::cout << ",\"supplied_cert_bundle_command\":";
+  emit_json_string(supplied_cert_bundle_command);
   std::cout << "},\"repaired_boundaries\":["
             << "{\"nominal\":122880,\"repaired\":122879},"
             << "{\"nominal\":475136,\"repaired\":475135},"
             << "{\"nominal\":622592,\"repaired\":622591}],"
-            << "\"acceptance_note\":\"Commands are a reproducible run contract only; SOURCE_DEAD_CERT remains blocked until the full run artifact, BZ evidence binding, seam-bridge rule, and terminal inventory verifier all pass.\""
+            << "\"acceptance_note\":\"Commands are a reproducible run contract only; generated summary-only certificates remain non-claim until full-run artifacts, claim-grade BZ evidence binding, seam-bridge proof, and terminal inventory provenance all pass.\""
             << "}\n";
   return EXIT_SUCCESS;
 }

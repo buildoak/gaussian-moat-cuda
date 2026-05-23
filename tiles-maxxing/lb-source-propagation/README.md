@@ -474,6 +474,12 @@ benchmarked with an explicit worker count instead of blindly using all visible
 hardware threads. This does not alter the underlying TileOp implementation or
 any existing campaign verdict semantics. Live-source continuation evidence is
 diagnostic runtime evidence, not a `SOURCE_ORIGIN_K26` claim.
+When both `--source-dead-gap-checker` and `--source-dead-checker` are supplied
+without `--cert-in`, the bundle harness generates
+`k26-source-dead-cert.json` as a `SUMMARY_ONLY_NON_CLAIM` artifact from the
+prefix witness plus full coordinate-port expansion paths, then runs the full
+bundle checker. This is the default checked path for naming the next K26
+blocker, not an accepted source-death certificate.
 If a cert is supplied with `--cert-in`, it copies it into the bundle, refreshes
 the hash manifest, and runs the full bundle checker with the supplied
 `--source-dead-checker`.

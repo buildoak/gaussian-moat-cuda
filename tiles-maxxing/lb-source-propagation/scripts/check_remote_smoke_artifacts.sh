@@ -269,6 +269,8 @@ require_grep '"execution_protocol":.*"chunk_ledger":"k26-continuation-chunks.jso
   "$out_dir/k26_source_run_profile.json" "K26 run profile chunk ledger contract"
 require_grep '"execution_protocol":.*"source_dead_gap_checker":"source_dead_gap_check".*"source_dead_checker":"source_dead_cert_check"' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile checked-bundle verifiers"
+require_grep '"execution_protocol":.*"auto_summary_nonclaim_cert":true.*"auto_summary_nonclaim_cert_artifact":"k26-source-dead-cert.json"' \
+  "$out_dir/k26_source_run_profile.json" "K26 run profile auto summary cert contract"
 require_grep '"execution_protocol":.*"recommended_max_runtime_seconds":14000' \
   "$out_dir/k26_source_run_profile.json" "K26 run profile runtime budget guard"
 require_grep 'full-run K26 bundle harness supports chunk/resume execution but has not completed accepted artifacts for the repaired variable-boundary schedule under the active budget' \
@@ -298,12 +300,18 @@ require_grep '"bundle_harness":.*"chunk_ledger":"k26-continuation-chunks.jsonl".
   "$out_dir/k26_source_run_commands.json" "K26 run commands chunk ledger contract"
 require_grep '"bundle_harness":.*"source_dead_gap_checker":"source_dead_gap_check".*"source_dead_checker":"source_dead_cert_check"' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands checked-bundle verifiers"
+require_grep '"bundle_harness":.*"auto_summary_nonclaim_cert":true.*"auto_summary_nonclaim_cert_artifact":"k26-source-dead-cert.json"' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands auto summary cert contract"
+require_grep '"bundle_harness":.*"auto_summary_nonclaim_blocker":"K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM"' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands summary non-claim blocker"
 require_grep '"bundle_harness":.*"timeout_seconds":1200.*"max_runtime_seconds":14000' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands runtime budget guard"
 require_grep '--timeout-seconds 1200 --max-runtime-seconds 14000' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands bounded bundle command"
+require_grep '"checked_bundle_command":"[^"]*--source-dead-gap-checker source_dead_gap_check --source-dead-checker source_dead_cert_check"' \
+  "$out_dir/k26_source_run_commands.json" "K26 run commands generated summary checked command"
 require_grep '--cert-in k26-source-dead-cert.json --source-dead-checker source_dead_cert_check' \
-  "$out_dir/k26_source_run_commands.json" "K26 run commands checked-bundle command"
+  "$out_dir/k26_source_run_commands.json" "K26 run commands supplied-cert checked command"
 require_grep '--target-a 376039 --target-b 943460' \
   "$out_dir/k26_source_run_commands.json" "K26 run commands target bridge flags"
 
