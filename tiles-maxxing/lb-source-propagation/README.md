@@ -160,13 +160,13 @@ does not emit an accepted `SOURCE_DEAD_CERT`.
 From the repo root:
 
 ```bash
-cmake -S tiles-maxxing/lb-source-propagation -B /tmp/gm-lbsp
-cmake --build /tmp/gm-lbsp -j
-ctest --test-dir /tmp/gm-lbsp --output-on-failure
+tiles-maxxing/lb-source-propagation/scripts/check_phase1_local_gates.sh
 ```
 
-The branch-scope gate is checked separately because remote smoke deployments
-may not include `.git` metadata:
+This runs fresh local sidecar CMake/CTest, fresh independent `verification/`
+CMake/CTest, `git diff --check`, the Phase 1 diff-scope guard, and the same
+artifact checker used after a pulled Vast smoke. To run only the branch-scope
+gate:
 
 ```bash
 tiles-maxxing/lb-source-propagation/scripts/check_phase1_diff_scope.sh
