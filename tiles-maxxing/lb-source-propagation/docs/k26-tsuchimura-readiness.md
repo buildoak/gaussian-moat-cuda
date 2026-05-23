@@ -350,6 +350,21 @@ completed under the active runtime/budget gate yet. The current local blocker
 is therefore runtime/budget, not the earlier target-not-reached terminal
 diagnostic.
 
+A longer 2026-05-23 local resume probe with `--continuation-chunk-bands 8`,
+`--timeout-seconds 1800`, and `--max-runtime-seconds 14000` reused the prefix
+and completed two continuation chunks: `8192 -> 73728` and
+`73728 -> 139264`. The chunk ledger recorded both handoffs, source carry was
+still live, the target was not yet seen, and all completed rows had
+`tileop_overflows_total=0`. The combined progress through 16 continuation
+bands emitted `K26_RUNTIME_BUDGET_PASS` with projected total `7684s`, but the
+next chunk's first completed band `139264 -> 147456` took `152.237s` and the
+chunk-local runtime checker emitted `K26_RUNTIME_BUDGET_REJECT` with projected
+total `18726s`. The local run was stopped on that budget signal. This does not
+invalidate the source-propagation protocol or checkpoint chain, but it means a
+full local K26 continuation is not accepted under the current runtime gate; a
+paid or larger-machine attempt must keep the same runtime checker active and
+stop if the later-radius projection remains over budget.
+
 After any partial continuation, run:
 
 ```bash
