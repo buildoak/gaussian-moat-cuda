@@ -236,6 +236,23 @@ fi
 grep -q 'K26_FULL_RUN_BUNDLE_BLOCKED_SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM' \
   "$tmp/summary-nonclaim.log"
 
+bad_summary_path="$tmp/bad-summary-path"
+write_bundle "$bad_summary_path"
+bad_summary_digest="$(shasum -a 256 "$bad_summary_path/k26-continuation-result.json" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+cat > "$bad_summary_path/k26-source-dead-cert.json" <<JSON
+{"schema":"lb_source_dead_cert_draft_v1","certificate_id":"k26-source-dead-cert-summary-bad-path","profile_id":"k26-source-run-profile","proof_status":"SUMMARY_ONLY_NON_CLAIM","non_claim":"summary-only diagnostic inventory, not a SOURCE_DEAD_CERT","terminal_source_inventory_mode":"summary_only_non_claim","metadata":{"source_mode":"ORIGIN_SOURCE","source_id":"omega","geometry_id":"SOURCE_ORIGIN_K26","commit_id":"abc123","build_id":"remote-test","bz_status":"BZ_REPAIRED_SCHEDULE_PASS_NON_SOURCE","bz_schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","bz_schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","artifact_hash":"sha256:$bad_summary_digest"},"k_sq":26,"terminal_radius":1015645,"negative_guard_pass":true,"endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121},"endpoint_atom_id":1615075207964004,"source_path_provenance":"coordinate_gaussian_prime_path","source_path":[{"a":0,"b":3,"norm_sq":9},{"a":376039,"b":943461,"norm_sq":1031523988042},{"a":376039,"b":943460,"norm_sq":1031522101121}],"terminal_source_inventory_summary":{"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]},"terminal_source_inventory_accumulator":{"mode":"summary_digest_only_non_claim","provenance":"terminal_component_inventory_accumulator","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"count":14542615005,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_norm_sq":1031522101121,"max_norm_atom_ids":[1615075207964004]}}
+JSON
+write_manifest "$bad_summary_path"
+if "$checker" "$bad_summary_path" \
+    --source-dead-checker "$fake_source_dead_checker" \
+    --source-dead-gap-checker "$fake_source_dead_gap_checker" \
+    > "$tmp/bad-summary-path.log" 2>&1; then
+  echo "checker accepted summary-only cert whose source path exceeds inventory summary" >&2
+  exit 1
+fi
+grep -q 'source-dead checker did not accept draft cert' \
+  "$tmp/bad-summary-path.log"
+
 bad_gap="$tmp/bad-gap"
 write_bundle "$bad_gap"
 perl -0pi -e 's/SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING/WRONG_BLOCKER/' \
