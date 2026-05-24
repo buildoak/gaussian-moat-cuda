@@ -136,6 +136,68 @@ struct LiveHandoffReadResult {
   bool accepted() const noexcept { return diagnostic.empty(); }
 };
 
+struct BridgeSafetyCounters {
+  std::uint64_t coordinate_carry_atoms_checked = 0;
+  std::uint64_t coordinate_carry_atoms_bridged = 0;
+  std::uint64_t coordinate_carry_atoms_unbridged = 0;
+  std::uint64_t coordinate_carry_atoms_without_next_band_candidates = 0;
+  std::uint64_t coordinate_carry_atoms_dead_end_candidates = 0;
+  std::uint64_t coordinate_carry_atoms_unsafe_candidates = 0;
+  std::uint64_t bridge_rejected_candidate_atoms = 0;
+
+  friend bool operator==(const BridgeSafetyCounters&,
+                         const BridgeSafetyCounters&) = default;
+};
+
+struct LastBandComponentSummaryV1 {
+  std::vector<AtomId> boundary_atoms;
+  bool touches_outer_coordinate_carry = false;
+  bool touches_port_overhang = false;
+  std::uint64_t max_coordinate_norm_sq = 0;
+  std::vector<AtomId> max_coordinate_atom_ids;
+  std::uint64_t max_support_norm_sq = 0;
+  std::vector<AtomId> max_support_atom_ids;
+  BridgeSafetyCounters bridge_safety;
+
+  friend bool operator==(const LastBandComponentSummaryV1&,
+                         const LastBandComponentSummaryV1&) = default;
+};
+
+struct LastBandReachabilitySummaryV1 {
+  std::uint64_t k_sq = 0;
+  std::uint64_t r_start = 0;
+  std::uint64_t r_outer = 0;
+  std::uint64_t carry_width = 0;
+  std::string source_mode;
+  std::string source_id;
+  std::string geometry_id;
+  std::string build_id;
+  std::string schedule_digest_algorithm;
+  std::string schedule_digest_hex;
+  std::string overflow_summary;
+  std::string bridge_policy;
+  bool transfer_summary_present = false;
+  std::vector<LastBandComponentSummaryV1> components;
+
+  friend bool operator==(const LastBandReachabilitySummaryV1&,
+                         const LastBandReachabilitySummaryV1&) = default;
+};
+
+struct LastBandSummaryApplyResult {
+  RejectReason reject = RejectReason::kNone;
+  std::string diagnostic;
+  bool has_incoming_source = false;
+  bool has_source_continuation = false;
+  bool terminal_source_dead = false;
+  std::uint64_t max_source_coordinate_norm_sq = 0;
+  std::vector<AtomId> max_source_coordinate_atom_ids;
+  std::uint64_t max_source_support_norm_sq = 0;
+  std::vector<AtomId> max_source_support_atom_ids;
+  BridgeSafetyCounters source_bridge_safety;
+
+  bool accepted() const noexcept { return reject == RejectReason::kNone; }
+};
+
 struct CarryManifest {
   std::uint64_t k_sq = 0;
   std::uint64_t outer_radius = 0;
@@ -285,6 +347,10 @@ LiveHandoffReadResult live_handoff_from_string(std::string_view text);
 
 LiveHandoffReadResult live_handoff_from_string(
     std::string_view text, const LiveHandoffExpectedContext& expected);
+
+LastBandSummaryApplyResult apply_last_band_summary(
+    const LiveHandoffV1& incoming,
+    const LastBandReachabilitySummaryV1& summary);
 
 std::string source_profile_draft_json(const SourceProfileDraft& profile);
 

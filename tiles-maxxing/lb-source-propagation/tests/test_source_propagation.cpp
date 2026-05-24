@@ -19,6 +19,9 @@ using lb_source::LiveHandoffExpectedContext;
 using lb_source::LiveHandoffV1;
 using lb_source::LiveProcessResult;
 using lb_source::LiveSeparator;
+using lb_source::LastBandReachabilitySummaryV1;
+using lb_source::LastBandSummaryApplyResult;
+using lb_source::LastBandComponentSummaryV1;
 using lb_source::ProcessResult;
 using lb_source::RejectReason;
 using lb_source::SeparatorState;
@@ -855,6 +858,186 @@ void test_live_handoff_rejects_malformed_separator() {
            std::string("carry atom norm does not match coordinate atom"));
 }
 
+LastBandReachabilitySummaryV1 last_band_summary_fixture(
+    const LiveHandoffV1& incoming) {
+  LastBandReachabilitySummaryV1 summary;
+  summary.k_sq = incoming.k_sq;
+  summary.r_start = incoming.cut_radius;
+  summary.r_outer = incoming.cut_radius + 10;
+  summary.carry_width = incoming.carry_width;
+  summary.source_mode = incoming.source_mode;
+  summary.source_id = incoming.source_id;
+  summary.geometry_id = incoming.geometry_id;
+  summary.build_id = incoming.build_id;
+  summary.schedule_digest_algorithm = incoming.schedule_digest_algorithm;
+  summary.schedule_digest_hex = incoming.schedule_digest_hex;
+  summary.overflow_summary = incoming.overflow_summary;
+  summary.bridge_policy = "synthetic";
+  summary.transfer_summary_present = true;
+  return summary;
+}
+
+void test_last_band_summary_reproduces_terminal_state() {
+  LiveHandoffV1 incoming = live_handoff_fixture();
+  incoming.cut_radius = 20;
+  incoming.separator.carry_atoms = {{2, 4}, {3, 9}, {4, 16}};
+  incoming.separator.component_partition = {{2, 3}, {4}};
+  incoming.separator.source_bit_per_component = {true, false};
+
+  LastBandReachabilitySummaryV1 summary =
+      last_band_summary_fixture(incoming);
+  summary.components = {
+      LastBandComponentSummaryV1{
+          .boundary_atoms = {2, 3, 10},
+          .max_coordinate_norm_sq = 100,
+          .max_coordinate_atom_ids = {10},
+          .max_support_norm_sq = 100,
+          .max_support_atom_ids = {10},
+          .bridge_safety = {.coordinate_carry_atoms_checked = 1,
+                            .coordinate_carry_atoms_bridged = 1},
+      },
+      LastBandComponentSummaryV1{
+          .boundary_atoms = {4, 11},
+          .touches_outer_coordinate_carry = true,
+          .max_coordinate_norm_sq = 121,
+          .max_coordinate_atom_ids = {11},
+          .max_support_norm_sq = 121,
+          .max_support_atom_ids = {11},
+      },
+  };
+
+  const LastBandSummaryApplyResult applied =
+      lb_source::apply_last_band_summary(incoming, summary);
+  CHECK_TRUE(applied.accepted());
+  CHECK_TRUE(applied.has_incoming_source);
+  CHECK_TRUE(applied.terminal_source_dead);
+  CHECK_TRUE(!applied.has_source_continuation);
+  CHECK_EQ(applied.max_source_coordinate_norm_sq,
+           static_cast<std::uint64_t>(100));
+  CHECK_EQ(applied.max_source_coordinate_atom_ids,
+           (std::vector<AtomId>{10}));
+  CHECK_EQ(applied.source_bridge_safety.coordinate_carry_atoms_checked,
+           static_cast<std::uint64_t>(1));
+  CHECK_EQ(applied.source_bridge_safety.coordinate_carry_atoms_bridged,
+           static_cast<std::uint64_t>(1));
+}
+
+void test_last_band_summary_welds_neutral_carry_into_source() {
+  LiveHandoffV1 incoming = live_handoff_fixture();
+  incoming.separator.carry_atoms = {{2, 4}, {4, 16}};
+  incoming.separator.component_partition = {{2}, {4}};
+  incoming.separator.source_bit_per_component = {true, false};
+
+  LastBandReachabilitySummaryV1 summary =
+      last_band_summary_fixture(incoming);
+  summary.components = {
+      LastBandComponentSummaryV1{
+          .boundary_atoms = {2, 4, 12},
+          .touches_outer_coordinate_carry = true,
+          .max_coordinate_norm_sq = 144,
+          .max_coordinate_atom_ids = {12},
+          .max_support_norm_sq = 144,
+          .max_support_atom_ids = {12},
+          .bridge_safety = {.coordinate_carry_atoms_checked = 2,
+                            .coordinate_carry_atoms_bridged = 1,
+                            .coordinate_carry_atoms_unbridged = 1,
+                            .coordinate_carry_atoms_unsafe_candidates = 1},
+      },
+  };
+
+  const LastBandSummaryApplyResult applied =
+      lb_source::apply_last_band_summary(incoming, summary);
+  CHECK_TRUE(applied.accepted());
+  CHECK_TRUE(applied.has_source_continuation);
+  CHECK_TRUE(!applied.terminal_source_dead);
+  CHECK_EQ(applied.max_source_coordinate_norm_sq,
+           static_cast<std::uint64_t>(144));
+  CHECK_EQ(applied.max_source_coordinate_atom_ids,
+           (std::vector<AtomId>{12}));
+  CHECK_EQ(applied.source_bridge_safety.coordinate_carry_atoms_checked,
+           static_cast<std::uint64_t>(2));
+  CHECK_EQ(
+      applied.source_bridge_safety.coordinate_carry_atoms_unsafe_candidates,
+      static_cast<std::uint64_t>(1));
+}
+
+void test_last_band_port_overhang_is_not_coordinate_max_evidence() {
+  LiveHandoffV1 incoming = live_handoff_fixture();
+  incoming.separator.carry_atoms = {{2, 4}};
+  incoming.separator.component_partition = {{2}};
+  incoming.separator.source_bit_per_component = {true};
+  const std::optional<AtomId> port = lb_source::port_atom_id(1, 2, 1, 5);
+  CHECK_TRUE(port.has_value());
+
+  LastBandReachabilitySummaryV1 summary =
+      last_band_summary_fixture(incoming);
+  summary.components = {
+      LastBandComponentSummaryV1{
+          .boundary_atoms = {2, *port},
+          .touches_port_overhang = true,
+          .max_support_norm_sq = 999,
+          .max_support_atom_ids = {*port},
+      },
+  };
+
+  const LastBandSummaryApplyResult applied =
+      lb_source::apply_last_band_summary(incoming, summary);
+  CHECK_TRUE(applied.accepted());
+  CHECK_TRUE(applied.has_source_continuation);
+  CHECK_TRUE(!applied.terminal_source_dead);
+  CHECK_EQ(applied.max_source_coordinate_norm_sq,
+           static_cast<std::uint64_t>(0));
+  CHECK_TRUE(applied.max_source_coordinate_atom_ids.empty());
+  CHECK_EQ(applied.max_source_support_norm_sq,
+           static_cast<std::uint64_t>(999));
+  CHECK_EQ(applied.max_source_support_atom_ids,
+           (std::vector<AtomId>{*port}));
+}
+
+void test_last_band_summary_rejects_progress_row_only_death() {
+  const LiveHandoffV1 incoming = live_handoff_fixture();
+  LastBandReachabilitySummaryV1 summary;
+  summary.k_sq = incoming.k_sq;
+  summary.r_start = incoming.cut_radius;
+  summary.r_outer = incoming.cut_radius + 10;
+  summary.carry_width = incoming.carry_width;
+
+  LastBandSummaryApplyResult applied =
+      lb_source::apply_last_band_summary(incoming, summary);
+  CHECK_EQ(applied.reject, RejectReason::kMalformed);
+  CHECK_EQ(applied.diagnostic,
+           std::string("missing last-band transfer summary"));
+
+  summary.transfer_summary_present = true;
+  applied = lb_source::apply_last_band_summary(incoming, summary);
+  CHECK_EQ(applied.reject, RejectReason::kMalformed);
+  CHECK_EQ(applied.diagnostic,
+           std::string("empty last-band transfer summary"));
+}
+
+void test_last_band_summary_must_cover_incoming_carry() {
+  LiveHandoffV1 incoming = live_handoff_fixture();
+  incoming.separator.carry_atoms = {{2, 4}, {3, 9}};
+  incoming.separator.component_partition = {{2, 3}};
+  incoming.separator.source_bit_per_component = {true};
+
+  LastBandReachabilitySummaryV1 summary =
+      last_band_summary_fixture(incoming);
+  summary.components = {
+      LastBandComponentSummaryV1{
+          .boundary_atoms = {2},
+          .max_coordinate_norm_sq = 4,
+          .max_coordinate_atom_ids = {2},
+      },
+  };
+
+  const LastBandSummaryApplyResult applied =
+      lb_source::apply_last_band_summary(incoming, summary);
+  CHECK_EQ(applied.reject, RejectReason::kMalformed);
+  CHECK_EQ(applied.diagnostic,
+           std::string("last-band summary omits incoming carry atom"));
+}
+
 void test_make_carry_manifest_from_process_result() {
   const BandInput band{
       .k_sq = 36,
@@ -1040,6 +1223,16 @@ int main() {
       test_live_handoff_accepts_diagnostic_source_mode);
   run("live_handoff_rejects_malformed_separator",
       test_live_handoff_rejects_malformed_separator);
+  run("last_band_summary_reproduces_terminal_state",
+      test_last_band_summary_reproduces_terminal_state);
+  run("last_band_summary_welds_neutral_carry_into_source",
+      test_last_band_summary_welds_neutral_carry_into_source);
+  run("last_band_port_overhang_is_not_coordinate_max_evidence",
+      test_last_band_port_overhang_is_not_coordinate_max_evidence);
+  run("last_band_summary_rejects_progress_row_only_death",
+      test_last_band_summary_rejects_progress_row_only_death);
+  run("last_band_summary_must_cover_incoming_carry",
+      test_last_band_summary_must_cover_incoming_carry);
   run("make_carry_manifest_from_process_result",
       test_make_carry_manifest_from_process_result);
   run("inventory_summary_is_canonical",

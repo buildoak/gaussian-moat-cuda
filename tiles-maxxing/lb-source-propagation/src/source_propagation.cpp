@@ -410,6 +410,96 @@ void append_manifest_json(std::ostringstream& out,
   out << "]}}";
 }
 
+LastBandSummaryApplyResult last_band_reject(RejectReason reason,
+                                            std::string diagnostic) {
+  LastBandSummaryApplyResult result;
+  result.reject = reason;
+  result.diagnostic = std::move(diagnostic);
+  return result;
+}
+
+void add_bridge_safety(BridgeSafetyCounters& target,
+                       const BridgeSafetyCounters& source) {
+  target.coordinate_carry_atoms_checked +=
+      source.coordinate_carry_atoms_checked;
+  target.coordinate_carry_atoms_bridged +=
+      source.coordinate_carry_atoms_bridged;
+  target.coordinate_carry_atoms_unbridged +=
+      source.coordinate_carry_atoms_unbridged;
+  target.coordinate_carry_atoms_without_next_band_candidates +=
+      source.coordinate_carry_atoms_without_next_band_candidates;
+  target.coordinate_carry_atoms_dead_end_candidates +=
+      source.coordinate_carry_atoms_dead_end_candidates;
+  target.coordinate_carry_atoms_unsafe_candidates +=
+      source.coordinate_carry_atoms_unsafe_candidates;
+  target.bridge_rejected_candidate_atoms +=
+      source.bridge_rejected_candidate_atoms;
+}
+
+void merge_max_atoms(std::uint64_t norm_sq, const std::vector<AtomId>& atoms,
+                     std::uint64_t& target_norm_sq,
+                     std::vector<AtomId>& target_atoms) {
+  if (atoms.empty()) {
+    return;
+  }
+  if (target_atoms.empty() || norm_sq > target_norm_sq) {
+    target_norm_sq = norm_sq;
+    target_atoms = atoms;
+  } else if (norm_sq == target_norm_sq) {
+    target_atoms.insert(target_atoms.end(), atoms.begin(), atoms.end());
+  }
+  sort_unique_atom_ids(target_atoms);
+}
+
+std::string validate_last_band_component(
+    const LastBandComponentSummaryV1& component) {
+  if (component.boundary_atoms.empty()) {
+    return "last-band component has no boundary atoms";
+  }
+  std::vector<AtomId> boundary = component.boundary_atoms;
+  if (!is_sorted_unique_atom_ids(boundary)) {
+    sort_unique_atom_ids(boundary);
+    if (boundary.size() != component.boundary_atoms.size()) {
+      return "duplicate atom in last-band component";
+    }
+  }
+  for (const AtomId id : component.boundary_atoms) {
+    if (!stable_atom_id(id)) {
+      return "last-band component contains unstable atom id";
+    }
+  }
+
+  if (component.max_coordinate_atom_ids.empty()) {
+    if (component.max_coordinate_norm_sq != 0) {
+      return "coordinate max norm has no coordinate atom ids";
+    }
+  } else {
+    for (const AtomId id : component.max_coordinate_atom_ids) {
+      const std::optional<CoordinateAtom> coordinate =
+          decode_coordinate_atom_id(id);
+      if (!coordinate.has_value()) {
+        return "coordinate max references non-coordinate atom";
+      }
+      if (coordinate->norm_sq != component.max_coordinate_norm_sq) {
+        return "coordinate max norm does not match coordinate atom";
+      }
+    }
+  }
+
+  if (component.max_support_atom_ids.empty()) {
+    if (component.max_support_norm_sq != 0) {
+      return "support max norm has no support atom ids";
+    }
+  } else {
+    for (const AtomId id : component.max_support_atom_ids) {
+      if (!stable_atom_id(id)) {
+        return "support max references unstable atom id";
+      }
+    }
+  }
+  return "";
+}
+
 }  // namespace
 
 std::uint64_t ceil_sqrt(std::uint64_t n) {
@@ -1133,6 +1223,162 @@ LiveHandoffReadResult live_handoff_from_string(
 
 LiveHandoffReadResult live_handoff_from_string(std::string_view text) {
   return live_handoff_from_string(text, LiveHandoffExpectedContext{});
+}
+
+LastBandSummaryApplyResult apply_last_band_summary(
+    const LiveHandoffV1& incoming,
+    const LastBandReachabilitySummaryV1& summary) {
+  if (!summary.transfer_summary_present) {
+    return last_band_reject(RejectReason::kMalformed,
+                            "missing last-band transfer summary");
+  }
+  if (summary.components.empty()) {
+    return last_band_reject(RejectReason::kMalformed,
+                            "empty last-band transfer summary");
+  }
+  if (summary.k_sq != incoming.k_sq) {
+    return last_band_reject(RejectReason::kMalformed,
+                            "summary k_sq does not match incoming handoff");
+  }
+  if (summary.r_start != incoming.cut_radius) {
+    return last_band_reject(
+        RejectReason::kMalformed,
+        "summary r_start does not match incoming cut radius");
+  }
+  if (summary.r_outer <= summary.r_start) {
+    return last_band_reject(RejectReason::kMalformed,
+                            "summary r_outer must be after r_start");
+  }
+  if (summary.carry_width != incoming.carry_width ||
+      summary.carry_width != ceil_sqrt(summary.k_sq)) {
+    return last_band_reject(RejectReason::kMalformed,
+                            "summary carry width does not match k_sq");
+  }
+  if (!summary.source_mode.empty() &&
+      summary.source_mode != incoming.source_mode) {
+    return last_band_reject(RejectReason::kMalformed,
+                            "summary source_mode does not match incoming");
+  }
+  if (!summary.source_id.empty() && summary.source_id != incoming.source_id) {
+    return last_band_reject(RejectReason::kMalformed,
+                            "summary source_id does not match incoming");
+  }
+
+  const std::string incoming_validation =
+      validate_live_separator(incoming.separator);
+  if (!incoming_validation.empty()) {
+    return last_band_reject(RejectReason::kMalformed,
+                            "incoming live separator " +
+                                incoming_validation);
+  }
+
+  std::vector<AtomId> ids;
+  ids.reserve(incoming.separator.carry_atoms.size() +
+              summary.components.size() * 2);
+  std::unordered_map<AtomId, std::size_t> index_by_id;
+  const auto ensure_index = [&](AtomId id) -> std::size_t {
+    const auto found = index_by_id.find(id);
+    if (found != index_by_id.end()) {
+      return found->second;
+    }
+    const std::size_t index = ids.size();
+    ids.push_back(id);
+    index_by_id.emplace(id, index);
+    return index;
+  };
+
+  for (const CarryAtom& atom : incoming.separator.carry_atoms) {
+    if (!stable_atom_id(atom.id)) {
+      return last_band_reject(RejectReason::kMalformed,
+                              "incoming carry atom has unstable id");
+    }
+    ensure_index(atom.id);
+  }
+
+  std::set<AtomId> summary_atoms;
+  for (const LastBandComponentSummaryV1& component : summary.components) {
+    const std::string component_validation =
+        validate_last_band_component(component);
+    if (!component_validation.empty()) {
+      return last_band_reject(RejectReason::kMalformed,
+                              component_validation);
+    }
+    for (const AtomId id : component.boundary_atoms) {
+      if (!summary_atoms.insert(id).second) {
+        return last_band_reject(
+            RejectReason::kMalformed,
+            "atom appears in multiple last-band components");
+      }
+      ensure_index(id);
+    }
+  }
+  for (const CarryAtom& atom : incoming.separator.carry_atoms) {
+    if (summary_atoms.find(atom.id) == summary_atoms.end()) {
+      return last_band_reject(RejectReason::kMalformed,
+                              "last-band summary omits incoming carry atom");
+    }
+  }
+
+  Dsu dsu(ids.size());
+  for (const auto& component : incoming.separator.component_partition) {
+    const AtomId first_id = component.front();
+    const auto first = index_by_id.find(first_id);
+    assert(first != index_by_id.end());
+    for (std::size_t i = 1; i < component.size(); ++i) {
+      const auto it = index_by_id.find(component[i]);
+      assert(it != index_by_id.end());
+      dsu.unite(first->second, it->second);
+    }
+  }
+  for (const LastBandComponentSummaryV1& component : summary.components) {
+    const auto first = index_by_id.find(component.boundary_atoms.front());
+    assert(first != index_by_id.end());
+    for (std::size_t i = 1; i < component.boundary_atoms.size(); ++i) {
+      const auto it = index_by_id.find(component.boundary_atoms[i]);
+      assert(it != index_by_id.end());
+      dsu.unite(first->second, it->second);
+    }
+  }
+
+  std::vector<bool> root_is_source(ids.size(), false);
+  LastBandSummaryApplyResult result;
+  for (std::size_t c = 0; c < incoming.separator.component_partition.size();
+       ++c) {
+    if (!incoming.separator.source_bit_per_component[c]) {
+      continue;
+    }
+    const AtomId id = incoming.separator.component_partition[c].front();
+    const auto it = index_by_id.find(id);
+    assert(it != index_by_id.end());
+    root_is_source[dsu.find(it->second)] = true;
+    result.has_incoming_source = true;
+  }
+
+  for (const LastBandComponentSummaryV1& component : summary.components) {
+    const auto it = index_by_id.find(component.boundary_atoms.front());
+    assert(it != index_by_id.end());
+    const std::size_t root = dsu.find(it->second);
+    if (!root_is_source[root]) {
+      continue;
+    }
+    if (component.touches_outer_coordinate_carry ||
+        component.touches_port_overhang) {
+      result.has_source_continuation = true;
+    }
+    merge_max_atoms(component.max_coordinate_norm_sq,
+                    component.max_coordinate_atom_ids,
+                    result.max_source_coordinate_norm_sq,
+                    result.max_source_coordinate_atom_ids);
+    merge_max_atoms(component.max_support_norm_sq,
+                    component.max_support_atom_ids,
+                    result.max_source_support_norm_sq,
+                    result.max_source_support_atom_ids);
+    add_bridge_safety(result.source_bridge_safety, component.bridge_safety);
+  }
+
+  result.terminal_source_dead =
+      result.has_incoming_source && !result.has_source_continuation;
+  return result;
 }
 
 InventorySummary summarize_inventory(const std::vector<AtomId>& atom_ids) {
