@@ -375,6 +375,52 @@ Two caveats are load-bearing:
   selected source-to-coordinate path, including any prefix equivalence used by
   neutral carry classes.
 
+### Minimal Campaign State
+
+For the normal W-scale seed-death campaign, the runner does not need to keep
+all band artifacts. The minimal correctness state is first-plus-rolling-last:
+
+```text
+CampaignState {
+  first_source_artifact
+  current_live_handoff
+  previous_live_handoff
+  active_band_summary
+  best_terminal_summary_if_dead
+}
+```
+
+`first_source_artifact` binds the certified source identity and the global
+`geo_I` / `geo_O` shell. It may be an origin-prefix certificate, a certified
+seed, or a trusted incoming handoff. It is not copied into every band.
+
+`current_live_handoff` is the only state needed to continue into the next band.
+`previous_live_handoff` is retained while processing the active band so that, if
+the active band kills the source, Mode 2 has the exact incoming source frontier
+needed to inspect/refine that last band.
+
+`active_band_summary` is overwritten band by band. If the source dies, the
+runner persists the pair:
+
+```text
+previous_live_handoff + active_band_summary
+```
+
+That pair is the local final artifact for diagnostic furthest-component
+refinement. Earlier band summaries are not required for the hot path.
+
+This keeps the campaign memory bounded by:
+
+```text
+O(first source artifact + two live frontiers + one active band summary)
+```
+
+The tradeoff is resumability. If only first-plus-last is persisted and the
+process dies mid-sweep, recovery may require replay from the first source
+artifact. For practical long runs, the runner may keep a single rolling
+checkpoint or sparse checkpoints, but those are operational restart artifacts,
+not mathematical continuation state.
+
 ### Optional Transfer-Summary Layer
 
 After the live-handoff split exists, there is a higher-leverage representation:
