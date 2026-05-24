@@ -21,7 +21,7 @@ Required artifact names:
   k26-continuation-result.json
   k26-continuation-progress.jsonl
   k26-continuation-chunks.jsonl, when present
-  k26-prefix-manifest.txt
+  k26-prefix-live-handoff.txt
   k26-prefix-witness.txt
   k26-source-dead-gap.json
   k26-source-dead-cert.json
@@ -280,14 +280,14 @@ continuation="$out_dir/k26-continuation-result.json"
 continuation_progress="$out_dir/k26-continuation-progress.jsonl"
 chunk_ledger="$out_dir/k26-continuation-chunks.jsonl"
 bridge_source="$continuation"
-prefix_manifest="$out_dir/k26-prefix-manifest.txt"
+prefix_live_handoff="$out_dir/k26-prefix-live-handoff.txt"
 prefix_witness="$out_dir/k26-prefix-witness.txt"
 gap="$out_dir/k26-source-dead-gap.json"
 cert="$out_dir/k26-source-dead-cert.json"
 artifact_manifest="$out_dir/k26-full-run-artifacts.sha256"
 
 for artifact in "$commands" "$bz" "$profile" "$prefix" "$prefix_progress" \
-    "$continuation" "$continuation_progress" "$prefix_manifest" \
+    "$continuation" "$continuation_progress" "$prefix_live_handoff" \
     "$prefix_witness" "$gap" "$cert" "$artifact_manifest"; do
   require_file "$artifact"
 done
@@ -320,7 +320,7 @@ if [[ -f "$chunk_ledger" ]]; then
   require_file "$bridge_source"
   require_manifest_hash "$bridge_source" k26-continuation-chunk-000.json
 fi
-require_manifest_hash "$prefix_manifest" k26-prefix-manifest.txt
+require_manifest_hash "$prefix_live_handoff" k26-prefix-live-handoff.txt
 require_manifest_hash "$prefix_witness" k26-prefix-witness.txt
 require_manifest_hash "$gap" k26-source-dead-gap.json
 require_manifest_hash "$cert" k26-source-dead-cert.json
@@ -337,6 +337,8 @@ require_grep '"canonical_octant_endpoint":.*"a":376039.*"b":943460.*"norm_sq":10
   "K26 command canonical endpoint"
 require_grep '--endpoint-a 376039 --endpoint-b 943460' "$commands" \
   "K26 command prefix endpoint flags"
+require_grep '--live-manifest-out k26-prefix-live-handoff.txt' "$commands" \
+  "K26 command prefix live handoff output"
 require_grep '"r_start":8192' "$commands" \
   "K26 command continuation start"
 require_grep '"r_final":1015645' "$commands" \
@@ -361,6 +363,12 @@ require_grep '"claim_grade_requires_source_unbridged_unsafe_candidate_atoms":0' 
   "K26 command source unsafe bridge stop condition"
 require_grep '--target-a 376039 --target-b 943460' "$commands" \
   "K26 command target bridge flags"
+require_grep '--live-manifest-in k26-prefix-live-handoff.txt' "$commands" \
+  "K26 command continuation live handoff input"
+if grep -Eq -- '--manifest-(in|out)' "$commands"; then
+  echo "K26_FULL_RUN_BUNDLE_REJECT: K26 command uses legacy carry manifest flags" >&2
+  exit 1
+fi
 
 require_grep '"schema":"lb_source_k26_bz_schedule_check_v1"' "$bz" \
   "K26 BZ schema"
@@ -432,7 +440,7 @@ commands_path = pathlib.Path(sys.argv[2])
 continuation_path = pathlib.Path(sys.argv[3])
 artifact_manifest_path = pathlib.Path(sys.argv[4])
 ledger_path = out_dir / "k26-continuation-chunks.jsonl"
-prefix_manifest_name = "k26-prefix-manifest.txt"
+prefix_live_handoff_name = "k26-prefix-live-handoff.txt"
 
 
 def reject(message: str) -> None:
@@ -507,7 +515,7 @@ if not rows:
     reject("is empty")
 
 expected_start = 0
-previous_output = prefix_manifest_name
+previous_output = prefix_live_handoff_name
 for index, row in enumerate(rows):
     if row.get("schema") != "lb_source_k26_continuation_chunk_v1":
         reject(f"row {index} has wrong schema")
@@ -536,15 +544,15 @@ for index, row in enumerate(rows):
     final_chunk = end == segment_count
     if row.get("final_chunk") is not final_chunk:
         reject(f"row {index} final_chunk flag mismatch")
-    if row.get("input_manifest") != previous_output:
-        reject(f"row {index} input_manifest does not chain from previous output")
-    require_hashed(row.get("input_manifest", ""), f"row {index} input_manifest")
+    if row.get("input_live_handoff") != previous_output:
+        reject(f"row {index} input_live_handoff does not chain from previous output")
+    require_hashed(row.get("input_live_handoff", ""), f"row {index} input_live_handoff")
     result_path = require_hashed(row.get("result", ""), f"row {index} result")
     require_hashed(row.get("progress", ""), f"row {index} progress")
-    output_manifest = row.get("output_manifest")
+    output_live_handoff = row.get("output_live_handoff")
     if final_chunk:
-        if output_manifest != "":
-            reject(f"row {index} final chunk unexpectedly has output_manifest")
+        if output_live_handoff != "":
+            reject(f"row {index} final chunk unexpectedly has output_live_handoff")
         if result_path.read_bytes() != continuation_path.read_bytes():
             reject(f"row {index} final result differs from k26-continuation-result.json")
         if row.get("terminal_source_dead") is not True:
@@ -552,7 +560,7 @@ for index, row in enumerate(rows):
         if row.get("has_source_carry") is not False:
             reject(f"row {index} final chunk must record has_source_carry=false")
     else:
-        output_path = require_hashed(output_manifest, f"row {index} output_manifest")
+        output_path = require_hashed(output_live_handoff, f"row {index} output_live_handoff")
         previous_output = output_path.name
         if row.get("terminal_source_dead") is not False:
             reject(f"row {index} non-final chunk must record terminal_source_dead=false")
@@ -583,8 +591,12 @@ require_grep '"terminal_source_dead":false' "$prefix" \
   "K26 prefix must have live source carry"
 require_grep '"has_source_carry":true' "$prefix" \
   "K26 prefix source carry"
-require_grep '"manifest_written":true' "$prefix" \
-  "K26 prefix manifest"
+require_grep '"live_manifest_written":true' "$prefix" \
+  "K26 prefix live handoff"
+if grep -q '"manifest_written":true' "$prefix"; then
+  echo "K26_FULL_RUN_BUNDLE_REJECT: K26 prefix wrote legacy carry manifest" >&2
+  exit 1
+fi
 require_grep '"prefix_witness_written":true' "$prefix" \
   "K26 prefix witness"
 
@@ -640,8 +652,8 @@ require_grep '"proof_status":"DIAGNOSTIC_NON_CLAIM"' "$gap" \
   "K26 source-dead gap non-claim status"
 require_grep '"blocker":"SOURCE_DEAD_CERT_COORDINATE_PATH_MISSING"' "$gap" \
   "K26 source-dead gap blocker"
-require_grep '"prefix_manifest_artifact":.*"name":"k26-prefix-manifest.txt".*"sha256":"[0-9a-f]{64}"' "$gap" \
-  "K26 source-dead gap prefix manifest binding"
+require_grep '"prefix_live_handoff_artifact":.*"name":"k26-prefix-live-handoff.txt".*"sha256":"[0-9a-f]{64}"' "$gap" \
+  "K26 source-dead gap prefix live handoff binding"
 require_grep '"prefix_witness_artifact":.*"name":"k26-prefix-witness.txt".*"sha256":"[0-9a-f]{64}"' "$gap" \
   "K26 source-dead gap prefix witness binding"
 require_grep '"continuation_artifact":.*"name":"k26-continuation-result.json".*"sha256":"[0-9a-f]{64}"' "$gap" \
@@ -682,17 +694,17 @@ require_grep '"missing_for_source_dead_cert":.*verifier' "$gap" \
 actual_continuation_digest="$(
   shasum -a 256 "$continuation" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
 )"
-actual_prefix_manifest_digest="$(
-  shasum -a 256 "$out_dir/k26-prefix-manifest.txt" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
+actual_prefix_live_handoff_digest="$(
+  shasum -a 256 "$out_dir/k26-prefix-live-handoff.txt" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
 )"
 actual_prefix_witness_digest="$(
   shasum -a 256 "$out_dir/k26-prefix-witness.txt" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p'
 )"
-gap_prefix_manifest_name="$(
-  json_object_string_value "$gap" prefix_manifest_artifact name
+gap_prefix_live_handoff_name="$(
+  json_object_string_value "$gap" prefix_live_handoff_artifact name
 )"
-gap_prefix_manifest_digest="$(
-  json_object_string_value "$gap" prefix_manifest_artifact sha256
+gap_prefix_live_handoff_digest="$(
+  json_object_string_value "$gap" prefix_live_handoff_artifact sha256
 )"
 gap_prefix_witness_name="$(
   json_object_string_value "$gap" prefix_witness_artifact name
@@ -703,10 +715,10 @@ gap_prefix_witness_digest="$(
 gap_continuation_digest="$(
   json_object_string_value "$gap" continuation_artifact sha256
 )"
-require_equal "k26-prefix-manifest.txt" "$gap_prefix_manifest_name" \
-  "K26 gap prefix manifest artifact name binding"
-require_equal "$actual_prefix_manifest_digest" "$gap_prefix_manifest_digest" \
-  "K26 gap prefix manifest hash binding"
+require_equal "k26-prefix-live-handoff.txt" "$gap_prefix_live_handoff_name" \
+  "K26 gap prefix live handoff artifact name binding"
+require_equal "$actual_prefix_live_handoff_digest" "$gap_prefix_live_handoff_digest" \
+  "K26 gap prefix live handoff hash binding"
 require_equal "k26-prefix-witness.txt" "$gap_prefix_witness_name" \
   "K26 gap prefix witness artifact name binding"
 require_equal "$actual_prefix_witness_digest" "$gap_prefix_witness_digest" \

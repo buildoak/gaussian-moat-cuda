@@ -545,11 +545,10 @@ Local evidence recorded during execution:
 
 Intentional deviations and limits:
 
-- The materialized runner still preserves legacy `--manifest-in/out` behavior
-  and legacy diagnostic inventory outputs. The new live frontier artifacts are
-  opt-in and carry only live separator state; the W-scale no-inventory hot path
-  is the live API plus future streaming runner, not the legacy v1 carry manifest
-  path.
+- The script, test, and command-contract surfaces now target live-only LB
+  handoffs via `--live-manifest-in/out`. Legacy v1 carry manifests remain
+  historical compatibility context only; the W-scale no-inventory hot path is
+  the live API plus future streaming runner.
 - `LastBandReachabilitySummaryV1` has a core apply API, but Phase 5 writes the
   materialized summary as runner-local diagnostic JSON. A claim-grade independent
   summary schema/checker remains Phase 6 work.

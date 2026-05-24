@@ -17,7 +17,7 @@ For certificate inventory it also carries per-component payloads. Those payloads
 do not create connectivity; they preserve retired vertices so terminal source
 death can report where the source component ended.
 
-## Carry Manifest And Draft Output
+## Live Handoff, Carry Manifest, And Draft Output
 
 The sidecar exposes `coordinate_atom_id(a, b)` /
 `decode_coordinate_atom_id(id)` for first-quadrant source runs. This keeps
@@ -31,7 +31,9 @@ negative ids and encode only canonical TileOp port position. They deliberately
 do not encode transient per-tile group labels, so future K26 runners can carry
 TileOp-compressed boundary state without depending on local union-find names.
 
-The library exposes deterministic carry-manifest helpers:
+The current LB continuation hot path uses `LB_SOURCE_LIVE_HANDOFF_V1`, which
+stores only live separator state. The older deterministic carry-manifest helpers
+remain available for small diagnostics and compatibility tests:
 
 - `make_carry_manifest(k_sq, outer_radius, result)`
 - `write_carry_manifest(...)` / `read_carry_manifest(...)`
@@ -49,7 +51,7 @@ Draft JSON emitters are also available for profile/certificate plumbing:
 - `summarize_inventory(...)`
 
 These are sidecar draft artifacts only. They make the source mode, geometry,
-build/BZ placeholders, carry manifest, terminal guard state, and terminal
+build/BZ placeholders, handoff state, terminal guard state, and terminal
 inventory explicit. Terminal inventory now carries a canonical
 `sha256:lb_source_inventory_v1` count/digest summary in addition to explicit
 small-run atom ids; it is still not a final source proof schema.
@@ -91,8 +93,8 @@ the sidecar. This is still a CPU diagnostic, but it proves the sidecar can be
 fed from existing campaign TileOp production surfaces without changing current
 campaign verdict semantics.
 
-The TileOp-fed runner can also start from a carry manifest emitted by
-`source_origin_cpu_runner --manifest-out`. That is the intended handoff shape
+The TileOp-fed runner can also start from a live handoff emitted by
+`source_origin_cpu_runner --live-manifest-out`. That is the intended handoff shape
 for K26: the coordinate-fed prefix certifies the origin component up to a radius
 where campaign `Grid` preconditions hold, then campaign TileOp bands continue
 from the exact separator state instead of inventing a new source seed. For
@@ -105,8 +107,8 @@ path.
 graph directly. Its smoke mode seeds the first band from `geo_I` inner flags and
 is intentionally labeled `GEO_I_PORT_DIAGNOSTIC`; on the tiny K36 fixture this
 source dies before the final carry shell, which is useful evidence that the
-runner reports terminal death instead of inventing a live source manifest.
-It can also consume `--manifest-in` plus `--prefix-witness-in` from the
+runner reports terminal death instead of inventing a source seed.
+It can also consume `--live-manifest-in` plus `--prefix-witness-in` from the
 coordinate-fed prefix runner. In that mode it keeps the original coordinate
 separator as the incoming state, then adds bridge edges from coordinate carry
 atoms to first-band TileOp port atoms by looking for TileOp-band primes within
@@ -116,7 +118,7 @@ no first-band port bridge are split into "no legal next-band candidate" and
 of the same counters. This is still diagnostic: the seam bridge is explicit
 evidence for the next engineering gate, not an accepted source/death
 certificate.
-The runner also has `--require-full-bridge`, which rejects a manifest handoff
+The runner also has `--require-full-bridge`, which rejects a live handoff
 when any coordinate carry atom lacks a first-band TileOp-port bridge. That
 strict mode is a conservative diagnostic guardrail, not the K26 run contract.
 The sharper certificate condition is
@@ -143,11 +145,11 @@ it also emits a deterministic `source_path` from a certified origin seed.
 With `--cert-out`, it writes a diagnostic `lb_source_dead_cert_draft_v1` only
 when the run has accepted terminal source death, a reached endpoint, a source
 path, and terminal inventory.
-With `--manifest-out`, it writes the live carry separator when source survives
+With `--live-manifest-out`, it writes the live carry separator when source survives
 into the final carry window, allowing the TileOp-fed runner to continue from
 the prefix without changing source semantics. With `--prefix-witness-out`, it
 also writes line-oriented origin-prefix paths to each live source carry atom, so
-the manifest bridge can prove a positive path rather than only propagate a
+the live handoff bridge can prove a positive path rather than only propagate a
 source bit.
 
 This closes the first executable gap between the abstract sidecar protocol and
@@ -350,7 +352,7 @@ overflow, wrong component size, missing source-dead draft, a source-dead draft
 whose terminal inventory summary does not match the executed continuation
 result, or a source-dead draft not accepted by the independent checker.
 When a chunk ledger is present, the checker also validates that the ledger
-covers the command schedule contiguously, chains carry manifests, binds every
+covers the command schedule contiguously, chains live handoffs, binds every
 chunk artifact through the hash manifest, and matches the final chunk result to
 `k26-continuation-result.json`.
 
@@ -407,7 +409,7 @@ requested terminal radius, the harness stops earlier with
 source-dead gap. `terminal_inventory_obligation` records that the observed
 inventory is still summary-digest non-claim evidence and must be promoted to
 claim-grade terminal inventory provenance. The gap artifact also binds the
-prefix manifest, prefix witness, and repaired K26 BZ schedule digest as
+prefix live handoff, prefix witness, and repaired K26 BZ schedule digest as
 schedule-only, non-claim evidence. `bz_schedule_obligation` makes that BZ
 status explicit: accepted for this schedule, not accepted for a source claim
 until a claim-grade BZ gate exists. When the mixed target atom chain is present,
@@ -431,16 +433,16 @@ fields into `status.txt` so remote logs show whether bridge safety passed and
 which certificate obligations remain blocked.
 It also writes
 `k26-full-run-artifacts.sha256`, binding the command, BZ, profile, prefix,
-prefix-progress, continuation, continuation-progress, manifest, witness, gap,
+prefix-progress, continuation, continuation-progress, live handoff, witness, gap,
 and any supplied cert artifacts by SHA-256.
 Use `--timeout-seconds` on paid runs as a per-command kill switch, and
 `--max-runtime-seconds` as the whole-bundle wall-clock budget guard. At the
 campaign cap of `$0.37/hr` and `$1.50` total, `14000` seconds leaves a small
 shutdown margin while preserving resume artifacts. `source_tileop_port_runner
 --progress-out` writes phase rows before and after expensive continuation
-stages (`manifest_read`, `prefix_witness_read`,
+stages (`live_manifest_read`, `prefix_witness_read`,
 `grid_build`, `tileop_build`, `port_graph`, `target_bridge`,
-`manifest_bridge`, and `source_process`) as well as completed-band rows. A
+`live_handoff_bridge`, and `source_process`) as well as completed-band rows. A
 timeout can therefore identify the active phase even when no continuation band
 has finished yet. The current local K26 two-band probe completes
 `8192 -> 16384` in about 31 seconds and `16384 -> 24576` in about 16 seconds on
@@ -451,17 +453,18 @@ terminal diagnostic at `R=16384`; the previous
 `SOURCE_DEAD_CERT_TARGET_NOT_REACHED` artifact remains a valid gap shape, but
 it is no longer the current local K26 continuation result. The TileOp-port
 runner can also checkpoint live continuation state with `--stop-after-bands N`
-and resume from the written port carry manifest. A K26-scale probe verified
+and resume from the written port live handoff. A K26-scale probe verified
 that full two-band continuation through `R=24576` and a one-band checkpoint at
-`R=16384` plus resumed second band produce byte-identical final carry
-manifests, with `source_carry_atoms=2337` and `source_inventory_count=2107474`.
+`R=16384` plus resumed second band produce byte-identical final live handoffs,
+with `source_carry_atoms=2337` and a live frontier summary instead of a
+materialized historical inventory.
 The bundle harness exposes this as `--continuation-chunk-bands N`: it splits
 the repaired continuation schedule into bounded chunks, concatenates chunk
 progress into the canonical continuation progress JSONL, preserves
 `k26-continuation-result.json` as the final chunk result, and hashes chunk
 artifacts in the bundle manifest. It also writes
 `k26-continuation-chunks.jsonl`, one ledger row per chunk, recording the
-schedule slice, input/output carry manifest names, result/progress artifacts,
+schedule slice, input/output live handoff names, result/progress artifacts,
 whether the chunk was executed or reused, and the observed live/dead source
 state. Add `--resume-existing` after a timeout to reuse complete prefix
 artifacts and complete live-source chunks from the same output directory
@@ -572,7 +575,7 @@ That accepts the schedule evidence only; it is not `SOURCE_ORIGIN_K26` or
 
 `k26_source_run_profile` binds the repaired schedule to the intended full-run
 shape: exact coordinate prefix for row `0`, then TileOp-port continuation for
-rows `1..123` from an origin-prefix manifest and witness. It also records the
+rows `1..123` from an origin-prefix live handoff and witness. It also records the
 next concrete implementation gap: the TileOp-port runner can consume explicit
 variable boundaries through the bundle harness, and checked chunked execution
 must include `k26-continuation-chunks.jsonl` as the validated chunk ledger, but

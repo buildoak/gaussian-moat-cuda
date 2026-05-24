@@ -28,9 +28,9 @@ Artifacts written under OUT_DIR:
   k26-continuation-result.json
   k26-continuation-progress.jsonl
   k26-continuation-chunks.jsonl, when --continuation-chunk-bands is supplied
-  k26-continuation-chunk-*.json and k26-continuation-chunk-*.manifest.txt,
+  k26-continuation-chunk-*.json and k26-continuation-chunk-*.live-handoff.txt,
     when --continuation-chunk-bands is supplied
-  k26-prefix-manifest.txt
+  k26-prefix-live-handoff.txt
   k26-prefix-witness.txt
   k26-source-dead-gap.json, when the continuation reaches terminal source death
   k26-full-run-artifacts.sha256
@@ -352,7 +352,7 @@ write_artifact_manifest() {
     k26-continuation-result.json
     k26-continuation-progress.jsonl
     k26-continuation-chunks.jsonl
-    k26-prefix-manifest.txt
+    k26-prefix-live-handoff.txt
     k26-prefix-witness.txt
     k26-source-dead-gap.json
     k26-source-dead-cert.json
@@ -384,7 +384,7 @@ write_artifact_manifest() {
     printf '%s  %s\n' "$digest" "$name" >> "$artifact_manifest"
   done < <(find "$out_dir" -maxdepth 1 -type f \
     \( -name 'k26-continuation-chunk-*.json' \
-       -o -name 'k26-continuation-chunk-*.manifest.txt' \
+       -o -name 'k26-continuation-chunk-*.live-handoff.txt' \
        -o -name 'k26-continuation-chunk-*.progress.jsonl' \) \
     -print | LC_ALL=C sort)
 }
@@ -540,16 +540,16 @@ append_chunk_ledger() {
   local chunk_r_final="$7"
   local chunk_csv="$8"
   local final_chunk="$9"
-  local input_manifest="${10}"
-  local output_manifest="${11}"
+  local input_live_handoff="${10}"
+  local output_live_handoff="${11}"
   local chunk_json="${12}"
   local chunk_progress="${13}"
   local terminal_dead="${14}"
   local has_live_source="${15}"
   local source_carry_atoms="${16}"
   local input_name output_name result_name progress_name final_bool
-  input_name="$(artifact_basename_or_empty "$input_manifest")"
-  output_name="$(artifact_basename_or_empty "$output_manifest")"
+  input_name="$(artifact_basename_or_empty "$input_live_handoff")"
+  output_name="$(artifact_basename_or_empty "$output_live_handoff")"
   result_name="$(artifact_basename_or_empty "$chunk_json")"
   progress_name="$(artifact_basename_or_empty "$chunk_progress")"
   if [[ "$final_chunk" == "1" ]]; then
@@ -560,7 +560,7 @@ append_chunk_ledger() {
   terminal_dead="$(json_bool_or_null "$terminal_dead")"
   has_live_source="$(json_bool_or_null "$has_live_source")"
   source_carry_atoms="$(json_number_or_null "$source_carry_atoms")"
-  printf '{"schema":"lb_source_k26_continuation_chunk_v1","chunk_index":%s,"chunk_id":"%s","action":"%s","schedule_segment_start":%s,"schedule_segment_end":%s,"schedule_segment_count":%s,"r_start":%s,"r_final":%s,"schedule_radii_csv":"%s","input_manifest":"%s","output_manifest":"%s","result":"%s","progress":"%s","final_chunk":%s,"terminal_source_dead":%s,"has_source_carry":%s,"source_carry_atoms":%s}\n' \
+  printf '{"schema":"lb_source_k26_continuation_chunk_v1","chunk_index":%s,"chunk_id":"%s","action":"%s","schedule_segment_start":%s,"schedule_segment_end":%s,"schedule_segment_count":%s,"r_start":%s,"r_final":%s,"schedule_radii_csv":"%s","input_live_handoff":"%s","output_live_handoff":"%s","result":"%s","progress":"%s","final_chunk":%s,"terminal_source_dead":%s,"has_source_carry":%s,"source_carry_atoms":%s}\n' \
     "$chunk_index" "$chunk_id" "$action" "$chunk_start" "$chunk_end" \
     "$((chunk_end - chunk_start))" "$chunk_r_start" "$chunk_r_final" \
     "$chunk_csv" "$input_name" "$output_name" "$result_name" \
@@ -572,14 +572,14 @@ prefix_resume_ready() {
   [[ "$resume_existing" == "1" &&
      -f "$out_dir/k26-prefix-result.json" &&
      -f "$out_dir/k26-prefix-progress.jsonl" &&
-     -f "$out_dir/k26-prefix-manifest.txt" &&
+     -f "$out_dir/k26-prefix-live-handoff.txt" &&
      -f "$out_dir/k26-prefix-witness.txt" ]]
 }
 
 chunk_resume_ready() {
   local chunk_json="$1"
   local chunk_progress="$2"
-  local chunk_manifest="$3"
+  local chunk_live_handoff="$3"
   local final_chunk="$4"
   if [[ "$resume_existing" != "1" ||
         ! -f "$chunk_json" ||
@@ -589,7 +589,7 @@ chunk_resume_ready() {
   if [[ "$final_chunk" == "1" ]]; then
     return 0
   fi
-  if [[ ! -f "$chunk_manifest" ]]; then
+  if [[ ! -f "$chunk_live_handoff" ]]; then
     return 1
   fi
   local terminal_dead has_live_source
@@ -610,7 +610,7 @@ run_k26_continuation() {
         --tileop-threads "$tileop_threads" \
         --target-a 376039 \
         --target-b 943460 \
-        --manifest-in "$out_dir/k26-prefix-manifest.txt" \
+        --live-manifest-in "$out_dir/k26-prefix-live-handoff.txt" \
         --prefix-witness-in "$out_dir/k26-prefix-witness.txt" \
         --progress-out "$out_dir/k26-continuation-progress.jsonl"
     return
@@ -636,9 +636,9 @@ run_k26_continuation() {
   : > "$chunk_ledger"
   local chunk_start=0
   local chunk_index=0
-  local manifest_in="$out_dir/k26-prefix-manifest.txt"
+  local live_handoff_in="$out_dir/k26-prefix-live-handoff.txt"
   local chunk_id chunk_end chunk_r_start chunk_r_final chunk_csv
-  local chunk_json chunk_progress chunk_manifest
+  local chunk_json chunk_progress chunk_live_handoff
   local terminal_dead has_live_source source_carry_atoms
   while (( chunk_start < segment_count )); do
     chunk_end=$((chunk_start + chunk_size))
@@ -651,21 +651,21 @@ run_k26_continuation() {
     chunk_id="$(printf '%03d' "$chunk_index")"
     chunk_json="$out_dir/k26-continuation-chunk-${chunk_id}.json"
     chunk_progress="$out_dir/k26-continuation-chunk-${chunk_id}.progress.jsonl"
-    chunk_manifest="$out_dir/k26-continuation-chunk-${chunk_id}.manifest.txt"
+    chunk_live_handoff="$out_dir/k26-continuation-chunk-${chunk_id}.live-handoff.txt"
     local final_chunk=0
     if (( chunk_end >= segment_count )); then
       final_chunk=1
     fi
 
-    local action chunk_input_manifest chunk_output_manifest
+    local action chunk_input_live_handoff chunk_output_live_handoff
     action="executed"
-    chunk_input_manifest="$manifest_in"
-    chunk_output_manifest=""
+    chunk_input_live_handoff="$live_handoff_in"
+    chunk_output_live_handoff=""
     if (( chunk_end < segment_count )); then
-      chunk_output_manifest="$chunk_manifest"
+      chunk_output_live_handoff="$chunk_live_handoff"
     fi
 
-    if chunk_resume_ready "$chunk_json" "$chunk_progress" "$chunk_manifest" \
+    if chunk_resume_ready "$chunk_json" "$chunk_progress" "$chunk_live_handoff" \
         "$final_chunk"; then
       echo "SKIP K26_CONTINUATION_CHUNK_${chunk_id}: existing complete chunk" \
         >> "$out_dir/run.log"
@@ -681,14 +681,14 @@ run_k26_continuation() {
         --tileop-threads "$tileop_threads"
         --target-a 376039
         --target-b 943460
-        --manifest-in "$manifest_in"
+        --live-manifest-in "$live_handoff_in"
         --progress-out "$chunk_progress"
       )
       if (( chunk_index == 0 )); then
         args+=(--prefix-witness-in "$out_dir/k26-prefix-witness.txt")
       fi
       if (( chunk_end < segment_count )); then
-        args+=(--manifest-out "$chunk_manifest")
+        args+=(--live-manifest-out "$chunk_live_handoff")
       fi
 
       run_json "K26_CONTINUATION_CHUNK_${chunk_id}" "$chunk_json" "${args[@]}"
@@ -707,20 +707,20 @@ run_k26_continuation() {
         echo "K26 continuation chunk ${chunk_id} did not leave live source carry for resume" >&2
         exit 1
       fi
-      if [[ ! -f "$chunk_manifest" ]]; then
-        write_status "K26_FULL_RUN_BUNDLE_BLOCKED_CHUNK_${chunk_id}_MANIFEST_MISSING"
-        echo "K26 continuation chunk ${chunk_id} did not write resume manifest" >&2
+      if [[ ! -f "$chunk_live_handoff" ]]; then
+        write_status "K26_FULL_RUN_BUNDLE_BLOCKED_CHUNK_${chunk_id}_LIVE_HANDOFF_MISSING"
+        echo "K26 continuation chunk ${chunk_id} did not write resume live handoff" >&2
         exit 1
       fi
-      manifest_in="$chunk_manifest"
+      live_handoff_in="$chunk_live_handoff"
     else
       cp "$chunk_json" "$out_dir/k26-continuation-result.json"
     fi
 
     append_chunk_ledger "$chunk_id" "$chunk_index" "$action" \
       "$chunk_start" "$chunk_end" "$chunk_r_start" "$chunk_r_final" \
-      "$chunk_csv" "$final_chunk" "$chunk_input_manifest" \
-      "$chunk_output_manifest" "$chunk_json" "$chunk_progress" \
+      "$chunk_csv" "$final_chunk" "$chunk_input_live_handoff" \
+      "$chunk_output_live_handoff" "$chunk_json" "$chunk_progress" \
       "$terminal_dead" "$has_live_source" "$source_carry_atoms"
     enforce_chunk_runtime_budget "$chunk_id"
 
@@ -795,11 +795,11 @@ write_source_dead_gap() {
     exit 1
   fi
 
-  local prefix_manifest="$out_dir/k26-prefix-manifest.txt"
+  local prefix_live_handoff="$out_dir/k26-prefix-live-handoff.txt"
   local prefix_witness="$out_dir/k26-prefix-witness.txt"
-  if [[ ! -f "$prefix_manifest" ]]; then
-    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_GAP_PREFIX_MANIFEST_MISSING"
-    echo "could not find prefix manifest artifact: $prefix_manifest" >&2
+  if [[ ! -f "$prefix_live_handoff" ]]; then
+    write_status "K26_FULL_RUN_BUNDLE_BLOCKED_GAP_PREFIX_LIVE_HANDOFF_MISSING"
+    echo "could not find prefix live handoff artifact: $prefix_live_handoff" >&2
     exit 1
   fi
   if [[ ! -f "$prefix_witness" ]]; then
@@ -808,10 +808,10 @@ write_source_dead_gap() {
     exit 1
   fi
 
-  local prefix_manifest_digest prefix_witness_digest
-  prefix_manifest_digest="$(shasum -a 256 "$prefix_manifest" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
+  local prefix_live_handoff_digest prefix_witness_digest
+  prefix_live_handoff_digest="$(shasum -a 256 "$prefix_live_handoff" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
   prefix_witness_digest="$(shasum -a 256 "$prefix_witness" | sed -nE 's/^([0-9a-f]{64}) .*/\1/p')"
-  require_extracted "$prefix_manifest_digest" "PREFIX_MANIFEST_HASH"
+  require_extracted "$prefix_live_handoff_digest" "PREFIX_LIVE_HANDOFF_HASH"
   require_extracted "$prefix_witness_digest" "PREFIX_WITNESS_HASH"
 
   local path_provenance atom_path atom_path_length inventory_count
@@ -1025,7 +1025,7 @@ PY
   fi
 
   cat > "$source_dead_gap" <<JSON
-{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"$blocker","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"$prefix_manifest_digest"},"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"$prefix_witness_digest"},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"}$chunk_ledger_artifact_json$bridge_artifact_json,"bz_evidence":{"status":"$bz_status","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"$bz_digest_algorithm","schedule_digest_hex":"$bz_digest_hex"},"bz_schedule_obligation":{"required_status":"claim_grade_bz_schedule","observed_status":"$bz_status","observed_schedule_digest_algorithm":"$bz_digest_algorithm","observed_schedule_digest_hex":"$bz_digest_hex","accepted_for_schedule":true,"accepted_for_claim":false,"claim_grade_bz_accepted":false},"bridge_safety":{"seam_bridge_policy":"$seam_bridge_policy","source_coordinate_carry_atoms_with_next_band_candidates":$source_with_next_candidates,"source_bridged_coordinate_carry_atoms":$source_bridged,"source_unbridged_coordinate_carry_atoms":$source_unbridged,"source_unbridged_without_next_band_candidates":$source_unbridged_without,"source_unbridged_with_next_band_candidates":$source_unbridged_with,"source_unbridged_dead_end_candidate_atoms":$source_dead_end,"source_unbridged_unsafe_candidate_atoms":$source_unsafe,"source_bridge_rejected_candidate_atoms":$source_bridge_rejected},"target_path_provenance":"$path_provenance","target_atom_path_length":$atom_path_length,"target_atom_path":$atom_path,"coordinate_path_obligation":{"required_provenance":"coordinate_gaussian_prime_path","observed_provenance":"$path_provenance","observed_coordinate_atom_count":$coordinate_atom_count,"observed_port_atom_count":$port_atom_count,"origin_prefix_witness_artifact":"k26-prefix-witness.txt","origin_prefix_witness_target_atom_id":${prefix_atom_id:-null},"origin_prefix_witness_accepted":$prefix_accepted_json,"origin_prefix_witness_path_available":$target_prefix_path_available_json,"origin_prefix_witness_path_target_atom_id":$target_prefix_path_atom_id_json,"origin_prefix_witness_path_points":$target_prefix_path_points,"origin_prefix_witness_seed_norm_sq":$target_prefix_path_seed_norm_sq,"origin_prefix_witness_path_target_norm_sq":$target_prefix_path_target_norm_sq,"per_port_coordinate_expansion":"$per_port_expansion_status","per_port_coordinate_expansion_required_edges":$target_port_expansion_required_edges,"per_port_coordinate_expansion_available_edges":$target_port_expansion_available_edges,"per_port_coordinate_expansion_path_points_total":$target_port_expansion_path_points_total,"claim_grade_path_accepted":false},"target_bridge_obligation":{"endpoint_atom_id":1615075207964004,"observed_target_seen":$target_seen_json,"observed_target_source_reached":$target_source_reached_json,"observed_target_port_atoms":$target_port_atoms,"observed_target_bridge_edges":$target_bridge_edges,"endpoint_bridge_accepted":$target_source_reached_json},"terminal_source_inventory_summary":{"count":$inventory_count,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"$inventory_digest","max_norm_sq":$max_norm,"max_norm_atom_ids":$max_ties},"terminal_source_inventory_accumulator":$terminal_accumulator_json,"terminal_inventory_obligation":{"required_mode":"claim_grade_terminal_inventory","observed_mode":"summary_digest_only_non_claim","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"observed_count":$inventory_count,"observed_digest_algorithm":"sha256:lb_source_inventory_v1","observed_digest_hex":"$inventory_digest","observed_max_norm_sq":$max_norm},"missing_for_source_dead_cert":[$missing_for_cert]}
+{"schema":"lb_source_k26_source_dead_gap_v1","claim_label":"SOURCE_ORIGIN_K26","proof_status":"DIAGNOSTIC_NON_CLAIM","blocker":"$blocker","non_claim":"executed prefix and continuation evidence only; not a SOURCE_DEAD_CERT","k_sq":26,"terminal_radius":1015645,"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix_live_handoff_artifact":{"name":"k26-prefix-live-handoff.txt","sha256":"$prefix_live_handoff_digest"},"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"$prefix_witness_digest"},"continuation_artifact":{"name":"k26-continuation-result.json","sha256":"$continuation_digest"}$chunk_ledger_artifact_json$bridge_artifact_json,"bz_evidence":{"status":"$bz_status","accepted_for_schedule":true,"accepted_for_claim":false,"schedule_digest_algorithm":"$bz_digest_algorithm","schedule_digest_hex":"$bz_digest_hex"},"bz_schedule_obligation":{"required_status":"claim_grade_bz_schedule","observed_status":"$bz_status","observed_schedule_digest_algorithm":"$bz_digest_algorithm","observed_schedule_digest_hex":"$bz_digest_hex","accepted_for_schedule":true,"accepted_for_claim":false,"claim_grade_bz_accepted":false},"bridge_safety":{"seam_bridge_policy":"$seam_bridge_policy","source_coordinate_carry_atoms_with_next_band_candidates":$source_with_next_candidates,"source_bridged_coordinate_carry_atoms":$source_bridged,"source_unbridged_coordinate_carry_atoms":$source_unbridged,"source_unbridged_without_next_band_candidates":$source_unbridged_without,"source_unbridged_with_next_band_candidates":$source_unbridged_with,"source_unbridged_dead_end_candidate_atoms":$source_dead_end,"source_unbridged_unsafe_candidate_atoms":$source_unsafe,"source_bridge_rejected_candidate_atoms":$source_bridge_rejected},"target_path_provenance":"$path_provenance","target_atom_path_length":$atom_path_length,"target_atom_path":$atom_path,"coordinate_path_obligation":{"required_provenance":"coordinate_gaussian_prime_path","observed_provenance":"$path_provenance","observed_coordinate_atom_count":$coordinate_atom_count,"observed_port_atom_count":$port_atom_count,"origin_prefix_witness_artifact":"k26-prefix-witness.txt","origin_prefix_witness_target_atom_id":${prefix_atom_id:-null},"origin_prefix_witness_accepted":$prefix_accepted_json,"origin_prefix_witness_path_available":$target_prefix_path_available_json,"origin_prefix_witness_path_target_atom_id":$target_prefix_path_atom_id_json,"origin_prefix_witness_path_points":$target_prefix_path_points,"origin_prefix_witness_seed_norm_sq":$target_prefix_path_seed_norm_sq,"origin_prefix_witness_path_target_norm_sq":$target_prefix_path_target_norm_sq,"per_port_coordinate_expansion":"$per_port_expansion_status","per_port_coordinate_expansion_required_edges":$target_port_expansion_required_edges,"per_port_coordinate_expansion_available_edges":$target_port_expansion_available_edges,"per_port_coordinate_expansion_path_points_total":$target_port_expansion_path_points_total,"claim_grade_path_accepted":false},"target_bridge_obligation":{"endpoint_atom_id":1615075207964004,"observed_target_seen":$target_seen_json,"observed_target_source_reached":$target_source_reached_json,"observed_target_port_atoms":$target_port_atoms,"observed_target_bridge_edges":$target_bridge_edges,"endpoint_bridge_accepted":$target_source_reached_json},"terminal_source_inventory_summary":{"count":$inventory_count,"digest_algorithm":"sha256:lb_source_inventory_v1","digest_hex":"$inventory_digest","max_norm_sq":$max_norm,"max_norm_atom_ids":$max_ties},"terminal_source_inventory_accumulator":$terminal_accumulator_json,"terminal_inventory_obligation":{"required_mode":"claim_grade_terminal_inventory","observed_mode":"summary_digest_only_non_claim","listed_inventory_present":false,"claim_grade_inventory_accepted":false,"observed_count":$inventory_count,"observed_digest_algorithm":"sha256:lb_source_inventory_v1","observed_digest_hex":"$inventory_digest","observed_max_norm_sq":$max_norm},"missing_for_source_dead_cert":[$missing_for_cert]}
 JSON
 }
 
@@ -1306,7 +1306,7 @@ else
       --endpoint-a 376039 \
       --endpoint-b 943460 \
       --max-atoms "$max_atoms" \
-      --manifest-out "$out_dir/k26-prefix-manifest.txt" \
+      --live-manifest-out "$out_dir/k26-prefix-live-handoff.txt" \
       --prefix-witness-out "$out_dir/k26-prefix-witness.txt" \
       --progress-out "$out_dir/k26-prefix-progress.jsonl"
 fi

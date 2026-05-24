@@ -52,6 +52,7 @@ if(OpenMP_CXX_FOUND)
 endif()
 
 add_library(lb_source_tileop_port_graph STATIC
+  src/tileop_live_bridge.cpp
   src/tileop_port_graph.cpp
 )
 target_compile_options(lb_source_tileop_port_graph PRIVATE -Wall -Wextra -Werror)
@@ -254,10 +255,11 @@ add_test(NAME source_origin_prefix_manifest_smoke
     --endpoint-a 0
     --endpoint-b 251
     --manifest-out ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt
+    --live-manifest-out ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_live_handoff.txt
     --prefix-witness-out ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt)
 set_tests_properties(source_origin_prefix_manifest_smoke PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"manifest_written\":true.*\"prefix_witness_written\":true.*\"prefix_witness_targets\":[1-9][0-9]*"
+    "\"schema\":\"lb_source_origin_cpu_runner_v1\".*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"live_manifest_written\":true.*\"prefix_witness_written\":true.*\"prefix_witness_targets\":[1-9][0-9]*"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_cpu_runner_smoke
@@ -297,7 +299,7 @@ add_test(NAME source_tileop_port_runner_smoke
     --seed-inner-flags)
 set_tests_properties(source_tileop_port_runner_smoke PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"port_atoms\":[1-9][0-9]*.*\"seam_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_carry_atoms\":[1-9][0-9]*.*\"manifest_written\":false"
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"GEO_I_PORT_DIAGNOSTIC\".*\"campaign_tiles_processed\":[1-9][0-9]*.*\"tileop_overflows\":0.*\"port_atoms\":[1-9][0-9]*.*\"seam_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_carry_atoms\":[1-9][0-9]*.*\"source_frontier_mode\":\"live_frontier_only_non_claim\".*\"source_frontier_count\":[1-9][0-9]*"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_schedule_smoke
@@ -329,12 +331,12 @@ add_test(NAME source_tileop_port_runner_manifest_smoke
     --r-start 248
     --r-final 512
     --band-width 128
-    --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt
+    --live-manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_live_handoff.txt
     --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt)
 set_tests_properties(source_tileop_port_runner_manifest_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"unbridged_coordinate_carry_atoms\":[0-9][0-9]*.*\"bridged_port_carry_atoms\":[1-9][0-9]*.*\"bridge_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_carry_atoms\":[1-9][0-9]*.*\"source_inventory_count\":[1-9][0-9]*.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\".*\"max_source_norm_sq\":[1-9][0-9]*.*\"manifest_written\":false"
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"live_manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"unbridged_coordinate_carry_atoms\":[0-9][0-9]*.*\"bridged_port_carry_atoms\":[1-9][0-9]*.*\"bridge_edges\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_carry_atoms\":[1-9][0-9]*.*\"source_frontier_mode\":\"live_frontier_only_non_claim\".*\"source_frontier_count\":[1-9][0-9]*.*\"source_frontier_digest_algorithm\":\"sha256:lb_source_inventory_v1\".*\"max_source_frontier_norm_sq\":[1-9][0-9]*"
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_target_smoke
@@ -344,7 +346,7 @@ add_test(NAME source_tileop_port_runner_target_smoke
     --band-width 128
     --target-a 0
     --target-b 251
-    --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt
+    --live-manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_live_handoff.txt
     --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt)
 set_tests_properties(source_tileop_port_runner_target_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
@@ -354,7 +356,7 @@ set_tests_properties(source_tileop_port_runner_target_smoke PROPERTIES
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME source_tileop_port_runner_manifest_full_bridge_reject
   COMMAND bash -c
-    "out=\"$($<TARGET_FILE:source_tileop_port_runner> --r-start 248 --r-final 512 --band-width 128 --require-full-bridge --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt 2>&1)\" || { echo \"$out\" | grep -q 'strict seam bridge requires zero unbridged coordinate carry atoms'; exit $?; }; echo \"$out\" | grep -q '\"seam_bridge_policy\":\"require_full_bridge\".*\"unbridged_coordinate_carry_atoms\":0'")
+    "out=\"$($<TARGET_FILE:source_tileop_port_runner> --r-start 248 --r-final 512 --band-width 128 --require-full-bridge --live-manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_live_handoff.txt --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt 2>&1)\" || { echo \"$out\" | grep -q 'strict seam bridge requires zero unbridged coordinate carry atoms'; exit $?; }; echo \"$out\" | grep -q '\"seam_bridge_policy\":\"require_full_bridge\".*\"unbridged_coordinate_carry_atoms\":0'")
 set_tests_properties(source_tileop_port_runner_manifest_full_bridge_reject PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke)
 add_test(NAME source_tileop_port_runner_manifest_schedule_smoke
@@ -363,17 +365,17 @@ add_test(NAME source_tileop_port_runner_manifest_schedule_smoke
     --r-final 512
     --band-width 128
     --schedule-radii 248,375,512
-    --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt
+    --live-manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_live_handoff.txt
     --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt)
 set_tests_properties(source_tileop_port_runner_manifest_schedule_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke
   PASS_REGULAR_EXPRESSION
-    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_inventory_digest_algorithm\":\"sha256:lb_source_inventory_v1\""
+    "\"schema\":\"lb_source_tileop_port_runner_v1\".*\"source_mode\":\"ORIGIN_PREFIX_PORT_WITNESS\".*\"schedule_mode\":\"explicit_radii\".*\"schedule_boundary_count\":3.*\"live_manifest_source_carry_atoms\":[1-9][0-9]*.*\"prefix_witness_targets\":[1-9][0-9]*.*\"bridged_coordinate_carry_atoms\":[1-9][0-9]*.*\"accepted\":true.*\"terminal_source_dead\":false.*\"has_source_carry\":true.*\"source_frontier_digest_algorithm\":\"sha256:lb_source_inventory_v1\""
   FAIL_REGULAR_EXPRESSION
     "SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 
 add_test(NAME source_tileop_port_runner_phase_progress_smoke
   COMMAND bash -c
-    "out='${CMAKE_CURRENT_BINARY_DIR}/source_tileop_port_phase_progress.out'; progress='${CMAKE_CURRENT_BINARY_DIR}/source_tileop_port_phase_progress.jsonl'; rm -f \"$out\" \"$progress\"; $<TARGET_FILE:source_tileop_port_runner> --r-start 248 --r-final 512 --band-width 128 --manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_manifest.txt --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt --progress-out \"$progress\" >\"$out\" && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"manifest_read\".*\"event\":\"begin\"' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"prefix_witness_read\".*\"event\":\"end\".*\"elapsed_ms\"' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"tileop_build\".*\"event\":\"begin\".*\"band_index\":0' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_progress_v1\".*\"band_index\":0.*\"tileop_worker_threads\":[1-9][0-9]*' \"$progress\" && grep -q '\"tileop_worker_threads\":[1-9][0-9]*' \"$out\"")
+    "out='${CMAKE_CURRENT_BINARY_DIR}/source_tileop_port_phase_progress.out'; progress='${CMAKE_CURRENT_BINARY_DIR}/source_tileop_port_phase_progress.jsonl'; rm -f \"$out\" \"$progress\"; $<TARGET_FILE:source_tileop_port_runner> --r-start 248 --r-final 512 --band-width 128 --live-manifest-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_live_handoff.txt --prefix-witness-in ${CMAKE_CURRENT_BINARY_DIR}/source_origin_prefix_witness.txt --progress-out \"$progress\" >\"$out\" && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"live_manifest_read\".*\"event\":\"begin\"' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"prefix_witness_read\".*\"event\":\"end\".*\"elapsed_ms\"' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_phase_v1\".*\"phase\":\"tileop_build\".*\"event\":\"begin\".*\"band_index\":0' \"$progress\" && grep -q '\"schema\":\"lb_source_tileop_port_progress_v1\".*\"band_index\":0.*\"tileop_worker_threads\":[1-9][0-9]*' \"$progress\" && grep -q '\"tileop_worker_threads\":[1-9][0-9]*' \"$out\"")
 set_tests_properties(source_tileop_port_runner_phase_progress_smoke PROPERTIES
   DEPENDS source_origin_prefix_manifest_smoke)

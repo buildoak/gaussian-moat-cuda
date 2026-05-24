@@ -16,17 +16,13 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 full_json="$tmp/full.json"
-full_manifest="$tmp/full-manifest.txt"
-full_live_manifest="$tmp/full-live-manifest.txt"
+full_live_handoff="$tmp/full.live-handoff.txt"
 chunk_json="$tmp/chunk.json"
-chunk_manifest="$tmp/chunk-manifest.txt"
-chunk_live_manifest="$tmp/chunk-live-manifest.txt"
-resumed_json="$tmp/resumed.json"
-resumed_manifest="$tmp/resumed-manifest.txt"
+chunk_live_handoff="$tmp/chunk.live-handoff.txt"
 resumed_live_json="$tmp/resumed-live.json"
-resumed_live_manifest="$tmp/resumed-live-manifest.txt"
+resumed_live_handoff="$tmp/resumed.live-handoff.txt"
 live_reject_err="$tmp/live-reject.err"
-death_live_manifest="$tmp/death-live-manifest.txt"
+death_live_handoff="$tmp/death.live-handoff.txt"
 death_json="$tmp/death.json"
 death_artifact="$tmp/death-artifact.json"
 death_summary="$tmp/death-summary.json"
@@ -38,8 +34,7 @@ death_false_err="$tmp/death-false.err"
   --band-width 128 \
   --schedule-radii 248,375,512 \
   --seed-inner-flags \
-  --manifest-out "$full_manifest" \
-  --live-manifest-out "$full_live_manifest" \
+  --live-manifest-out "$full_live_handoff" \
   > "$full_json"
 
 "$runner" \
@@ -49,14 +44,12 @@ death_false_err="$tmp/death-false.err"
   --schedule-radii 248,375,512 \
   --seed-inner-flags \
   --stop-after-bands 1 \
-  --manifest-out "$chunk_manifest" \
-  --live-manifest-out "$chunk_live_manifest" \
+  --live-manifest-out "$chunk_live_handoff" \
   > "$chunk_json"
 
 grep -q '"r_final":375' "$chunk_json"
 grep -q '"requested_r_final":512' "$chunk_json"
 grep -q '"bands_processed":1' "$chunk_json"
-grep -q '"manifest_written":true' "$chunk_json"
 grep -q '"live_manifest_written":true' "$chunk_json"
 
 "$runner" \
@@ -64,16 +57,17 @@ grep -q '"live_manifest_written":true' "$chunk_json"
   --r-final 512 \
   --band-width 128 \
   --schedule-radii 375,512 \
-  --manifest-in "$chunk_manifest" \
-  --manifest-out "$resumed_manifest" \
-  > "$resumed_json"
+  --live-manifest-in "$chunk_live_handoff" \
+  --live-manifest-out "$resumed_live_handoff" \
+  > "$resumed_live_json"
 
-grep -q '"source_mode":"PORT_CARRY_MANIFEST"' "$resumed_json"
-grep -q '"r_final":512' "$resumed_json"
-grep -q '"accepted":true' "$resumed_json"
-grep -q '"terminal_source_dead":false' "$resumed_json"
-grep -q '"has_source_carry":true' "$resumed_json"
-cmp "$full_manifest" "$resumed_manifest"
+grep -q '"source_mode":"GEO_I_PORT_DIAGNOSTIC"' "$resumed_live_json"
+grep -q '"r_final":512' "$resumed_live_json"
+grep -q '"accepted":true' "$resumed_live_json"
+grep -q '"terminal_source_dead":false' "$resumed_live_json"
+grep -q '"has_source_carry":true' "$resumed_live_json"
+grep -q '"live_manifest_written":true' "$resumed_live_json"
+cmp "$full_live_handoff" "$resumed_live_handoff"
 
 compiled_k_sq="$(
   sed -n 's/.*"k_sq":\([0-9][0-9]*\).*/\1/p' "$full_json"
@@ -83,30 +77,13 @@ compiled_carry_width="$(
     'BEGIN { r = int(sqrt(k)); if (r * r < k) { r += 1 } print r }'
 )"
 
-"$runner" \
-  --r-start 375 \
-  --r-final 512 \
-  --band-width 128 \
-  --schedule-radii 375,512 \
-  --live-manifest-in "$chunk_live_manifest" \
-  --live-manifest-out "$resumed_live_manifest" \
-  > "$resumed_live_json"
-
-grep -q '"source_mode":"GEO_I_PORT_DIAGNOSTIC"' "$resumed_live_json"
-grep -q '"r_final":512' "$resumed_live_json"
-grep -q '"accepted":true' "$resumed_live_json"
-grep -q '"terminal_source_dead":false' "$resumed_live_json"
-grep -q '"has_source_carry":true' "$resumed_live_json"
-grep -q '"live_manifest_written":true' "$resumed_live_json"
-cmp "$full_live_manifest" "$resumed_live_manifest"
-
 if "$runner" \
   --r-start 375 \
   --r-final 512 \
   --band-width 128 \
   --schedule-radii 375,512 \
   --seed-inner-flags \
-  --live-manifest-in "$chunk_live_manifest" \
+  --live-manifest-in "$chunk_live_handoff" \
   >/tmp/tileop-live-reject.out \
   2>"$live_reject_err"; then
   echo "runner accepted --seed-inner-flags with --live-manifest-in" >&2
@@ -130,7 +107,7 @@ fi
 grep -q -- '--death-out requires terminal_source_dead=true' \
   "$death_false_err"
 
-cat > "$death_live_manifest" <<EOF_MANIFEST
+cat > "$death_live_handoff" <<EOF_MANIFEST
 LB_SOURCE_LIVE_HANDOFF_V1
 k_sq $compiled_k_sq
 cut_radius 248
@@ -143,9 +120,9 @@ schedule_digest_algorithm sha256:tileop_port_diagnostic_schedule_v1
 schedule_digest_hex 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 overflow_summary none
 carry_atoms 1
-carry_atom 249 62001
+carry_atom 1 1
 components 1
-component 1 1 249
+component 1 1 1
 END
 EOF_MANIFEST
 
@@ -154,7 +131,7 @@ EOF_MANIFEST
   --r-final 512 \
   --band-width 128 \
   --schedule-radii 248,512 \
-  --live-manifest-in "$death_live_manifest" \
+  --live-manifest-in "$death_live_handoff" \
   --last-band-summary-out "$death_summary" \
   --death-out "$death_artifact" \
   > "$death_json"

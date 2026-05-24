@@ -151,7 +151,7 @@ int main() {
   const std::string prefix_command =
       "source_origin_cpu_runner --k-sq 26 --r-final 8192 --band-width 8192 "
       "--endpoint-a 376039 --endpoint-b 943460 --max-atoms 50000000 "
-      "--manifest-out k26-prefix-manifest.txt --prefix-witness-out "
+      "--live-manifest-out k26-prefix-live-handoff.txt --prefix-witness-out "
       "k26-prefix-witness.txt";
   const std::string continuation_command =
       "source_tileop_port_runner --r-start 8192 --r-final 1015645 "
@@ -159,7 +159,7 @@ int main() {
       schedule_csv +
       " --max-atoms 50000000 "
       "--target-a 376039 --target-b 943460 "
-      "--manifest-in k26-prefix-manifest.txt "
+      "--live-manifest-in k26-prefix-live-handoff.txt "
       "--prefix-witness-in k26-prefix-witness.txt";
   const std::string bundle_command =
       "run_k26_full_source_bundle.sh --build-dir BUILD_DIR --out-dir OUT_DIR "
@@ -188,7 +188,7 @@ int main() {
             << "\"prefix\":{\"runner\":\"source_origin_cpu_runner\","
             << "\"r_final\":" << kPrefixOuter
             << ",\"band_width\":" << kBandWidth
-            << ",\"manifest_out\":\"k26-prefix-manifest.txt\","
+            << ",\"live_handoff_out\":\"k26-prefix-live-handoff.txt\","
             << "\"prefix_witness_out\":\"k26-prefix-witness.txt\","
             << "\"command\":";
   emit_json_string(prefix_command);
@@ -208,7 +208,7 @@ int main() {
             << ",\"claim_grade_requires_source_unbridged_unsafe_candidate_atoms\":0"
             << ",\"schedule_radii_csv\":";
   emit_json_string(schedule_csv);
-  std::cout << ",\"manifest_in\":\"k26-prefix-manifest.txt\","
+  std::cout << ",\"live_handoff_in\":\"k26-prefix-live-handoff.txt\","
             << "\"prefix_witness_in\":\"k26-prefix-witness.txt\","
             << "\"target\":{\"a\":" << kCanonicalEndpointA
             << ",\"b\":" << kCanonicalEndpointB

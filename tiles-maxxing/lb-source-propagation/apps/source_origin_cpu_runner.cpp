@@ -31,6 +31,7 @@ struct Config {
   std::size_t max_atoms = 65535;
   std::optional<std::string> cert_out;
   std::optional<std::string> manifest_out;
+  std::optional<std::string> live_manifest_out;
   std::optional<std::string> prefix_witness_out;
   std::optional<std::string> progress_out;
 };
@@ -91,6 +92,9 @@ void usage(const char* prog) {
       << "                        endpoint is reached and source dies\n"
       << "  --manifest-out PATH   write carry manifest when source survives into\n"
       << "                        the final carry window\n"
+      << "  --live-manifest-out PATH\n"
+      << "                        write LB_SOURCE_LIVE_HANDOFF_V1 when source\n"
+      << "                        survives into the final carry window\n"
       << "  --prefix-witness-out PATH\n"
       << "                        write diagnostic origin-prefix paths to live\n"
       << "                        source carry atoms\n"
@@ -168,6 +172,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.manifest_out = value;
+    } else if (take_value("--live-manifest-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--live-manifest-out must not be empty\n";
+        return false;
+      }
+      config.live_manifest_out = value;
     } else if (take_value("--prefix-witness-out", value)) {
       if (value.empty()) {
         std::cerr << "--prefix-witness-out must not be empty\n";
@@ -598,6 +608,27 @@ std::size_t write_prefix_witness_or_die(
   return targets.size();
 }
 
+lb_source::LiveHandoffV1 make_live_handoff(
+    std::uint64_t k_sq,
+    std::uint64_t cut_radius,
+    const lb_source::SeparatorState& separator) {
+  lb_source::LiveHandoffV1 handoff;
+  handoff.k_sq = k_sq;
+  handoff.cut_radius = cut_radius;
+  handoff.carry_width = lb_source::ceil_sqrt(k_sq);
+  handoff.source_mode = "ORIGIN_SOURCE";
+  handoff.source_id = "omega";
+  handoff.geometry_id = "canonical_octant_coordinate_prefix_v1";
+  handoff.build_id = "local_sidecar_build";
+  handoff.schedule_digest_algorithm =
+      "sha256:lb_source_origin_cpu_runner_schedule_v1";
+  handoff.schedule_digest_hex =
+      "0000000000000000000000000000000000000000000000000000000000000000";
+  handoff.overflow_summary = "none";
+  handoff.separator = lb_source::live_separator_from_separator(separator);
+  return lb_source::canonicalize_live_handoff(handoff);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -777,6 +808,7 @@ int main(int argc, char** argv) {
           : std::vector<lb_source::AtomId>{};
   bool manifest_written = false;
   bool prefix_witness_written = false;
+  bool live_manifest_written = false;
   std::size_t prefix_witness_targets = 0;
   if (config.manifest_out.has_value()) {
     if (!last.accepted() || last.terminal_source_dead ||
@@ -794,6 +826,24 @@ int main(int argc, char** argv) {
         manifest, lb_source::make_carry_manifest(config.k_sq, config.r_final,
                                                  last));
     manifest_written = true;
+  }
+  if (config.live_manifest_out.has_value()) {
+    if (!last.accepted() || last.terminal_source_dead ||
+        !has_source_carry(last.outgoing)) {
+      std::cerr
+          << "--live-manifest-out requires accepted live source carry\n";
+      return EXIT_FAILURE;
+    }
+    std::ofstream manifest(*config.live_manifest_out);
+    if (!manifest) {
+      std::cerr << "cannot open --live-manifest-out path: "
+                << *config.live_manifest_out << "\n";
+      return EXIT_FAILURE;
+    }
+    lb_source::write_live_handoff(
+        manifest, make_live_handoff(config.k_sq, config.r_final,
+                                    last.outgoing));
+    live_manifest_written = true;
   }
   if (config.prefix_witness_out.has_value()) {
     if (!last.accepted() || last.terminal_source_dead ||
@@ -881,6 +931,8 @@ int main(int argc, char** argv) {
   std::cout << ",\"cert_written\":" << (cert_written ? "true" : "false")
             << ",\"manifest_written\":"
             << (manifest_written ? "true" : "false")
+            << ",\"live_manifest_written\":"
+            << (live_manifest_written ? "true" : "false")
             << ",\"prefix_witness_written\":"
             << (prefix_witness_written ? "true" : "false")
             << ",\"prefix_witness_targets\":" << prefix_witness_targets

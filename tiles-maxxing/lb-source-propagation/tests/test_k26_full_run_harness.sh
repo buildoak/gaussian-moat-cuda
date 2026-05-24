@@ -21,7 +21,7 @@ CACHE
 cat > "$build_dir/k26_source_run_commands" <<'SH'
 #!/usr/bin/env bash
 cat <<'JSON'
-{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"build":{"required_k_sq":26},"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix":{"command":"source_origin_cpu_runner --endpoint-a 376039 --endpoint-b 943460"},"continuation":{"r_start":8192,"r_final":1015645,"schedule_boundary_count":124,"schedule_segment_count":123,"schedule_min_width":8029,"schedule_max_width":8193,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"diagnostic_allow_unbridged","blocked_if_unbridged_coordinate_carry_atoms":false,"claim_grade_requires_source_unbridged_unsafe_candidate_atoms":0,"schedule_radii_csv":"8192,122879,475135,622591,1015645","command":"source_tileop_port_runner --target-a 376039 --target-b 943460"}}
+{"schema":"lb_source_k26_run_commands_v1","claim_label":"SOURCE_ORIGIN_K26","executable_now":false,"build":{"required_k_sq":26},"target":{"tsuchimura_endpoint":{"a":943460,"b":376039,"norm_sq":1031522101121},"canonical_octant_endpoint":{"a":376039,"b":943460,"norm_sq":1031522101121}},"prefix":{"command":"source_origin_cpu_runner --endpoint-a 376039 --endpoint-b 943460 --live-manifest-out k26-prefix-live-handoff.txt"},"continuation":{"r_start":8192,"r_final":1015645,"schedule_boundary_count":124,"schedule_segment_count":123,"schedule_min_width":8029,"schedule_max_width":8193,"schedule_digest_algorithm":"sha256:lb_source_k26_repaired_bz_schedule_v1","schedule_digest_hex":"7c820f641cc218631ddc2bc22c5767a70e8608ec4fdb293fadde6cc1fde57b95","seam_bridge_policy":"diagnostic_allow_unbridged","blocked_if_unbridged_coordinate_carry_atoms":false,"claim_grade_requires_source_unbridged_unsafe_candidate_atoms":0,"schedule_radii_csv":"8192,122879,475135,622591,1015645","command":"source_tileop_port_runner --target-a 376039 --target-b 943460 --live-manifest-in k26-prefix-live-handoff.txt"}}
 JSON
 SH
 
@@ -41,13 +41,13 @@ SH
 
 cat > "$build_dir/source_origin_cpu_runner" <<'SH'
 #!/usr/bin/env bash
-manifest=""
+live_handoff=""
 witness=""
 progress=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --manifest-out)
-      manifest="$2"; shift 2 ;;
+    --live-manifest-out)
+      live_handoff="$2"; shift 2 ;;
     --prefix-witness-out)
       witness="$2"; shift 2 ;;
     --progress-out)
@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
       shift ;;
   esac
 done
-[[ -n "$manifest" ]] && echo "manifest" > "$manifest"
+[[ -n "$live_handoff" ]] && echo "live-handoff" > "$live_handoff"
 if [[ -n "$witness" ]]; then
   cat > "$witness" <<'WITNESS'
 LB_SOURCE_PREFIX_WITNESS_V1
@@ -71,7 +71,7 @@ WITNESS
 fi
 [[ -n "$progress" ]] && echo '{"schema":"lb_source_origin_progress_v1","accepted":true}' > "$progress"
 cat <<'JSON'
-{"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"manifest_written":true,"prefix_witness_written":true}
+{"schema":"lb_source_origin_cpu_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","k_sq":26,"r_final":8192,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"live_manifest_written":true,"prefix_witness_written":true}
 JSON
 SH
 
@@ -88,7 +88,7 @@ if [[ -n "${EXPECT_TILEOP_THREADS:-}" &&
   exit 1
 fi
 progress=""
-manifest=""
+live_handoff=""
 r_start="8192"
 r_final="1015645"
 while [[ $# -gt 0 ]]; do
@@ -97,8 +97,8 @@ while [[ $# -gt 0 ]]; do
       r_start="$2"; shift 2 ;;
     --r-final)
       r_final="$2"; shift 2 ;;
-    --manifest-out)
-      manifest="$2"; shift 2 ;;
+    --live-manifest-out)
+      live_handoff="$2"; shift 2 ;;
     --progress-out)
       progress="$2"; shift 2 ;;
     *)
@@ -107,10 +107,10 @@ while [[ $# -gt 0 ]]; do
 done
 band_index=0
 [[ -n "$progress" ]] && printf '{"schema":"lb_source_tileop_port_progress_v1","accepted":true,"band_index":%s,"r_start":%s,"r_outer":%s,"total_ms":1000,"has_source_carry":true,"terminal_source_dead":false}\n' "$band_index" "$r_start" "$r_final" > "$progress"
-if [[ -n "$manifest" ]]; then
-  echo "port-manifest-${r_final}" > "$manifest"
+if [[ -n "$live_handoff" ]]; then
+  echo "port-live-handoff-${r_final}" > "$live_handoff"
   cat <<JSON
-{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":${r_final},"schedule_mode":"explicit_radii","schedule_boundary_count":3,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1],"manifest_written":true}
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":8192,"r_final":${r_final},"schedule_mode":"explicit_radii","schedule_boundary_count":3,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":1249,"source_coordinate_carry_atoms_with_next_band_candidates":1426,"source_bridged_coordinate_carry_atoms":1369,"source_unbridged_coordinate_carry_atoms":1211,"source_unbridged_without_next_band_candidates":1154,"source_unbridged_with_next_band_candidates":57,"source_unbridged_dead_end_candidate_atoms":57,"source_unbridged_unsafe_candidate_atoms":0,"source_bridge_rejected_candidate_atoms":72,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1],"live_manifest_written":true}
 JSON
   exit 0
 fi
@@ -285,7 +285,7 @@ cp -R "$build_dir" "$chunk_budget_build"
 cat > "$chunk_budget_build/source_tileop_port_runner" <<'SH'
 #!/usr/bin/env bash
 progress=""
-manifest=""
+live_handoff=""
 r_start="8192"
 r_final="1015645"
 while [[ $# -gt 0 ]]; do
@@ -294,8 +294,8 @@ while [[ $# -gt 0 ]]; do
       r_start="$2"; shift 2 ;;
     --r-final)
       r_final="$2"; shift 2 ;;
-    --manifest-out)
-      manifest="$2"; shift 2 ;;
+    --live-manifest-out)
+      live_handoff="$2"; shift 2 ;;
     --progress-out)
       progress="$2"; shift 2 ;;
     *)
@@ -303,9 +303,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$progress" ]] && printf '{"schema":"lb_source_tileop_port_progress_v1","accepted":true,"band_index":0,"r_start":%s,"r_outer":%s,"total_ms":200000,"has_source_carry":true,"terminal_source_dead":false}\n' "$r_start" "$r_final" > "$progress"
-[[ -n "$manifest" ]] && echo "slow-port-manifest-${r_final}" > "$manifest"
+[[ -n "$live_handoff" ]] && echo "slow-port-live-handoff-${r_final}" > "$live_handoff"
 cat <<JSON
-{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":${r_start},"r_final":${r_final},"schedule_mode":"explicit_radii","schedule_boundary_count":3,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"source_unbridged_unsafe_candidate_atoms":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1],"manifest_written":true}
+{"schema":"lb_source_tileop_port_runner_v1","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"ORIGIN_PREFIX_PORT_WITNESS","seam_bridge_policy":"diagnostic_allow_unbridged","k_sq":26,"r_start":${r_start},"r_final":${r_final},"schedule_mode":"explicit_radii","schedule_boundary_count":3,"tileop_overflows":0,"unbridged_coordinate_carry_atoms":0,"source_unbridged_unsafe_candidate_atoms":0,"target":{"enabled":true,"a":376039,"b":943460,"norm_sq":1031522101121,"seen":false,"port_atoms":0,"bridge_edges":0,"source_reached":false,"path_provenance":"component_reachability_only","atom_path_length":0,"atom_path":[]},"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"source_carry_atoms":7,"source_inventory_count":123,"source_inventory_digest_algorithm":"sha256:lb_source_inventory_v1","source_inventory_digest_hex":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","max_source_norm_sq":67108837,"max_source_norm_atom_ids":[1],"live_manifest_written":true}
 JSON
 SH
 chmod +x "$chunk_budget_build/source_tileop_port_runner"
@@ -643,7 +643,7 @@ test -f "$chunked_out/k26-continuation-progress.jsonl"
 test -f "$chunked_out/k26-continuation-chunks.jsonl"
 test -f "$chunked_out/k26-continuation-chunk-000.json"
 test -f "$chunked_out/k26-continuation-chunk-000.progress.jsonl"
-test -f "$chunked_out/k26-continuation-chunk-000.manifest.txt"
+test -f "$chunked_out/k26-continuation-chunk-000.live-handoff.txt"
 test -f "$chunked_out/k26-continuation-chunk-001.json"
 test -f "$chunked_out/k26-continuation-chunk-001.progress.jsonl"
 grep -q '"chunk_id":"000","action":"executed","schedule_segment_start":0,"schedule_segment_end":2,"schedule_segment_count":2,"r_start":8192,"r_final":475135,"schedule_radii_csv":"8192,122879,475135"' \
@@ -652,7 +652,7 @@ grep -q '"chunk_id":"001","action":"executed","schedule_segment_start":2,"schedu
   "$chunked_out/k26-continuation-chunks.jsonl"
 grep -q 'k26-continuation-chunk-000.json' \
   "$chunked_out/k26-full-run-artifacts.sha256"
-grep -q 'k26-continuation-chunk-000.manifest.txt' \
+grep -q 'k26-continuation-chunk-000.live-handoff.txt' \
   "$chunked_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-continuation-chunk-001.json' \
   "$chunked_out/k26-full-run-artifacts.sha256"
@@ -660,7 +660,7 @@ grep -q 'k26-continuation-chunks.jsonl' \
   "$chunked_out/k26-full-run-artifacts.sha256"
 grep -q '"terminal_source_dead":true' \
   "$chunked_out/k26-continuation-result.json"
-grep -q '"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"[0-9a-f]\{64\}"' \
+grep -q '"prefix_live_handoff_artifact":{"name":"k26-prefix-live-handoff.txt","sha256":"[0-9a-f]\{64\}"' \
   "$chunked_out/k26-source-dead-gap.json"
 grep -q '"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"[0-9a-f]\{64\}"' \
   "$chunked_out/k26-source-dead-gap.json"
@@ -679,11 +679,11 @@ resume_out="$tmp/resume-existing"
 mkdir -p "$resume_out"
 cp "$chunked_out"/k26-prefix-result.json "$resume_out"/
 cp "$chunked_out"/k26-prefix-progress.jsonl "$resume_out"/
-cp "$chunked_out"/k26-prefix-manifest.txt "$resume_out"/
+cp "$chunked_out"/k26-prefix-live-handoff.txt "$resume_out"/
 cp "$chunked_out"/k26-prefix-witness.txt "$resume_out"/
 cp "$chunked_out"/k26-continuation-chunk-000.json "$resume_out"/
 cp "$chunked_out"/k26-continuation-chunk-000.progress.jsonl "$resume_out"/
-cp "$chunked_out"/k26-continuation-chunk-000.manifest.txt "$resume_out"/
+cp "$chunked_out"/k26-continuation-chunk-000.live-handoff.txt "$resume_out"/
 if "$harness" \
     --build-dir "$build_dir" \
     --out-dir "$resume_out" \
@@ -709,7 +709,7 @@ grep -q '"chunk_id":"000","action":"reused"' \
   "$resume_out/k26-continuation-chunks.jsonl"
 grep -q '"chunk_id":"001","action":"executed"' \
   "$resume_out/k26-continuation-chunks.jsonl"
-grep -q 'k26-continuation-chunk-000.manifest.txt' \
+grep -q 'k26-continuation-chunk-000.live-handoff.txt' \
   "$resume_out/k26-full-run-artifacts.sha256"
 grep -q 'k26-continuation-chunk-001.json' \
   "$resume_out/k26-full-run-artifacts.sha256"
@@ -872,7 +872,7 @@ grep -q '"chunk_id":"000","action":"executed"' \
   "$checked_chunked_out/k26-continuation-chunks.jsonl"
 grep -q 'k26-continuation-chunks.jsonl' \
   "$checked_chunked_out/k26-full-run-artifacts.sha256"
-grep -q '"prefix_manifest_artifact":{"name":"k26-prefix-manifest.txt","sha256":"[0-9a-f]\{64\}"' \
+grep -q '"prefix_live_handoff_artifact":{"name":"k26-prefix-live-handoff.txt","sha256":"[0-9a-f]\{64\}"' \
   "$checked_chunked_out/k26-source-dead-gap.json"
 grep -q '"prefix_witness_artifact":{"name":"k26-prefix-witness.txt","sha256":"[0-9a-f]\{64\}"' \
   "$checked_chunked_out/k26-source-dead-gap.json"

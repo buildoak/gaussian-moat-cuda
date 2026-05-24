@@ -516,7 +516,7 @@ It emits:
 ```text
 run.progress.jsonl
 run.profile.json
-run.live.manifest.txt       optional rolling live checkpoint
+run.live-handoff.txt        optional rolling live checkpoint
 run.death.json              previous_live_handoff + active_band_summary
 run.abort.json              reject/exception state
 run.sha256                  artifact ledger
@@ -585,21 +585,21 @@ Operational go/no-go:
 
 ## Implementation Roadmap
 
-1. Centralize `LB_SOURCE_CARRY_MANIFEST_V1` parsing.
-   Keep byte-compatible v1 output. Remove duplicated runner parsing before v2
-   exists.
+1. Retire hot-path `LB_SOURCE_CARRY_MANIFEST_V1` parsing from LB runners.
+   Keep v1 fixtures as historical compatibility coverage outside the live
+   continuation protocol.
 
 2. Introduce a live-frontier type.
-   Split `LiveSeparator` from proof inventory. Keep compatibility adapters so
-   existing fixtures and manifests still pass.
+   Split `LiveSeparator` from proof inventory. Live continuation fixtures must
+   pass through live handoff files, not legacy carry manifests.
 
 3. Add an envelope layer.
    Bind schema, `k_sq`, cut radius, carry width, producer kind, source mode,
    lineage mode, BZ status, artifact hashes, and version.
 
-4. Add manifest v2.
-   `lb_source_carry_manifest_v2` carries envelope plus `LiveSeparator`. Readers
-   accept v1 and v2. Writers emit v2 behind an opt-in flag first.
+4. Add live handoff serialization.
+   `LiveHandoffV1` carries envelope plus `LiveSeparator`. Runners read and
+   write it through `--live-manifest-in/out`.
 
 5. Add independent accumulator checker.
    It must consume accumulator/replay artifacts and verify count, digest/root,
@@ -618,7 +618,7 @@ Operational go/no-go:
 
 8. Add domain preflight guards.
    Check coordinate atom id limits, port atom id tile-coordinate limits,
-   schedule width, cut-radius monotonicity, stale manifests, and partial chunk
+   schedule width, cut-radius monotonicity, stale handoffs, and partial chunk
    artifacts before long runs.
 
 9. Add source-seeding policy guards.
@@ -681,7 +681,7 @@ Operational go/no-go:
 
 Stop before claim-grade promotion if:
 
-- v1 manifests break;
+- live handoff roundtrips break;
 - composed-vs-big live frontier parity changes;
 - source lineage depends on transient component ids;
 - neutral-to-source inventory lineage is missing;

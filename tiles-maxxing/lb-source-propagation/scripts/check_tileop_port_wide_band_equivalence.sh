@@ -12,8 +12,8 @@ Compare one wide TileOp-port source-propagation band against the same radial
 range split into equal explicit schedule bands. The gate requires:
   - both runs accepted,
   - both runs keep live source carry,
-  - exact byte-identical final carry manifests,
-  - key source inventory/carry JSON fields match.
+  - exact byte-identical final live handoffs,
+  - key live frontier/carry JSON fields match.
 
 Defaults are K26-oriented and power-of-two aligned:
   --r-start        8192
@@ -108,10 +108,10 @@ else
 fi
 
 wide_json="$out_dir/wide.json"
-wide_manifest="$out_dir/wide-manifest.txt"
+wide_live_handoff="$out_dir/wide.live-handoff.txt"
 wide_progress="$out_dir/wide-progress.jsonl"
 multi_json="$out_dir/multi.json"
-multi_manifest="$out_dir/multi-manifest.txt"
+multi_live_handoff="$out_dir/multi.live-handoff.txt"
 multi_progress="$out_dir/multi-progress.jsonl"
 
 common_args=(
@@ -126,7 +126,7 @@ common_args=(
   "${common_args[@]}" \
   --band-width "$((segments * segment_width))" \
   --schedule-radii "$wide_schedule" \
-  --manifest-out "$wide_manifest" \
+  --live-manifest-out "$wide_live_handoff" \
   --progress-out "$wide_progress" \
   > "$wide_json"
 
@@ -134,7 +134,7 @@ common_args=(
   "${common_args[@]}" \
   --band-width "$segment_width" \
   --schedule-radii "$multi_schedule" \
-  --manifest-out "$multi_manifest" \
+  --live-manifest-out "$multi_live_handoff" \
   --progress-out "$multi_progress" \
   > "$multi_json"
 
@@ -155,8 +155,8 @@ for label, obj in (("wide", wide), ("multi", multi)):
         raise SystemExit(f"{label} run reached terminal source death; expected live carry")
     if not obj.get("has_source_carry"):
         raise SystemExit(f"{label} run has no live source carry")
-    if not obj.get("manifest_written"):
-        raise SystemExit(f"{label} run did not write carry manifest")
+    if not obj.get("live_manifest_written"):
+        raise SystemExit(f"{label} run did not write live handoff")
 
 keys = [
     "k_sq",
@@ -165,11 +165,12 @@ keys = [
     "requested_r_final",
     "tileop_overflows",
     "source_carry_atoms",
-    "source_inventory_count",
-    "source_inventory_digest_algorithm",
-    "source_inventory_digest_hex",
-    "max_source_norm_sq",
-    "max_source_norm_atom_ids",
+    "source_frontier_mode",
+    "source_frontier_count",
+    "source_frontier_digest_algorithm",
+    "source_frontier_digest_hex",
+    "max_source_frontier_norm_sq",
+    "max_source_frontier_norm_atom_ids",
 ]
 for key in keys:
     if wide.get(key) != multi.get(key):
@@ -191,11 +192,11 @@ print(
     f"k_sq={wide['k_sq']} r_start={wide['r_start']} r_final={wide['r_final']} "
     f"wide_bands={wide['bands_processed']} multi_bands={multi['bands_processed']} "
     f"source_carry_atoms={wide['source_carry_atoms']} "
-    f"source_inventory_count={wide['source_inventory_count']}"
+    f"source_frontier_count={wide['source_frontier_count']}"
 )
 PY
 
-cmp "$wide_manifest" "$multi_manifest"
+cmp "$wide_live_handoff" "$multi_live_handoff"
 
 {
   echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -206,8 +207,8 @@ cmp "$wide_manifest" "$multi_manifest"
   echo "segment_width=$segment_width"
   echo "wide_schedule=$wide_schedule"
   echo "multi_schedule=$multi_schedule"
-  echo "wide_manifest_sha256=$(shasum -a 256 "$wide_manifest" | awk '{print $1}')"
-  echo "multi_manifest_sha256=$(shasum -a 256 "$multi_manifest" | awk '{print $1}')"
+  echo "wide_live_handoff_sha256=$(shasum -a 256 "$wide_live_handoff" | awk '{print $1}')"
+  echo "multi_live_handoff_sha256=$(shasum -a 256 "$multi_live_handoff" | awk '{print $1}')"
 } > "$out_dir/status.txt"
 
 echo "TILEOP_PORT_WIDE_BAND_EQUIVALENCE_PASS out_dir=$out_dir"

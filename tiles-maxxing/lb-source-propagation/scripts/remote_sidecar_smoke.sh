@@ -134,19 +134,20 @@ ctest --test-dir "$verify_build_dir" --output-on-failure \
   --band-width 128 \
   --endpoint-a 0 \
   --endpoint-b 251 \
-  --manifest-out "$out_dir/source_origin_prefix_manifest.txt" \
+  --live-manifest-out "$out_dir/source_origin_prefix_live_handoff.txt" \
   --prefix-witness-out "$out_dir/source_origin_prefix_witness.txt" \
   | tee "$out_dir/source_origin_prefix_manifest_smoke.json"
 
-"$build_dir/source_tileop_cpu_runner" \
+"$build_dir/source_tileop_port_runner" \
   --r-start 248 \
   --r-final 512 \
   --band-width 128 \
-  --endpoint-a 0 \
-  --endpoint-b 251 \
-  --manifest-in "$out_dir/source_origin_prefix_manifest.txt" \
+  --target-a 0 \
+  --target-b 251 \
+  --live-manifest-in "$out_dir/source_origin_prefix_live_handoff.txt" \
   --prefix-witness-in "$out_dir/source_origin_prefix_witness.txt" \
-  | tee "$out_dir/source_tileop_cpu_runner_manifest_smoke.json"
+  | tee "$out_dir/source_tileop_cpu_runner_manifest_smoke.json" \
+      "$out_dir/source_tileop_port_runner_live_handoff_smoke.json"
 
 "$build_dir/k26_tsuchimura_preflight" \
   | tee "$out_dir/k26_tsuchimura_preflight.json"
@@ -168,7 +169,7 @@ ctest --test-dir "$verify_build_dir" --output-on-failure \
 
 cat > "$out_dir/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule evidence, K26 run profile draft, and K26 run command contract only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, TileOp-port live handoff smoke, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule evidence, K26 run profile draft, and K26 run command contract only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 
