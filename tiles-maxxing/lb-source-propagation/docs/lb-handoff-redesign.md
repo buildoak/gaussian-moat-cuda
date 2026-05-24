@@ -298,10 +298,12 @@ This is the key refinement idea: the wide sweep finds the small region that
 matters; expensive precise evidence is collected only around the last-live /
 first-dead transition. The rest of the W-scale scan remains frontier-only.
 
-The refinement is not "inspect the last dead band" in isolation. A dead band
-without the exact preceding live separator has lost the source partition needed
-for exact replay. If the last-live handoff is unavailable, the refinement must
-restart from an earlier saved checkpoint or from the certified seed.
+A dead progress row alone is not enough. A rich last-band reachability summary
+can be enough. The difference is whether the band artifact preserves the
+boundary transfer needed to apply the exact incoming source frontier locally.
+If the last-live handoff or an equivalent boundary summary is unavailable, the
+refinement must restart from an earlier saved checkpoint or from the certified
+seed.
 
 The refinement pass may enable listed inventory for tiny windows, replayed
 coordinate paths, extra bridge expansion, or claim-grade accumulator emission.
@@ -313,6 +315,65 @@ For lower-bound claims, separate coordinate facts from port-continuation facts:
 - TileOp port/support norms are diagnostic continuation evidence;
 - TileOp port atoms must be expanded into checked coordinate Gaussian-prime
   paths before they can support a coordinate furthest-component claim.
+
+### Last-Band Reachability Summary
+
+The elegant last-band object is not a historical inventory. It is a local
+transfer summary for the band that died, plus the incoming live frontier at its
+inner cut.
+
+Conceptually:
+
+```text
+LastBandReachabilitySummaryV1 {
+  k_sq
+  r_start
+  r_outer
+  geo_i_cut
+  geo_o_cut
+  carry_width
+  schedule_digest
+  oracle_identity
+  bridge_policy
+  overflow_status
+
+  inner_boundary_atoms_or_ports[]
+  outer_boundary_atoms_or_ports[]
+  local_boundary_partition[]
+  local_component_max_coordinate_norm[]
+  local_component_max_coordinate_atom_ids[]
+  local_witness_refs[]
+}
+```
+
+`geo_i_cut` and `geo_o_cut` bind the local annulus. The incoming source is not
+inferred from `geo_i_cut`; it is applied through the incoming `LiveHandoffV1`
+source bits. The band summary says which inner boundary/port atoms connect to
+which outer boundary/port atoms and what the furthest coordinate Gaussian-prime
+atom is inside each boundary-connected local component.
+
+The local refinement algorithm is:
+
+1. Load the incoming `LiveHandoffV1` at `r_start`.
+2. Union its full frontier partition with the band's local boundary partition.
+3. Mark roots source when they contain an incoming source-bit class.
+4. Death is confirmed if no source root touches outer carry / `geo_o_cut`,
+   respecting TileOp port overhang.
+5. The last-band furthest candidate is the maximum coordinate atom summary
+   among source roots.
+
+This is the version of "inspect the last band" that is actually exact. It is
+still O(frontier plus boundary-connected component summaries), not O(history).
+
+Two caveats are load-bearing:
+
+- Storing only the source-carrying ports is not enough in general. Neutral
+  incoming frontier classes must also be present, because a neutral class can
+  weld to source inside the last band and then carry additional local reach.
+- The summary can identify the coordinate furthest candidate diagnostically.
+  A claim-grade endpoint still needs targeted path expansion or replay for the
+  selected source-to-coordinate path, including any prefix equivalence used by
+  neutral carry classes.
 
 ### Optional Transfer-Summary Layer
 
