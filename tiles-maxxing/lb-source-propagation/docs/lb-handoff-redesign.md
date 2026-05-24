@@ -326,12 +326,16 @@ Conceptually:
 
 ```text
 LastBandReachabilitySummaryV1 {
+  schema
   k_sq
+  source_identity
+  band_index
   r_start
   r_outer
-  geo_i_cut
-  geo_o_cut
   carry_width
+  incoming_interface
+  carry_window_predicate
+  outer_continuation_predicate
   schedule_digest
   oracle_identity
   bridge_policy
@@ -342,15 +346,19 @@ LastBandReachabilitySummaryV1 {
   local_boundary_partition[]
   local_component_max_coordinate_norm[]
   local_component_max_coordinate_atom_ids[]
+  coordinate_bridge_records[]
   local_witness_refs[]
+  atom_set_digest
+  partition_digest
 }
 ```
 
-`geo_i_cut` and `geo_o_cut` bind the local annulus. The incoming source is not
-inferred from `geo_i_cut`; it is applied through the incoming `LiveHandoffV1`
-source bits. The band summary says which inner boundary/port atoms connect to
-which outer boundary/port atoms and what the furthest coordinate Gaussian-prime
-atom is inside each boundary-connected local component.
+`r_start` and `r_outer` bind the local annulus and play the local `geo_I` /
+`geo_O` role for guard predicates. The incoming source is not inferred from
+the inner surface; it is applied through the incoming `LiveHandoffV1` source
+bits. The band summary says which inner boundary/port atoms connect to which
+outer boundary/port atoms and what the furthest coordinate Gaussian-prime atom
+is inside each boundary-connected local component.
 
 The local refinement algorithm is:
 
@@ -420,6 +428,104 @@ process dies mid-sweep, recovery may require replay from the first source
 artifact. For practical long runs, the runner may keep a single rolling
 checkpoint or sparse checkpoints, but those are operational restart artifacts,
 not mathematical continuation state.
+
+If restart convenience is not required, no sparse checkpoint is required. The
+last-band artifact is still sufficient for diagnostic death/furthest
+localization, because it carries the previous live frontier and the local
+transfer summary for the band that killed source.
+
+### First Implementation Slice
+
+Keep the first implementation additive. Do not rewrite the TileOp core and do
+not break `LB_SOURCE_CARRY_MANIFEST_V1`.
+
+Add these live types beside the existing `SeparatorState`:
+
+```text
+LiveSeparator {
+  carry_atoms
+  component_partition
+  source_bit_per_component
+}
+
+LiveHandoffV1 {
+  envelope
+  LiveSeparator
+}
+
+LiveProcessResult {
+  reject
+  diagnostic
+  carry_width
+  outgoing LiveSeparator
+  terminal_source_dead
+}
+```
+
+Add adapters:
+
+```text
+live_separator_from_separator
+separator_from_live_separator
+canonicalize_live_separator
+validate_live_separator
+```
+
+The adapter from live to legacy `SeparatorState` leaves
+`component_inventory` empty. That is reachability-correct for continuation,
+but it is not claim-grade terminal inventory.
+
+Then factor the current `process_band` closure into two public fronts:
+
+- `process_band(...)`: existing listed-inventory/debug behavior, byte-compatible
+  with current tests and v1 manifests;
+- `process_band_live(...)`: same closure and carry semantics, but no historical
+  inventory growth and no terminal listed inventory.
+
+`process_band_live` and continuation runners must reject fresh source seeding
+when an incoming handoff exists, unless a clearly marked diagnostic mode opts
+into non-continuation behavior.
+
+### Runner Strategy
+
+Use the current `source_tileop_port_runner` as the materialized correctness and
+parity gate. It can build the first live-summary artifacts while still using
+the battle-proven TileOp-port conversion path.
+
+W-scale execution should be a new streaming runner rather than an overloaded
+mode in the diagnostic runner:
+
+```text
+source_tileop_port_stream_runner
+```
+
+The streaming runner state machine is:
+
+```text
+INIT
+FIRST_LIVE_GATE
+STREAM_SEGMENT
+PORT_FOLD
+HANDOFF
+ROLL_SUMMARY
+DEATH_OR_CONTINUE
+```
+
+It emits:
+
+```text
+run.progress.jsonl
+run.profile.json
+run.live.manifest.txt       optional rolling live checkpoint
+run.death.json              previous_live_handoff + active_band_summary
+run.abort.json              reject/exception state
+run.sha256                  artifact ledger
+```
+
+`run.death.json` is diagnostic non-claim unless later independent proof gates
+promote it. It must bind `k_sq`, cuts, schedule digest, oracle identity,
+overflow status, previous handoff hash, active summary hash, coordinate/port
+metric split, and bridge safety counters.
 
 ### Optional Transfer-Summary Layer
 
@@ -551,12 +657,18 @@ Operational go/no-go:
   accumulator roots on small and K26-scale probes.
 - Synthetic long-chain probes show memory bounded by frontier plus active
   microband, not by history.
-- Mode 1 persists/hash-addresses the exact last-live handoff at every accepted
-  live cut.
+- Mode 1 retains exact `previous_live_handoff + active_band_summary` while
+  processing the active band; sparse checkpoints are optional restart artifacts,
+  not acceptance requirements.
 - Refinement from the last-live handoff reproduces the original first-dead
   bracket before enabling richer instrumentation.
 - Shared-cut coarse/fine equivalence is checked before accepting a refined
   death boundary.
+- `previous_live_handoff + active_band_summary` reproduces the same diagnostic
+  terminal state and coordinate furthest candidate as all-band replay on
+  hostile fixtures.
+- A progress row without previous handoff plus summary is rejected as terminal
+  evidence.
 - Later-band reseeding and source revival fixtures are rejected.
 - Coordinate furthest facts and port/support diagnostics are checked as
   different fields.

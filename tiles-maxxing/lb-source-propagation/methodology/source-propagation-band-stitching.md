@@ -188,6 +188,79 @@ For a source-death certificate,
 carry atoms still matter for composed-band equivalence, but they do not by
 themselves keep the source component alive.
 
+## Lemma 6: Last-Band Transfer Sufficiency
+
+For diagnostic lower-bound refinement, a dead progress row is not sufficient,
+but all earlier band artifacts are not mathematically necessary. Let `H_L` be
+the exact live separator at the inner cut of the first dead band, including all
+source and neutral carry atoms, the full carry partition, and source bits. Let
+`T_D` be a source-free transfer summary for the dead band `[R_L, R_D]`.
+
+`T_D` must bind:
+
+```text
+K, R_L, R_D, carry width, schedule/oracle identity, overflow status,
+inner boundary atoms or ports, outer continuation atoms or ports,
+the local boundary partition induced by accepted local edges and bridges,
+and per local boundary component coordinate max summaries.
+```
+
+Then `H_L + T_D` is enough to identify which local components in the dead band
+are source-connected and to locate the furthest coordinate Gaussian-prime
+candidate inside that band. The algorithm is:
+
+1. Union the partition blocks from `H_L`.
+2. Union the local boundary partition blocks from `T_D`.
+3. Mark a root as source iff it contains an incoming source-bit component from
+   `H_L`.
+4. Death is confirmed iff no source root touches an outer continuation atom or
+   valid TileOp port overhang.
+5. The diagnostic furthest candidate is the maximum coordinate atom summary
+   among source roots.
+
+The incoming source is not inferred from `geo_I`. The `geo_I` and `geo_O`
+surfaces in `T_D` bind the local annulus and guard predicates only. TileOp port
+support may keep continuation alive, but a port support norm is not a coordinate
+furthest atom.
+
+The following weakenings are invalid:
+
+- storing only source-marked ports or source-marked carry;
+- dropping neutral carry classes, because they may weld to source inside the
+  dead band;
+- treating all carry as source;
+- using a dead progress row without `H_L` or an equivalent boundary transfer;
+- using port atoms as coordinate endpoint evidence without coordinate-path
+  expansion.
+
+## Lemma 7: First-Plus-Rolling-Last Campaign State
+
+For source-survival execution, the only mathematical continuation state after a
+cut is the exact live separator for that cut. Therefore a W-scale campaign does
+not need to retain all prior band artifacts in the hot path.
+
+The minimal campaign state is:
+
+```text
+first_source_artifact
+current_live_handoff
+previous_live_handoff
+active_last_band_transfer_summary
+terminal_summary_if_dead
+```
+
+`first_source_artifact` certifies the seed/source identity and global geometry.
+`current_live_handoff` continues the next band. `previous_live_handoff` is kept
+only while processing the active band, so that if the active band kills the
+source, `previous_live_handoff + active_last_band_transfer_summary` forms the
+local diagnostic refinement artifact.
+
+Sparse checkpoints and older band summaries are operational restart evidence,
+not mathematical continuation state. Claim-grade certificates may still require
+targeted replay, coordinate path expansion, or an independent accumulator for
+terminal coordinate inventory; those artifacts belong to the proof tier, not to
+the hot continuation state.
+
 ## Engineering Constraints
 
 - The carry width is `ceil(sqrt(K))`; for `K = 32`, this is `6`.
