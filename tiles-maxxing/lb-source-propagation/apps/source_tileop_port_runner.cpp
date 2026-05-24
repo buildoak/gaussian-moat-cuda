@@ -15,6 +15,7 @@
 #include <optional>
 #include <queue>
 #include <set>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -28,6 +29,7 @@
 #include "campaign/grid.h"
 #include "campaign/sieve.h"
 #include "campaign/tileop.h"
+#include "../../cpp-campaign-v2/src/sha256.h"
 
 namespace {
 
@@ -42,8 +44,12 @@ struct Config {
   bool require_full_bridge = false;
   std::vector<std::uint64_t> schedule_radii;
   std::optional<std::string> manifest_in;
+  std::optional<std::string> live_manifest_in;
   std::optional<std::string> prefix_witness_in;
   std::optional<std::string> manifest_out;
+  std::optional<std::string> live_manifest_out;
+  std::optional<std::string> last_band_summary_out;
+  std::optional<std::string> death_out;
   std::optional<std::string> progress_out;
   std::optional<std::uint64_t> target_a;
   std::optional<std::uint64_t> target_b;
@@ -147,6 +153,40 @@ struct RunnerInventorySummary {
   std::vector<lb_source::AtomId> max_norm_atom_ids;
 };
 
+struct RunnerDsu {
+  explicit RunnerDsu(std::size_t n) : parent(n), rank(n, 0) {
+    for (std::size_t i = 0; i < n; ++i) {
+      parent[i] = i;
+    }
+  }
+
+  std::size_t find(std::size_t x) {
+    while (parent[x] != x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+
+  void unite(std::size_t a, std::size_t b) {
+    a = find(a);
+    b = find(b);
+    if (a == b) {
+      return;
+    }
+    if (rank[a] < rank[b]) {
+      std::swap(a, b);
+    }
+    parent[b] = a;
+    if (rank[a] == rank[b]) {
+      ++rank[a];
+    }
+  }
+
+  std::vector<std::size_t> parent;
+  std::vector<std::uint8_t> rank;
+};
+
 enum class ManifestKind {
   kNone,
   kCoordinateCarry,
@@ -230,6 +270,9 @@ void usage(const char* prog) {
       << "  --manifest-in PATH    read an origin-prefix coordinate carry\n"
       << "                        manifest at --r-start and bridge it to\n"
       << "                        canonical TileOp port atoms\n"
+      << "  --live-manifest-in PATH\n"
+      << "                        read an LB_SOURCE_LIVE_HANDOFF_V1 checkpoint\n"
+      << "                        at --r-start and resume without fresh seeding\n"
       << "  --prefix-witness-in PATH\n"
       << "                        read diagnostic origin-prefix paths for\n"
       << "                        incoming source carry atoms\n"
@@ -237,6 +280,13 @@ void usage(const char* prog) {
       << "                        add a canonical coordinate target atom and\n"
       << "                        bridge it to its TileOp port component when seen\n"
       << "  --manifest-out PATH   write final carry manifest when source survives\n"
+      << "  --live-manifest-out PATH\n"
+      << "                        write final LB_SOURCE_LIVE_HANDOFF_V1 checkpoint\n"
+      << "                        when source survives\n"
+      << "  --last-band-summary-out PATH\n"
+      << "                        write the active last-band summary diagnostic\n"
+      << "  --death-out PATH      write previous-live + active-summary death\n"
+      << "                        diagnostic when terminal_source_dead is true\n"
       << "  --progress-out PATH   write one JSONL progress row per processed band\n";
 }
 
@@ -320,6 +370,12 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.manifest_in = value;
+    } else if (take_value("--live-manifest-in", value)) {
+      if (value.empty()) {
+        std::cerr << "--live-manifest-in must not be empty\n";
+        return false;
+      }
+      config.live_manifest_in = value;
     } else if (take_value("--prefix-witness-in", value)) {
       if (value.empty()) {
         std::cerr << "--prefix-witness-in must not be empty\n";
@@ -350,6 +406,24 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.manifest_out = value;
+    } else if (take_value("--live-manifest-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--live-manifest-out must not be empty\n";
+        return false;
+      }
+      config.live_manifest_out = value;
+    } else if (take_value("--last-band-summary-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--last-band-summary-out must not be empty\n";
+        return false;
+      }
+      config.last_band_summary_out = value;
+    } else if (take_value("--death-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--death-out must not be empty\n";
+        return false;
+      }
+      config.death_out = value;
     } else if (take_value("--progress-out", value)) {
       if (value.empty()) {
         std::cerr << "--progress-out must not be empty\n";
@@ -394,6 +468,15 @@ bool parse_args(int argc, char** argv, Config& config) {
   }
   if (config.seed_inner_flags && config.manifest_in.has_value()) {
     std::cerr << "--seed-inner-flags cannot be combined with --manifest-in\n";
+    return false;
+  }
+  if (config.seed_inner_flags && config.live_manifest_in.has_value()) {
+    std::cerr << "--seed-inner-flags cannot be combined with "
+                 "--live-manifest-in\n";
+    return false;
+  }
+  if (config.manifest_in.has_value() && config.live_manifest_in.has_value()) {
+    std::cerr << "--manifest-in cannot be combined with --live-manifest-in\n";
     return false;
   }
   if (config.prefix_witness_in.has_value() && !config.manifest_in.has_value()) {
@@ -483,6 +566,24 @@ lb_source::CarryManifest read_manifest_or_die(const std::string& path) {
     std::exit(EXIT_FAILURE);
   }
   return result.manifest;
+}
+
+lb_source::LiveHandoffV1 read_live_handoff_or_die(
+    const std::string& path,
+    const lb_source::LiveHandoffExpectedContext& expected) {
+  std::ifstream in(path);
+  if (!in) {
+    std::cerr << "cannot open --live-manifest-in path: " << path << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  const lb_source::LiveHandoffReadResult result =
+      lb_source::read_live_handoff(in, expected);
+  if (!result.accepted()) {
+    std::cerr << "invalid --live-manifest-in: " << result.diagnostic << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return result.handoff;
 }
 
 void fail_prefix_witness(const std::string& diagnostic) {
@@ -640,6 +741,12 @@ bool has_source_carry(const lb_source::SeparatorState& state) {
                    true) != state.source_bit_per_component.end();
 }
 
+bool has_source_carry(const lb_source::LiveSeparator& state) {
+  return std::find(state.source_bit_per_component.begin(),
+                   state.source_bit_per_component.end(),
+                   true) != state.source_bit_per_component.end();
+}
+
 std::uint64_t source_carry_atoms(const lb_source::SeparatorState& state) {
   std::uint64_t count = 0;
   for (std::size_t c = 0; c < state.component_partition.size(); ++c) {
@@ -781,6 +888,294 @@ void append_count_object(
     out << ':' << count;
   }
   out << '}';
+}
+
+std::string sha256_hex_string(const std::string& text) {
+  return campaign::detail::sha256_hex(text);
+}
+
+std::string diagnostic_schedule_digest_hex() {
+  return sha256_hex_string("lb_source_tileop_port_runner_live_schedule_v1");
+}
+
+lb_source::LiveHandoffV1 make_live_handoff(
+    std::uint64_t cut_radius,
+    std::string_view source_mode,
+    const lb_source::LiveSeparator& separator,
+    const std::optional<lb_source::LiveHandoffV1>& previous = std::nullopt) {
+  lb_source::LiveHandoffV1 handoff;
+  handoff.k_sq = static_cast<std::uint64_t>(campaign::k_sq_value);
+  handoff.cut_radius = cut_radius;
+  handoff.carry_width = lb_source::ceil_sqrt(handoff.k_sq);
+  handoff.source_mode = std::string(source_mode);
+  handoff.source_id = previous ? previous->source_id
+                               : "tileop_port_materialized_source_v1";
+  handoff.geometry_id = previous ? previous->geometry_id
+                                 : "gaussian_octant_tileop_port_v1";
+  handoff.build_id = previous ? previous->build_id : "local_campaign_build";
+  handoff.schedule_digest_algorithm =
+      previous ? previous->schedule_digest_algorithm
+               : "sha256:tileop_port_diagnostic_schedule_v1";
+  handoff.schedule_digest_hex =
+      previous ? previous->schedule_digest_hex
+               : diagnostic_schedule_digest_hex();
+  handoff.overflow_summary = previous ? previous->overflow_summary : "none";
+  handoff.separator = separator;
+  return lb_source::canonicalize_live_handoff(handoff);
+}
+
+lb_source::BridgeSafetyCounters bridge_safety_from_segment(
+    const PortManifestBridgeResult& bridge) {
+  lb_source::BridgeSafetyCounters counters;
+  counters.coordinate_carry_atoms_checked =
+      bridge.bridged_coordinate_carry_atoms +
+      bridge.unbridged_coordinate_carry_atoms;
+  counters.coordinate_carry_atoms_bridged =
+      bridge.bridged_coordinate_carry_atoms;
+  counters.coordinate_carry_atoms_unbridged =
+      bridge.unbridged_coordinate_carry_atoms;
+  counters.coordinate_carry_atoms_without_next_band_candidates =
+      bridge.unbridged_without_next_band_candidates;
+  counters.coordinate_carry_atoms_dead_end_candidates =
+      bridge.unbridged_dead_end_candidate_atoms;
+  counters.coordinate_carry_atoms_unsafe_candidates =
+      bridge.unbridged_unsafe_candidate_atoms;
+  counters.bridge_rejected_candidate_atoms =
+      bridge.bridge_rejected_candidate_atoms;
+  return counters;
+}
+
+void sort_unique_atom_ids(std::vector<lb_source::AtomId>& ids) {
+  std::sort(ids.begin(), ids.end());
+  ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+}
+
+void merge_component_max(
+    lb_source::LastBandComponentSummaryV1& component,
+    lb_source::AtomId id,
+    std::uint64_t norm_sq) {
+  if (component.max_support_atom_ids.empty() ||
+      norm_sq > component.max_support_norm_sq) {
+    component.max_support_norm_sq = norm_sq;
+    component.max_support_atom_ids = {id};
+  } else if (norm_sq == component.max_support_norm_sq) {
+    component.max_support_atom_ids.push_back(id);
+  }
+
+  const std::optional<lb_source::CoordinateAtom> coordinate =
+      lb_source::decode_coordinate_atom_id(id);
+  if (!coordinate.has_value() || coordinate->norm_sq != norm_sq) {
+    return;
+  }
+  if (component.max_coordinate_atom_ids.empty() ||
+      norm_sq > component.max_coordinate_norm_sq) {
+    component.max_coordinate_norm_sq = norm_sq;
+    component.max_coordinate_atom_ids = {id};
+  } else if (norm_sq == component.max_coordinate_norm_sq) {
+    component.max_coordinate_atom_ids.push_back(id);
+  }
+}
+
+std::optional<lb_source::LastBandReachabilitySummaryV1>
+make_active_band_summary(
+    const lb_source::LiveHandoffV1& previous_handoff,
+    const lb_source::BandInput& band,
+    const lb_source::LiveSeparator& outgoing,
+    std::uint64_t r_start,
+    std::uint64_t r_outer,
+    const PortManifestBridgeResult& segment_bridge) {
+  std::vector<lb_source::BandAtom> all_atoms = band.atoms;
+  std::unordered_map<lb_source::AtomId, std::size_t> index_by_id;
+  index_by_id.reserve(all_atoms.size() +
+                      previous_handoff.separator.carry_atoms.size());
+  for (std::size_t i = 0; i < all_atoms.size(); ++i) {
+    index_by_id.emplace(all_atoms[i].id, i);
+  }
+  for (const lb_source::CarryAtom& atom :
+       previous_handoff.separator.carry_atoms) {
+    if (index_by_id.find(atom.id) != index_by_id.end()) {
+      continue;
+    }
+    const std::size_t idx = all_atoms.size();
+    all_atoms.push_back({.id = atom.id,
+                         .norm_sq = atom.norm_sq,
+                         .certified_source = false,
+                         .allow_outer_overshoot_carry =
+                             lb_source::decode_port_atom_id(atom.id)
+                                 .has_value()});
+    index_by_id.emplace(atom.id, idx);
+  }
+  RunnerDsu dsu(all_atoms.size());
+  for (const auto& component :
+       previous_handoff.separator.component_partition) {
+    if (component.empty()) {
+      continue;
+    }
+    const auto first = index_by_id.find(component.front());
+    if (first == index_by_id.end()) {
+      return std::nullopt;
+    }
+    for (std::size_t i = 1; i < component.size(); ++i) {
+      const auto it = index_by_id.find(component[i]);
+      if (it == index_by_id.end()) {
+        return std::nullopt;
+      }
+      dsu.unite(first->second, it->second);
+    }
+  }
+  for (const auto& edge : band.edges) {
+    const auto lhs = index_by_id.find(edge.first);
+    const auto rhs = index_by_id.find(edge.second);
+    if (lhs == index_by_id.end() || rhs == index_by_id.end()) {
+      return std::nullopt;
+    }
+    dsu.unite(lhs->second, rhs->second);
+  }
+
+  std::map<std::size_t, lb_source::LastBandComponentSummaryV1>
+      component_by_root;
+  for (const lb_source::CarryAtom& atom :
+       previous_handoff.separator.carry_atoms) {
+    const auto it = index_by_id.find(atom.id);
+    if (it == index_by_id.end()) {
+      return std::nullopt;
+    }
+    component_by_root[dsu.find(it->second)].boundary_atoms.push_back(atom.id);
+  }
+  for (const lb_source::CarryAtom& atom : outgoing.carry_atoms) {
+    const auto it = index_by_id.find(atom.id);
+    if (it == index_by_id.end()) {
+      continue;
+    }
+    lb_source::LastBandComponentSummaryV1& component =
+        component_by_root[dsu.find(it->second)];
+    component.boundary_atoms.push_back(atom.id);
+    if (lb_source::decode_coordinate_atom_id(atom.id).has_value()) {
+      component.touches_outer_coordinate_carry = true;
+    } else if (lb_source::decode_port_atom_id(atom.id).has_value()) {
+      component.touches_port_overhang = true;
+    }
+  }
+  for (std::size_t i = 0; i < all_atoms.size(); ++i) {
+    const std::size_t root = dsu.find(i);
+    const auto component_it = component_by_root.find(root);
+    if (component_it == component_by_root.end()) {
+      continue;
+    }
+    merge_component_max(component_it->second, all_atoms[i].id,
+                        all_atoms[i].norm_sq);
+  }
+
+  const lb_source::BridgeSafetyCounters bridge_safety =
+      bridge_safety_from_segment(segment_bridge);
+  lb_source::LastBandReachabilitySummaryV1 summary;
+  summary.k_sq = previous_handoff.k_sq;
+  summary.r_start = r_start;
+  summary.r_outer = r_outer;
+  summary.carry_width = previous_handoff.carry_width;
+  summary.source_mode = previous_handoff.source_mode;
+  summary.source_id = previous_handoff.source_id;
+  summary.geometry_id = previous_handoff.geometry_id;
+  summary.build_id = previous_handoff.build_id;
+  summary.schedule_digest_algorithm =
+      previous_handoff.schedule_digest_algorithm;
+  summary.schedule_digest_hex = previous_handoff.schedule_digest_hex;
+  summary.overflow_summary = previous_handoff.overflow_summary;
+  summary.bridge_policy = "materialized_tileop_port_diagnostic";
+  summary.transfer_summary_present = true;
+  for (auto& [root, component] : component_by_root) {
+    (void)root;
+    sort_unique_atom_ids(component.boundary_atoms);
+    sort_unique_atom_ids(component.max_coordinate_atom_ids);
+    sort_unique_atom_ids(component.max_support_atom_ids);
+    // The materialized runner currently has aggregate bridge counters only.
+    // Attach them conservatively to every local component for non-claim output.
+    component.bridge_safety = bridge_safety;
+    summary.components.push_back(std::move(component));
+  }
+  return summary;
+}
+
+void append_bridge_safety_json(
+    std::ostream& out,
+    const lb_source::BridgeSafetyCounters& counters) {
+  out << "{\"coordinate_carry_atoms_checked\":"
+      << counters.coordinate_carry_atoms_checked
+      << ",\"coordinate_carry_atoms_bridged\":"
+      << counters.coordinate_carry_atoms_bridged
+      << ",\"coordinate_carry_atoms_unbridged\":"
+      << counters.coordinate_carry_atoms_unbridged
+      << ",\"coordinate_carry_atoms_without_next_band_candidates\":"
+      << counters.coordinate_carry_atoms_without_next_band_candidates
+      << ",\"coordinate_carry_atoms_dead_end_candidates\":"
+      << counters.coordinate_carry_atoms_dead_end_candidates
+      << ",\"coordinate_carry_atoms_unsafe_candidates\":"
+      << counters.coordinate_carry_atoms_unsafe_candidates
+      << ",\"bridge_rejected_candidate_atoms\":"
+      << counters.bridge_rejected_candidate_atoms << '}';
+}
+
+void append_last_band_summary_json(
+    std::ostream& out,
+    const lb_source::LastBandReachabilitySummaryV1& summary) {
+  out << "{\"schema\":\"lb_source_last_band_reachability_summary_v1\""
+      << ",\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\""
+      << ",\"k_sq\":" << summary.k_sq
+      << ",\"r_start\":" << summary.r_start
+      << ",\"r_outer\":" << summary.r_outer
+      << ",\"carry_width\":" << summary.carry_width
+      << ",\"source_mode\":";
+  append_json_string(out, summary.source_mode);
+  out << ",\"source_id\":";
+  append_json_string(out, summary.source_id);
+  out << ",\"geometry_id\":";
+  append_json_string(out, summary.geometry_id);
+  out << ",\"build_id\":";
+  append_json_string(out, summary.build_id);
+  out << ",\"schedule_digest_algorithm\":";
+  append_json_string(out, summary.schedule_digest_algorithm);
+  out << ",\"schedule_digest_hex\":";
+  append_json_string(out, summary.schedule_digest_hex);
+  out << ",\"overflow_summary\":";
+  append_json_string(out, summary.overflow_summary);
+  out << ",\"bridge_policy\":";
+  append_json_string(out, summary.bridge_policy);
+  out << ",\"transfer_summary_present\":"
+      << (summary.transfer_summary_present ? "true" : "false")
+      << ",\"components\":[";
+  for (std::size_t i = 0; i < summary.components.size(); ++i) {
+    if (i != 0) {
+      out << ',';
+    }
+    const lb_source::LastBandComponentSummaryV1& component =
+        summary.components[i];
+    out << "{\"boundary_atoms\":";
+    append_atom_id_array(out, component.boundary_atoms);
+    out << ",\"touches_outer_coordinate_carry\":"
+        << (component.touches_outer_coordinate_carry ? "true" : "false")
+        << ",\"touches_port_overhang\":"
+        << (component.touches_port_overhang ? "true" : "false")
+        << ",\"max_coordinate_norm_sq\":"
+        << component.max_coordinate_norm_sq
+        << ",\"max_coordinate_atom_ids\":";
+    append_atom_id_array(out, component.max_coordinate_atom_ids);
+    out << ",\"max_support_norm_sq\":" << component.max_support_norm_sq
+        << ",\"max_support_atom_ids\":";
+    append_atom_id_array(out, component.max_support_atom_ids);
+    out << ",\"bridge_safety\":";
+    append_bridge_safety_json(out, component.bridge_safety);
+    out << '}';
+  }
+  out << "],\"non_claim\":\"materialized runner summary only; not a "
+         "SOURCE_DEAD_CERT\"}";
+}
+
+std::string last_band_summary_to_json(
+    const lb_source::LastBandReachabilitySummaryV1& summary) {
+  std::ostringstream out;
+  append_last_band_summary_json(out, summary);
+  out << '\n';
+  return out.str();
 }
 
 void emit_phase_progress(std::ofstream& progress,
@@ -1637,6 +2032,29 @@ int main(int argc, char** argv) {
   std::map<std::pair<lb_source::AtomId, lb_source::AtomId>,
            std::vector<lb_source::CoordinateAtom>>
       coordinate_port_expansion_paths;
+  std::optional<lb_source::LiveHandoffV1> first_source_artifact;
+  std::optional<lb_source::LiveHandoffV1> previous_live_handoff;
+  std::optional<lb_source::LiveHandoffV1> current_live_handoff;
+  std::optional<lb_source::LastBandReachabilitySummaryV1>
+      active_band_summary;
+  std::optional<lb_source::LastBandReachabilitySummaryV1>
+      terminal_summary_if_dead;
+  std::optional<lb_source::LiveHandoffV1> terminal_previous_live_handoff;
+  std::optional<lb_source::LiveSeparator> live_incoming;
+  lb_source::LiveProcessResult live_last;
+  if (config.live_manifest_in.has_value()) {
+    lb_source::LiveHandoffExpectedContext expected;
+    expected.k_sq = static_cast<std::uint64_t>(campaign::k_sq_value);
+    expected.cut_radius = config.r_start;
+    expected.carry_width =
+        lb_source::ceil_sqrt(static_cast<std::uint64_t>(
+            campaign::k_sq_value));
+    previous_live_handoff =
+        read_live_handoff_or_die(*config.live_manifest_in, expected);
+    first_source_artifact = previous_live_handoff;
+    live_incoming = previous_live_handoff->separator;
+    source_mode = previous_live_handoff->source_mode;
+  }
   if (config.manifest_in.has_value()) {
     const auto manifest_read_begin = std::chrono::steady_clock::now();
     emit_phase_progress(progress, "manifest_read", "begin",
@@ -1750,9 +2168,33 @@ int main(int argc, char** argv) {
   std::uint64_t seam_edges = 0;
   std::map<lb_source::AtomId, std::uint64_t> norm_by_id;
   std::uint64_t processed_outer = config.r_start;
+  if (live_incoming.has_value()) {
+    incoming = lb_source::separator_from_live_separator(*live_incoming);
+    add_partition_adjacency(provenance_adjacency, *incoming);
+    for (const lb_source::CarryAtom& atom : incoming->carry_atoms) {
+      norm_by_id.emplace(atom.id, atom.norm_sq);
+    }
+    for (std::size_t c = 0; c < incoming->component_partition.size(); ++c) {
+      if (!incoming->source_bit_per_component[c]) {
+        continue;
+      }
+      manifest_source_carry_atoms +=
+          incoming->component_partition[c].size();
+      provenance_source_ids.insert(
+          provenance_source_ids.end(),
+          incoming->component_partition[c].begin(),
+          incoming->component_partition[c].end());
+    }
+  }
   if (coordinate_manifest.has_value() &&
       manifest_kind == ManifestKind::kPortCarry) {
     incoming = coordinate_manifest->separator;
+    if (!previous_live_handoff.has_value()) {
+      previous_live_handoff = make_live_handoff(
+          config.r_start, source_mode,
+          lb_source::live_separator_from_separator(*incoming));
+      first_source_artifact = previous_live_handoff;
+    }
     add_partition_adjacency(provenance_adjacency,
                             coordinate_manifest->separator);
     for (const lb_source::CarryAtom& atom :
@@ -1877,6 +2319,7 @@ int main(int argc, char** argv) {
                         elapsed_ms(graph_done, target_bridge_done));
     auto bridge_done = target_bridge_done;
     PortManifestBridgeResult segment_bridge;
+    lb_source::BandInput processed_band_for_summary = band;
     if (coordinate_manifest.has_value() &&
         manifest_kind == ManifestKind::kCoordinateCarry &&
         bands_processed == 0) {
@@ -1908,6 +2351,13 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
       }
       incoming = coordinate_manifest->separator;
+      if (!previous_live_handoff.has_value()) {
+        previous_live_handoff = make_live_handoff(
+            previous_outer, source_mode,
+            lb_source::live_separator_from_separator(*incoming));
+        first_source_artifact = previous_live_handoff;
+      }
+      processed_band_for_summary = bridged_band;
       emit_phase_progress(progress, "source_process", "begin", segment,
                           previous_outer, outer,
                           std::numeric_limits<std::uint64_t>::max());
@@ -1983,6 +2433,49 @@ int main(int argc, char** argv) {
             provenance_source_ids.push_back(atom.id);
           }
         }
+      }
+    }
+    const std::optional<lb_source::LiveSeparator> live_input =
+        previous_live_handoff.has_value()
+            ? std::optional<lb_source::LiveSeparator>(
+                  previous_live_handoff->separator)
+            : std::nullopt;
+    live_last = lb_source::process_band_live(
+        processed_band_for_summary, live_input,
+        {.max_atoms = config.max_atoms,
+         .max_carry_atoms = config.max_atoms,
+         .max_components = config.max_atoms,
+         .max_inventory_atoms = config.max_atoms});
+    if (live_last.reject != last.reject ||
+        live_last.diagnostic != last.diagnostic ||
+        live_last.carry_width != last.carry_width ||
+        live_last.terminal_source_dead != last.terminal_source_dead ||
+        (live_last.accepted() &&
+         live_last.outgoing !=
+             lb_source::live_separator_from_separator(last.outgoing))) {
+      std::cerr << "live process result diverged from materialized legacy "
+                   "runner state\n";
+      return EXIT_FAILURE;
+    }
+    active_band_summary.reset();
+    if (live_last.accepted() && previous_live_handoff.has_value()) {
+      active_band_summary = make_active_band_summary(
+          *previous_live_handoff, processed_band_for_summary,
+          live_last.outgoing, previous_outer, outer, segment_bridge);
+      if (!active_band_summary.has_value()) {
+        std::cerr << "failed to construct active last-band summary\n";
+        return EXIT_FAILURE;
+      }
+    }
+    if (live_last.accepted()) {
+      current_live_handoff = make_live_handoff(
+          outer, source_mode, live_last.outgoing, previous_live_handoff);
+      if (!first_source_artifact.has_value()) {
+        first_source_artifact = current_live_handoff;
+      }
+      if (live_last.terminal_source_dead) {
+        terminal_previous_live_handoff = previous_live_handoff;
+        terminal_summary_if_dead = active_band_summary;
       }
     }
     const auto process_done = std::chrono::steady_clock::now();
@@ -2098,6 +2591,10 @@ int main(int argc, char** argv) {
       break;
     }
     incoming = last.outgoing;
+    if (current_live_handoff.has_value()) {
+      previous_live_handoff = current_live_handoff;
+      live_incoming = current_live_handoff->separator;
+    }
     if (config.stop_after_bands != 0 &&
         bands_processed >= config.stop_after_bands) {
       break;
@@ -2122,6 +2619,102 @@ int main(int argc, char** argv) {
                       static_cast<std::uint64_t>(campaign::k_sq_value),
                       processed_outer, last));
     manifest_written = true;
+  }
+
+  bool live_manifest_written = false;
+  if (config.live_manifest_out.has_value()) {
+    if (!live_last.accepted() || live_last.terminal_source_dead ||
+        !current_live_handoff.has_value() ||
+        !has_source_carry(current_live_handoff->separator)) {
+      std::cerr << "--live-manifest-out requires accepted live source carry\n";
+      return EXIT_FAILURE;
+    }
+    std::ofstream manifest(*config.live_manifest_out);
+    if (!manifest) {
+      std::cerr << "cannot open --live-manifest-out path: "
+                << *config.live_manifest_out << "\n";
+      return EXIT_FAILURE;
+    }
+    lb_source::write_live_handoff(manifest, *current_live_handoff);
+    live_manifest_written = true;
+  }
+
+  bool last_band_summary_written = false;
+  if (config.last_band_summary_out.has_value()) {
+    if (!active_band_summary.has_value()) {
+      std::cerr << "--last-band-summary-out requires an active band summary\n";
+      return EXIT_FAILURE;
+    }
+    std::ofstream summary(*config.last_band_summary_out);
+    if (!summary) {
+      std::cerr << "cannot open --last-band-summary-out path: "
+                << *config.last_band_summary_out << "\n";
+      return EXIT_FAILURE;
+    }
+    summary << last_band_summary_to_json(*active_band_summary);
+    last_band_summary_written = true;
+  }
+
+  bool death_written = false;
+  if (config.death_out.has_value()) {
+    if (!last.accepted() || !last.terminal_source_dead) {
+      std::cerr << "--death-out requires terminal_source_dead=true; current "
+                   "terminal_source_dead is false\n";
+      return EXIT_FAILURE;
+    }
+    if (!terminal_previous_live_handoff.has_value()) {
+      std::cerr << "--death-out requires previous live handoff; refusing "
+                   "progress-row-only death evidence\n";
+      return EXIT_FAILURE;
+    }
+    if (!terminal_summary_if_dead.has_value()) {
+      std::cerr << "--death-out requires active band summary; refusing "
+                   "progress-row-only death evidence\n";
+      return EXIT_FAILURE;
+    }
+    const lb_source::LastBandSummaryApplyResult replay =
+        lb_source::apply_last_band_summary(*terminal_previous_live_handoff,
+                                           *terminal_summary_if_dead);
+    if (!replay.accepted() || !replay.terminal_source_dead) {
+      std::cerr << "--death-out replay of previous live handoff plus active "
+                   "summary did not confirm terminal source death: "
+                << replay.diagnostic << "\n";
+      return EXIT_FAILURE;
+    }
+    const std::string previous_text =
+        lb_source::live_handoff_to_string(*terminal_previous_live_handoff);
+    const std::string summary_text =
+        last_band_summary_to_json(*terminal_summary_if_dead);
+    const std::string previous_hash = sha256_hex_string(previous_text);
+    const std::string summary_hash = sha256_hex_string(summary_text);
+    std::ofstream death(*config.death_out);
+    if (!death) {
+      std::cerr << "cannot open --death-out path: " << *config.death_out
+                << "\n";
+      return EXIT_FAILURE;
+    }
+    death << "{\"schema\":\"lb_source_tileop_port_death_diagnostic_v1\""
+          << ",\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\""
+          << ",\"terminal_source_dead\":true"
+          << ",\"previous_live_handoff_hash_algorithm\":\"sha256\""
+          << ",\"previous_live_handoff_sha256\":\"" << previous_hash
+          << "\""
+          << ",\"active_band_summary_hash_algorithm\":\"sha256\""
+          << ",\"active_band_summary_sha256\":\"" << summary_hash << "\""
+          << ",\"coordinate_metrics\":{\"max_source_coordinate_norm_sq\":"
+          << replay.max_source_coordinate_norm_sq
+          << ",\"max_source_coordinate_atom_ids\":";
+    append_atom_id_array(death, replay.max_source_coordinate_atom_ids);
+    death << "},\"port_support_metrics\":{\"max_source_support_norm_sq\":"
+          << replay.max_source_support_norm_sq
+          << ",\"max_source_support_atom_ids\":";
+    append_atom_id_array(death, replay.max_source_support_atom_ids);
+    death << "},\"bridge_counters\":";
+    append_bridge_safety_json(death, replay.source_bridge_safety);
+    death << ",\"non_claim\":\"diagnostic death artifact only; previous "
+             "handoff and active summary are required; not a claim-grade "
+             "source-dead certificate\"}\n";
+    death_written = true;
   }
 
   const bool accepted = last.accepted();
@@ -2311,6 +2904,18 @@ int main(int argc, char** argv) {
   std::cout
             << ",\"manifest_written\":"
             << (manifest_written ? "true" : "false");
+  if (config.live_manifest_out.has_value()) {
+    std::cout << ",\"live_manifest_written\":"
+              << (live_manifest_written ? "true" : "false");
+  }
+  if (config.last_band_summary_out.has_value()) {
+    std::cout << ",\"last_band_summary_written\":"
+              << (last_band_summary_written ? "true" : "false");
+  }
+  if (config.death_out.has_value()) {
+    std::cout << ",\"death_written\":"
+              << (death_written ? "true" : "false");
+  }
   if (accepted && last.terminal_source_dead) {
     std::cout << ",\"terminal_source_inventory_accumulator\":";
     append_terminal_inventory_accumulator(std::cout, inventory_summary);
