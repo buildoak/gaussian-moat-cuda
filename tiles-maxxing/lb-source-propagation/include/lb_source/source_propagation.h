@@ -29,6 +29,14 @@ struct SeparatorState {
                          const SeparatorState&) = default;
 };
 
+struct LiveSeparator {
+  std::vector<CarryAtom> carry_atoms;
+  std::vector<std::vector<AtomId>> component_partition;
+  std::vector<bool> source_bit_per_component;
+
+  friend bool operator==(const LiveSeparator&, const LiveSeparator&) = default;
+};
+
 struct BandAtom {
   AtomId id = 0;
   std::uint64_t norm_sq = 0;
@@ -77,6 +85,16 @@ struct ProcessResult {
   SeparatorState outgoing;
   bool terminal_source_dead = false;
   std::vector<AtomId> terminal_source_inventory;
+
+  bool accepted() const noexcept { return reject == RejectReason::kNone; }
+};
+
+struct LiveProcessResult {
+  RejectReason reject = RejectReason::kNone;
+  std::string diagnostic;
+  std::uint64_t carry_width = 0;
+  LiveSeparator outgoing;
+  bool terminal_source_dead = false;
 
   bool accepted() const noexcept { return reject == RejectReason::kNone; }
 };
@@ -186,6 +204,14 @@ std::optional<PortAtom> decode_port_atom_id(AtomId id);
 
 SeparatorState canonicalize_separator(const SeparatorState& state);
 
+LiveSeparator live_separator_from_separator(const SeparatorState& state);
+
+SeparatorState separator_from_live_separator(const LiveSeparator& state);
+
+LiveSeparator canonicalize_live_separator(const LiveSeparator& state);
+
+std::string validate_live_separator(const LiveSeparator& state);
+
 SourceSeedApplyResult apply_source_seeds(BandInput& band,
                                          const std::vector<SourceSeed>& seeds);
 
@@ -212,6 +238,11 @@ InventorySummary summarize_inventory(const std::vector<AtomId>& atom_ids);
 ProcessResult process_band(const BandInput& band,
                            const std::optional<SeparatorState>& incoming,
                            const ProcessOptions& options = {});
+
+LiveProcessResult process_band_live(
+    const BandInput& band,
+    const std::optional<LiveSeparator>& incoming,
+    const ProcessOptions& options = {});
 
 ProcessResult process_bands(const std::vector<BandInput>& bands,
                             const std::optional<SeparatorState>& incoming = {},

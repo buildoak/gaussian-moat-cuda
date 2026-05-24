@@ -14,6 +14,8 @@ using lb_source::AtomId;
 using lb_source::BandAtom;
 using lb_source::BandInput;
 using lb_source::CarryAtom;
+using lb_source::LiveProcessResult;
+using lb_source::LiveSeparator;
 using lb_source::ProcessResult;
 using lb_source::RejectReason;
 using lb_source::SeparatorState;
@@ -75,6 +77,16 @@ void expect_same_separator(const ProcessResult& stitched,
   CHECK_EQ(stitched.terminal_source_dead, big.terminal_source_dead);
   CHECK_EQ(stitched.terminal_source_inventory,
            big.terminal_source_inventory);
+}
+
+void expect_live_projection_matches_legacy(const LiveProcessResult& live,
+                                           const ProcessResult& legacy) {
+  CHECK_TRUE(live.accepted());
+  CHECK_TRUE(legacy.accepted());
+  CHECK_EQ(live.carry_width, legacy.carry_width);
+  CHECK_EQ(live.outgoing, lb_source::live_separator_from_separator(
+                              legacy.outgoing));
+  CHECK_EQ(live.terminal_source_dead, legacy.terminal_source_dead);
 }
 
 bool component_has_source_bit(const SeparatorState& state,
@@ -318,6 +330,142 @@ void test_component_inventory_cap_rejects_before_unbounded_growth() {
   CHECK_EQ(result.reject, RejectReason::kOverflow);
   CHECK_EQ(result.diagnostic,
            std::string("component inventory exceeds source cap"));
+}
+
+void test_live_projection_matches_legacy_without_inventory() {
+  const BandInput first{
+      .k_sq = 36,
+      .outer_radius = 10,
+      .atoms = {{1, 25, true}, {2, 100, false}, {3, 100, false}},
+      .edges = {{1, 2}},
+  };
+  const BandInput second{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{4, 400, false}, {5, 400, false}},
+      .edges = {{2, 3}, {3, 4}},
+  };
+
+  const ProcessResult legacy_first =
+      lb_source::process_band(first, std::nullopt);
+  const LiveProcessResult live_first =
+      lb_source::process_band_live(first, std::nullopt);
+  expect_live_projection_matches_legacy(live_first, legacy_first);
+
+  const ProcessResult legacy_second =
+      lb_source::process_band(second, legacy_first.outgoing);
+  const LiveProcessResult live_second = lb_source::process_band_live(
+      second, lb_source::live_separator_from_separator(legacy_first.outgoing));
+  expect_live_projection_matches_legacy(live_second, legacy_second);
+
+  const SeparatorState projected =
+      lb_source::separator_from_live_separator(live_second.outgoing);
+  CHECK_TRUE(projected.component_inventory.empty());
+}
+
+void test_live_empty_inventory_bypasses_inventory_cap() {
+  LiveSeparator incoming;
+  incoming.carry_atoms = {{2, 100}, {3, 100}};
+  incoming.component_partition = {{2, 3}};
+  incoming.source_bit_per_component = {true};
+
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{4, 400, false}},
+      .edges = {{3, 4}},
+  };
+  lb_source::ProcessOptions options;
+  options.max_atoms = 16;
+  options.max_carry_atoms = 16;
+  options.max_components = 16;
+  options.max_inventory_atoms = 0;
+
+  const LiveProcessResult live =
+      lb_source::process_band_live(band, incoming, options);
+  CHECK_TRUE(live.accepted());
+  CHECK_EQ(live.outgoing, (LiveSeparator{
+                              .carry_atoms = {{4, 400}},
+                              .component_partition = {{4}},
+                              .source_bit_per_component = {true},
+                          }));
+  CHECK_TRUE(lb_source::separator_from_live_separator(live.outgoing)
+                 .component_inventory.empty());
+}
+
+void test_live_still_enforces_non_inventory_caps() {
+  LiveSeparator incoming;
+  incoming.carry_atoms = {{2, 100}};
+  incoming.component_partition = {{2}};
+  incoming.source_bit_per_component = {true};
+
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{4, 400, false}},
+      .edges = {{2, 4}},
+  };
+  lb_source::ProcessOptions options;
+  options.max_atoms = 16;
+  options.max_carry_atoms = 0;
+  options.max_components = 16;
+  options.max_inventory_atoms = 1;
+
+  const LiveProcessResult result =
+      lb_source::process_band_live(band, incoming, options);
+  CHECK_EQ(result.reject, RejectReason::kOverflow);
+  CHECK_EQ(result.diagnostic,
+           std::string("separator state exceeds source caps"));
+}
+
+void test_live_terminal_death_drops_listed_inventory() {
+  const BandInput first{
+      .k_sq = 36,
+      .outer_radius = 10,
+      .atoms = {{1, 25, true}, {2, 100, false}},
+      .edges = {{1, 2}},
+  };
+  const BandInput second{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{9, 400, false}},
+      .edges = {},
+  };
+
+  const ProcessResult legacy_first =
+      lb_source::process_band(first, std::nullopt);
+  CHECK_TRUE(legacy_first.accepted());
+  const ProcessResult legacy_second =
+      lb_source::process_band(second, legacy_first.outgoing);
+  const LiveProcessResult live_second = lb_source::process_band_live(
+      second, lb_source::live_separator_from_separator(legacy_first.outgoing));
+
+  expect_live_projection_matches_legacy(live_second, legacy_second);
+  CHECK_TRUE(live_second.terminal_source_dead);
+  CHECK_TRUE(lb_source::separator_from_live_separator(live_second.outgoing)
+                 .component_inventory.empty());
+}
+
+void test_live_rejects_fresh_source_with_incoming_handoff() {
+  LiveSeparator incoming;
+  incoming.carry_atoms = {{2, 100}};
+  incoming.component_partition = {{2}};
+  incoming.source_bit_per_component = {true};
+
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{4, 400, true}},
+      .edges = {{2, 4}},
+  };
+
+  const LiveProcessResult result =
+      lb_source::process_band_live(band, incoming);
+  CHECK_EQ(result.reject, RejectReason::kMalformed);
+  CHECK_EQ(result.diagnostic,
+           std::string(
+               "fresh certified source is not allowed with incoming live "
+               "handoff"));
 }
 
 void test_overflow_reject_is_hard() {
@@ -703,6 +851,16 @@ int main() {
       test_process_band_canonicalizes_unsorted_incoming_inventory);
   run("component_inventory_cap_rejects_before_unbounded_growth",
       test_component_inventory_cap_rejects_before_unbounded_growth);
+  run("live_projection_matches_legacy_without_inventory",
+      test_live_projection_matches_legacy_without_inventory);
+  run("live_empty_inventory_bypasses_inventory_cap",
+      test_live_empty_inventory_bypasses_inventory_cap);
+  run("live_still_enforces_non_inventory_caps",
+      test_live_still_enforces_non_inventory_caps);
+  run("live_terminal_death_drops_listed_inventory",
+      test_live_terminal_death_drops_listed_inventory);
+  run("live_rejects_fresh_source_with_incoming_handoff",
+      test_live_rejects_fresh_source_with_incoming_handoff);
   run("overflow_reject_is_hard", test_overflow_reject_is_hard);
   run("k32_ceil_sqrt_carry_width_is_six",
       test_k32_ceil_sqrt_carry_width_is_six);

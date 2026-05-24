@@ -65,6 +65,20 @@ ProcessResult reject(RejectReason reason, std::string diagnostic,
   return result;
 }
 
+enum class InventoryMode {
+  kCollect,
+  kFrontierOnly,
+};
+
+LiveProcessResult live_reject(RejectReason reason, std::string diagnostic,
+                              std::uint64_t carry_width = 0) {
+  LiveProcessResult result;
+  result.reject = reason;
+  result.diagnostic = std::move(diagnostic);
+  result.carry_width = carry_width;
+  return result;
+}
+
 bool lexicographic_component_less(const std::vector<AtomId>& a,
                                   const std::vector<AtomId>& b) {
   return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
@@ -532,6 +546,95 @@ SeparatorState canonicalize_separator(const SeparatorState& state) {
   return out;
 }
 
+LiveSeparator canonicalize_live_separator(const LiveSeparator& state) {
+  LiveSeparator out;
+  out.carry_atoms = state.carry_atoms;
+  std::sort(out.carry_atoms.begin(), out.carry_atoms.end(),
+            [](const CarryAtom& a, const CarryAtom& b) {
+              if (a.id != b.id) {
+                return a.id < b.id;
+              }
+              return a.norm_sq < b.norm_sq;
+            });
+
+  std::vector<std::pair<std::vector<AtomId>, bool>> components;
+  components.reserve(state.component_partition.size());
+  for (std::size_t i = 0; i < state.component_partition.size(); ++i) {
+    std::vector<AtomId> component = state.component_partition[i];
+    std::sort(component.begin(), component.end());
+    component.erase(std::unique(component.begin(), component.end()),
+                    component.end());
+    const bool source =
+        i < state.source_bit_per_component.size()
+            ? state.source_bit_per_component[i]
+            : false;
+    components.push_back({std::move(component), source});
+  }
+
+  std::sort(components.begin(), components.end(),
+            [](const auto& a, const auto& b) {
+              return lexicographic_component_less(a.first, b.first);
+            });
+
+  out.component_partition.reserve(components.size());
+  out.source_bit_per_component.reserve(components.size());
+  for (auto& [component, source] : components) {
+    out.component_partition.push_back(std::move(component));
+    out.source_bit_per_component.push_back(source);
+  }
+  return out;
+}
+
+std::string validate_live_separator(const LiveSeparator& state) {
+  if (state.component_partition.size() !=
+      state.source_bit_per_component.size()) {
+    return "source-bit count does not match component count";
+  }
+
+  std::set<AtomId> carry_atoms;
+  for (const CarryAtom& atom : state.carry_atoms) {
+    if (!carry_atoms.insert(atom.id).second) {
+      return "duplicate carry atom";
+    }
+  }
+
+  std::set<AtomId> partition_atoms;
+  for (const auto& component : state.component_partition) {
+    if (component.empty()) {
+      return "empty component";
+    }
+    for (const AtomId id : component) {
+      if (carry_atoms.find(id) == carry_atoms.end()) {
+        return "component references non-carry atom";
+      }
+      if (!partition_atoms.insert(id).second) {
+        return "carry atom appears in multiple components";
+      }
+    }
+  }
+  if (partition_atoms != carry_atoms) {
+    return "component partition does not cover all carry atoms";
+  }
+  return "";
+}
+
+LiveSeparator live_separator_from_separator(const SeparatorState& state) {
+  LiveSeparator live;
+  live.carry_atoms = state.carry_atoms;
+  live.component_partition = state.component_partition;
+  live.source_bit_per_component = state.source_bit_per_component;
+  return canonicalize_live_separator(live);
+}
+
+SeparatorState separator_from_live_separator(const LiveSeparator& state) {
+  const LiveSeparator canonical = canonicalize_live_separator(state);
+  SeparatorState separator;
+  separator.carry_atoms = canonical.carry_atoms;
+  separator.component_partition = canonical.component_partition;
+  separator.source_bit_per_component = canonical.source_bit_per_component;
+  return separator;
+}
+
 SourceSeedApplyResult apply_source_seeds(BandInput& band,
                                          const std::vector<SourceSeed>& seeds) {
   SourceSeedApplyResult result;
@@ -827,10 +930,14 @@ std::string source_certificate_draft_json(
   return out.str();
 }
 
-ProcessResult process_band(const BandInput& band,
-                           const std::optional<SeparatorState>& incoming,
-                           const ProcessOptions& options) {
+namespace {
+
+ProcessResult process_band_impl(const BandInput& band,
+                                const std::optional<SeparatorState>& incoming,
+                                const ProcessOptions& options,
+                                InventoryMode inventory_mode) {
   const std::uint64_t carry_width = ceil_sqrt(band.k_sq);
+  const bool collect_inventory = inventory_mode == InventoryMode::kCollect;
 
   if (band.force_overflow) {
     return reject(RejectReason::kOverflow, "band marked overflow", carry_width);
@@ -995,7 +1102,7 @@ ProcessResult process_band(const BandInput& band,
   for (std::size_t i = 0; i < all_atoms.size(); ++i) {
     norm_by_id.emplace(all_atoms[i].id, all_atoms[i].norm_sq);
     const std::size_t root = dsu.find(i);
-    if (i < band.atoms.size()) {
+    if (collect_inventory && i < band.atoms.size()) {
       inventory_by_root[root].push_back(all_atoms[i].id);
     }
     if (in_final_carry_window(
@@ -1004,11 +1111,13 @@ ProcessResult process_band(const BandInput& band,
       carry_by_root[root].push_back(all_atoms[i].id);
     }
   }
-  for (auto& [root, inventory] : inventory_by_root) {
-    (void)root;
-    sort_unique_atom_ids(inventory);
+  if (collect_inventory) {
+    for (auto& [root, inventory] : inventory_by_root) {
+      (void)root;
+      sort_unique_atom_ids(inventory);
+    }
   }
-  if (incoming) {
+  if (collect_inventory && incoming) {
     for (std::size_t c = 0; c < incoming->component_partition.size(); ++c) {
       const AtomId id = incoming->component_partition[c].front();
       const auto it = index_by_id.find(id);
@@ -1035,19 +1144,28 @@ ProcessResult process_band(const BandInput& band,
     }
     result.outgoing.component_partition.push_back(ids);
     result.outgoing.source_bit_per_component.push_back(root_is_source[root]);
-    result.outgoing.component_inventory.push_back(inventory_by_root[root]);
+    if (collect_inventory) {
+      result.outgoing.component_inventory.push_back(inventory_by_root[root]);
+    }
     for (const AtomId id : ids) {
       result.outgoing.carry_atoms.push_back({id, norm_by_id.at(id)});
     }
   }
 
-  result.outgoing = canonicalize_separator(result.outgoing);
+  if (collect_inventory) {
+    result.outgoing = canonicalize_separator(result.outgoing);
+  } else {
+    result.outgoing =
+        separator_from_live_separator(live_separator_from_separator(
+            result.outgoing));
+  }
   if (result.outgoing.carry_atoms.size() > options.max_carry_atoms ||
       result.outgoing.component_partition.size() > options.max_components) {
     return reject(RejectReason::kOverflow,
                   "separator state exceeds source caps", carry_width);
   }
-  if (inventory_payload_exceeds_cap(inventory_by_root,
+  if (collect_inventory &&
+      inventory_payload_exceeds_cap(inventory_by_root,
                                     options.max_inventory_atoms)) {
     return reject(RejectReason::kOverflow,
                   "component inventory exceeds source cap", carry_width);
@@ -1058,7 +1176,7 @@ ProcessResult process_band(const BandInput& band,
                 result.outgoing.source_bit_per_component.end(),
                 true) != result.outgoing.source_bit_per_component.end();
   result.terminal_source_dead = any_source && !has_source_carry;
-  if (result.terminal_source_dead) {
+  if (collect_inventory && result.terminal_source_dead) {
     std::vector<AtomId> source_inventory;
     for (const auto& [root, inventory] : inventory_by_root) {
       if (root_is_source[root]) {
@@ -1079,6 +1197,57 @@ ProcessResult process_band(const BandInput& band,
         source_inventory.end());
     result.terminal_source_inventory = std::move(source_inventory);
   }
+  return result;
+}
+
+}  // namespace
+
+ProcessResult process_band(const BandInput& band,
+                           const std::optional<SeparatorState>& incoming,
+                           const ProcessOptions& options) {
+  return process_band_impl(band, incoming, options, InventoryMode::kCollect);
+}
+
+LiveProcessResult process_band_live(
+    const BandInput& band,
+    const std::optional<LiveSeparator>& incoming,
+    const ProcessOptions& options) {
+  const std::uint64_t carry_width = ceil_sqrt(band.k_sq);
+  std::optional<SeparatorState> legacy_incoming;
+
+  if (incoming) {
+    for (const BandAtom& atom : band.atoms) {
+      if (atom.certified_source) {
+        return live_reject(
+            RejectReason::kMalformed,
+            "fresh certified source is not allowed with incoming live handoff",
+            carry_width);
+      }
+    }
+
+    const std::string validation = validate_live_separator(*incoming);
+    if (!validation.empty()) {
+      return live_reject(RejectReason::kMalformed,
+                         "incoming live separator " + validation,
+                         carry_width);
+    }
+    const LiveSeparator canonical = canonicalize_live_separator(*incoming);
+    legacy_incoming = separator_from_live_separator(canonical);
+  }
+
+  const ProcessResult legacy =
+      process_band_impl(band, legacy_incoming, options,
+                        InventoryMode::kFrontierOnly);
+
+  LiveProcessResult result;
+  result.reject = legacy.reject;
+  result.diagnostic = legacy.diagnostic;
+  result.carry_width = legacy.carry_width;
+  result.terminal_source_dead = legacy.terminal_source_dead;
+  if (!legacy.accepted()) {
+    return result;
+  }
+  result.outgoing = live_separator_from_separator(legacy.outgoing);
   return result;
 }
 
