@@ -501,6 +501,65 @@ Phase 0 through Phase 5 pass locally, work is committed in scoped commits, and
 PLAN.md is updated with any deviations.
 ```
 
+## Execution Record
+
+Status: Phase 0 through Phase 5 implemented locally on 2026-05-24.
+
+Scoped commits:
+
+- `e33bd7c` - Phase 1, centralized `source_tileop_port_runner` v1 carry
+  manifest parsing through `lb_source::read_carry_manifest`.
+- `370de09` - Phase 2, added `LiveSeparator`, live adapters, and
+  `process_band_live`; coordinator repaired the implementation so the live path
+  uses a frontier-only core instead of building historical inventories with a
+  disabled cap.
+- `ef4953c` - Phase 3, added additive `LB_SOURCE_LIVE_HANDOFF_V1` I/O and
+  validation without changing `LB_SOURCE_CARRY_MANIFEST_V1`.
+- `d0ac1e2` - Phase 4, added `LastBandReachabilitySummaryV1` and
+  `apply_last_band_summary`; coordinator added a guard requiring summaries to
+  cover every incoming live carry atom.
+- `ad867c5` - Phase 5, added opt-in materialized runner live artifacts:
+  `--live-manifest-in`, `--live-manifest-out`,
+  `--last-band-summary-out`, and `--death-out`.
+
+Local evidence recorded during execution:
+
+- Phase 0 baseline:
+  `check_phase1_parity_gate.sh --repo "$PWD"` passed;
+  `check_phase1_local_gates.sh --repo "$PWD" --k-sq 26` passed.
+- Phase 2 repair build:
+  `/tmp/gm-lbsp-phase2-fixed/source_prop_tests` passed and
+  `ctest --test-dir /tmp/gm-lbsp-phase2-fixed --output-on-failure` passed
+  `31/31`.
+- Phase 3 build:
+  `/tmp/gm-lbsp-phase3/source_prop_tests` passed and
+  `ctest --test-dir /tmp/gm-lbsp-phase3 --output-on-failure` passed `31/31`.
+- Phase 4 build:
+  `/tmp/gm-lbsp-phase4/source_prop_tests` passed. A full CTest run exposed an
+  intermittent `k26_full_run_harness` failure; the harness passed when rerun
+  alone and when rerun with `k26_full_run_bundle_checker`.
+- Phase 5 build:
+  `tests/test_tileop_port_runner_resume.sh /tmp/gm-lbsp-phase5/source_tileop_port_runner`
+  passed and `ctest --test-dir /tmp/gm-lbsp-phase5 --output-on-failure` passed
+  `31/31`.
+
+Intentional deviations and limits:
+
+- The materialized runner still preserves legacy `--manifest-in/out` behavior
+  and legacy diagnostic inventory outputs. The new live frontier artifacts are
+  opt-in and carry only live separator state; the W-scale no-inventory hot path
+  is the live API plus future streaming runner, not the legacy v1 carry manifest
+  path.
+- `LastBandReachabilitySummaryV1` has a core apply API, but Phase 5 writes the
+  materialized summary as runner-local diagnostic JSON. A claim-grade independent
+  summary schema/checker remains Phase 6 work.
+- The materialized runner has aggregate bridge counters, not exact per-local-
+  component bridge counters, so the runner attaches aggregate counters
+  conservatively to every local summary component. This is non-claim diagnostic
+  evidence only.
+- No Vast, 4090, paid remote validation, CUDA validation, Phase 6 independent
+  verifier, or claim-barrier work was run in this goal.
+
 Second goal:
 
 ```text
