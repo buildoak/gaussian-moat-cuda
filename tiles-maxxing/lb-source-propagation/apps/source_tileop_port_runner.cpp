@@ -476,103 +476,13 @@ lb_source::CarryManifest read_manifest_or_die(const std::string& path) {
     std::exit(EXIT_FAILURE);
   }
 
-  const auto fail = [](const std::string& diagnostic) {
-    std::cerr << "invalid --manifest-in: " << diagnostic << "\n";
+  const lb_source::CarryManifestReadResult result =
+      lb_source::read_carry_manifest(in);
+  if (!result.accepted()) {
+    std::cerr << "invalid --manifest-in: " << result.diagnostic << "\n";
     std::exit(EXIT_FAILURE);
-  };
-  const auto expect = [&](std::string_view expected) {
-    std::string token;
-    if (!(in >> token) || token != expected) {
-      fail("missing " + std::string(expected));
-    }
-  };
-
-  lb_source::CarryManifest manifest;
-  expect("LB_SOURCE_CARRY_MANIFEST_V1");
-  expect("k_sq");
-  if (!(in >> manifest.k_sq)) fail("missing or invalid k_sq");
-  expect("outer_radius");
-  if (!(in >> manifest.outer_radius)) {
-    fail("missing or invalid outer_radius");
   }
-  expect("carry_width");
-  if (!(in >> manifest.carry_width)) {
-    fail("missing or invalid carry_width");
-  }
-
-  std::size_t carry_count = 0;
-  expect("carry_atoms");
-  if (!(in >> carry_count)) fail("missing or invalid carry atom count");
-  manifest.separator.carry_atoms.reserve(carry_count);
-  std::set<lb_source::AtomId> carry_ids;
-  for (std::size_t i = 0; i < carry_count; ++i) {
-    std::string token;
-    lb_source::CarryAtom atom;
-    if (!(in >> token) || token != "carry_atom" || !(in >> atom.id) ||
-        !(in >> atom.norm_sq)) {
-      fail("missing or invalid carry atom");
-    }
-    if (!carry_ids.insert(atom.id).second) {
-      fail("duplicate carry atom");
-    }
-    manifest.separator.carry_atoms.push_back(atom);
-  }
-
-  std::size_t component_count = 0;
-  expect("components");
-  if (!(in >> component_count)) fail("missing or invalid component count");
-  manifest.separator.component_partition.reserve(component_count);
-  manifest.separator.source_bit_per_component.reserve(component_count);
-  manifest.separator.component_inventory.reserve(component_count);
-
-  std::set<lb_source::AtomId> partition_ids;
-  for (std::size_t c = 0; c < component_count; ++c) {
-    std::string token;
-    std::uint64_t source_bit = 0;
-    std::size_t partition_count = 0;
-    if (!(in >> token) || token != "component" || !(in >> source_bit) ||
-        source_bit > 1 || !(in >> partition_count) ||
-        partition_count == 0) {
-      fail("missing or invalid component header");
-    }
-    std::vector<lb_source::AtomId> partition;
-    partition.reserve(partition_count);
-    for (std::size_t i = 0; i < partition_count; ++i) {
-      lb_source::AtomId id = 0;
-      if (!(in >> id)) fail("missing or invalid component atom");
-      if (carry_ids.find(id) == carry_ids.end()) {
-        fail("component references non-carry atom");
-      }
-      if (!partition_ids.insert(id).second) {
-        fail("carry atom appears in multiple components");
-      }
-      partition.push_back(id);
-    }
-
-    std::size_t inventory_count = 0;
-    if (!(in >> inventory_count) || inventory_count == 0) {
-      fail("missing or invalid inventory count");
-    }
-    std::vector<lb_source::AtomId> inventory;
-    inventory.reserve(inventory_count);
-    for (std::size_t i = 0; i < inventory_count; ++i) {
-      lb_source::AtomId id = 0;
-      if (!(in >> id)) fail("missing or invalid inventory atom");
-      inventory.push_back(id);
-    }
-
-    manifest.separator.source_bit_per_component.push_back(source_bit != 0);
-    manifest.separator.component_partition.push_back(std::move(partition));
-    manifest.separator.component_inventory.push_back(std::move(inventory));
-  }
-
-  if (partition_ids != carry_ids) {
-    fail("component partition does not cover all carry atoms");
-  }
-  expect("END");
-  std::string trailing;
-  if (in >> trailing) fail("unexpected trailing manifest tokens");
-  return manifest;
+  return result.manifest;
 }
 
 void fail_prefix_witness(const std::string& diagnostic) {
