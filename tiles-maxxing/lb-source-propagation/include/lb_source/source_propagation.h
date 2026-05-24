@@ -99,6 +99,43 @@ struct LiveProcessResult {
   bool accepted() const noexcept { return reject == RejectReason::kNone; }
 };
 
+struct LiveHandoffV1 {
+  std::uint64_t k_sq = 0;
+  std::uint64_t cut_radius = 0;
+  std::uint64_t carry_width = 0;
+  std::string source_mode;
+  std::string source_id;
+  std::string geometry_id;
+  std::string build_id;
+  std::string schedule_digest_algorithm;
+  std::string schedule_digest_hex;
+  std::string overflow_summary;
+  LiveSeparator separator;
+
+  friend bool operator==(const LiveHandoffV1&,
+                         const LiveHandoffV1&) = default;
+};
+
+struct LiveHandoffExpectedContext {
+  std::optional<std::uint64_t> k_sq;
+  std::optional<std::uint64_t> cut_radius;
+  std::optional<std::uint64_t> carry_width;
+  std::optional<std::string> source_mode;
+  std::optional<std::string> source_id;
+  std::optional<std::string> geometry_id;
+  std::optional<std::string> build_id;
+  std::optional<std::string> schedule_digest_algorithm;
+  std::optional<std::string> schedule_digest_hex;
+  std::optional<std::string> overflow_summary;
+};
+
+struct LiveHandoffReadResult {
+  LiveHandoffV1 handoff;
+  std::string diagnostic;
+
+  bool accepted() const noexcept { return diagnostic.empty(); }
+};
+
 struct CarryManifest {
   std::uint64_t k_sq = 0;
   std::uint64_t outer_radius = 0;
@@ -212,6 +249,12 @@ LiveSeparator canonicalize_live_separator(const LiveSeparator& state);
 
 std::string validate_live_separator(const LiveSeparator& state);
 
+LiveHandoffV1 canonicalize_live_handoff(const LiveHandoffV1& handoff);
+
+std::string validate_live_handoff(
+    const LiveHandoffV1& handoff,
+    const LiveHandoffExpectedContext& expected = {});
+
 SourceSeedApplyResult apply_source_seeds(BandInput& band,
                                          const std::vector<SourceSeed>& seeds);
 
@@ -227,6 +270,21 @@ CarryManifestReadResult read_carry_manifest(std::istream& in);
 std::string carry_manifest_to_string(const CarryManifest& manifest);
 
 CarryManifestReadResult carry_manifest_from_string(std::string_view text);
+
+std::ostream& write_live_handoff(std::ostream& out,
+                                 const LiveHandoffV1& handoff);
+
+LiveHandoffReadResult read_live_handoff(std::istream& in);
+
+LiveHandoffReadResult read_live_handoff(
+    std::istream& in, const LiveHandoffExpectedContext& expected);
+
+std::string live_handoff_to_string(const LiveHandoffV1& handoff);
+
+LiveHandoffReadResult live_handoff_from_string(std::string_view text);
+
+LiveHandoffReadResult live_handoff_from_string(
+    std::string_view text, const LiveHandoffExpectedContext& expected);
 
 std::string source_profile_draft_json(const SourceProfileDraft& profile);
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <charconv>
+#include <cctype>
 #include <iomanip>
 #include <istream>
 #include <iterator>
@@ -190,6 +191,35 @@ bool parse_size_token(const std::string& token, std::size_t& value) {
   }
   value = static_cast<std::size_t>(parsed);
   return true;
+}
+
+bool valid_manifest_token(std::string_view value) {
+  if (value.empty()) {
+    return false;
+  }
+  for (const unsigned char ch : value) {
+    if (std::isspace(ch) != 0 || ch < 0x20) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool valid_hex_token(std::string_view value) {
+  if (!valid_manifest_token(value)) {
+    return false;
+  }
+  for (const unsigned char ch : value) {
+    if (std::isxdigit(ch) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool stable_atom_id(AtomId id) {
+  return decode_coordinate_atom_id(id).has_value() ||
+         decode_port_atom_id(id).has_value();
 }
 
 std::string validate_separator_manifest(const SeparatorState& state) {
@@ -618,6 +648,94 @@ std::string validate_live_separator(const LiveSeparator& state) {
   return "";
 }
 
+LiveHandoffV1 canonicalize_live_handoff(const LiveHandoffV1& handoff) {
+  LiveHandoffV1 canonical = handoff;
+  canonical.separator = canonicalize_live_separator(canonical.separator);
+  return canonical;
+}
+
+std::string validate_live_handoff(
+    const LiveHandoffV1& handoff,
+    const LiveHandoffExpectedContext& expected) {
+  if (handoff.carry_width != ceil_sqrt(handoff.k_sq)) {
+    return "carry width does not match k_sq";
+  }
+  if (!valid_manifest_token(handoff.source_mode)) {
+    return "missing or invalid source_mode";
+  }
+  if (!valid_manifest_token(handoff.source_id)) {
+    return "missing or invalid source_id";
+  }
+  if (!valid_manifest_token(handoff.geometry_id)) {
+    return "missing or invalid geometry_id";
+  }
+  if (!valid_manifest_token(handoff.build_id)) {
+    return "missing or invalid build_id";
+  }
+  if (!valid_manifest_token(handoff.schedule_digest_algorithm)) {
+    return "missing or invalid schedule_digest_algorithm";
+  }
+  if (!valid_hex_token(handoff.schedule_digest_hex)) {
+    return "missing or invalid schedule_digest_hex";
+  }
+  if (!valid_manifest_token(handoff.overflow_summary)) {
+    return "missing or invalid overflow_summary";
+  }
+
+  const std::string separator_validation =
+      validate_live_separator(handoff.separator);
+  if (!separator_validation.empty()) {
+    return separator_validation;
+  }
+
+  for (const CarryAtom& atom : handoff.separator.carry_atoms) {
+    const std::optional<CoordinateAtom> coordinate =
+        decode_coordinate_atom_id(atom.id);
+    if (coordinate.has_value() && coordinate->norm_sq != atom.norm_sq) {
+      return "carry atom norm does not match coordinate atom";
+    }
+    if (!coordinate.has_value() && !stable_atom_id(atom.id)) {
+      return "unstable carry atom id";
+    }
+  }
+
+  if (expected.k_sq && handoff.k_sq != *expected.k_sq) {
+    return "wrong k_sq";
+  }
+  if (expected.cut_radius && handoff.cut_radius != *expected.cut_radius) {
+    return "stale cut radius";
+  }
+  if (expected.carry_width && handoff.carry_width != *expected.carry_width) {
+    return "wrong carry width";
+  }
+  if (expected.source_mode && handoff.source_mode != *expected.source_mode) {
+    return "wrong source_mode";
+  }
+  if (expected.source_id && handoff.source_id != *expected.source_id) {
+    return "wrong source_id";
+  }
+  if (expected.geometry_id && handoff.geometry_id != *expected.geometry_id) {
+    return "wrong geometry_id";
+  }
+  if (expected.build_id && handoff.build_id != *expected.build_id) {
+    return "wrong build_id";
+  }
+  if (expected.schedule_digest_algorithm &&
+      handoff.schedule_digest_algorithm !=
+          *expected.schedule_digest_algorithm) {
+    return "wrong schedule_digest_algorithm";
+  }
+  if (expected.schedule_digest_hex &&
+      handoff.schedule_digest_hex != *expected.schedule_digest_hex) {
+    return "wrong schedule_digest_hex";
+  }
+  if (expected.overflow_summary &&
+      handoff.overflow_summary != *expected.overflow_summary) {
+    return "wrong overflow_summary";
+  }
+  return "";
+}
+
 LiveSeparator live_separator_from_separator(const SeparatorState& state) {
   LiveSeparator live;
   live.carry_atoms = state.carry_atoms;
@@ -839,6 +957,182 @@ std::string carry_manifest_to_string(const CarryManifest& manifest) {
 CarryManifestReadResult carry_manifest_from_string(std::string_view text) {
   std::istringstream in{std::string(text)};
   return read_carry_manifest(in);
+}
+
+std::ostream& write_live_handoff(std::ostream& out,
+                                 const LiveHandoffV1& handoff) {
+  const LiveHandoffV1 canonical = canonicalize_live_handoff(handoff);
+
+  out << "LB_SOURCE_LIVE_HANDOFF_V1\n";
+  out << "k_sq " << canonical.k_sq << "\n";
+  out << "cut_radius " << canonical.cut_radius << "\n";
+  out << "carry_width " << canonical.carry_width << "\n";
+  out << "source_mode " << canonical.source_mode << "\n";
+  out << "source_id " << canonical.source_id << "\n";
+  out << "geometry_id " << canonical.geometry_id << "\n";
+  out << "build_id " << canonical.build_id << "\n";
+  out << "schedule_digest_algorithm "
+      << canonical.schedule_digest_algorithm << "\n";
+  out << "schedule_digest_hex " << canonical.schedule_digest_hex << "\n";
+  out << "overflow_summary " << canonical.overflow_summary << "\n";
+  out << "carry_atoms " << canonical.separator.carry_atoms.size() << "\n";
+  for (const CarryAtom& atom : canonical.separator.carry_atoms) {
+    out << "carry_atom " << atom.id << ' ' << atom.norm_sq << "\n";
+  }
+  out << "components " << canonical.separator.component_partition.size()
+      << "\n";
+  for (std::size_t c = 0; c < canonical.separator.component_partition.size();
+       ++c) {
+    out << "component "
+        << (canonical.separator.source_bit_per_component[c] ? 1 : 0) << ' '
+        << canonical.separator.component_partition[c].size();
+    for (const AtomId id : canonical.separator.component_partition[c]) {
+      out << ' ' << id;
+    }
+    out << "\n";
+  }
+  out << "END\n";
+  return out;
+}
+
+LiveHandoffReadResult read_live_handoff(
+    std::istream& in, const LiveHandoffExpectedContext& expected) {
+  LiveHandoffReadResult result;
+  std::string token;
+  const auto fail = [&](std::string diagnostic) {
+    result = {};
+    result.diagnostic = std::move(diagnostic);
+    return result;
+  };
+  const auto expect = [&](std::string_view expected_token) -> bool {
+    return (in >> token) && token == expected_token;
+  };
+  const auto read_uint64 = [&](std::uint64_t& value) -> bool {
+    return (in >> token) && parse_uint64_token(token, value);
+  };
+  const auto read_int64 = [&](std::int64_t& value) -> bool {
+    return (in >> token) && parse_int64_token(token, value);
+  };
+  const auto read_size = [&](std::size_t& value) -> bool {
+    return (in >> token) && parse_size_token(token, value);
+  };
+  const auto read_string = [&](std::string& value) -> bool {
+    return static_cast<bool>(in >> value);
+  };
+
+  if (!expect("LB_SOURCE_LIVE_HANDOFF_V1")) {
+    return fail("missing live handoff header");
+  }
+  if (!expect("k_sq") || !read_uint64(result.handoff.k_sq)) {
+    return fail("missing or invalid k_sq");
+  }
+  if (!expect("cut_radius") || !read_uint64(result.handoff.cut_radius)) {
+    return fail("missing or invalid cut_radius");
+  }
+  if (!expect("carry_width") || !read_uint64(result.handoff.carry_width)) {
+    return fail("missing or invalid carry_width");
+  }
+  if (!expect("source_mode") || !read_string(result.handoff.source_mode)) {
+    return fail("missing or invalid source_mode");
+  }
+  if (!expect("source_id") || !read_string(result.handoff.source_id)) {
+    return fail("missing or invalid source_id");
+  }
+  if (!expect("geometry_id") || !read_string(result.handoff.geometry_id)) {
+    return fail("missing or invalid geometry_id");
+  }
+  if (!expect("build_id") || !read_string(result.handoff.build_id)) {
+    return fail("missing or invalid build_id");
+  }
+  if (!expect("schedule_digest_algorithm") ||
+      !read_string(result.handoff.schedule_digest_algorithm)) {
+    return fail("missing or invalid schedule_digest_algorithm");
+  }
+  if (!expect("schedule_digest_hex") ||
+      !read_string(result.handoff.schedule_digest_hex)) {
+    return fail("missing or invalid schedule_digest_hex");
+  }
+  if (!expect("overflow_summary") ||
+      !read_string(result.handoff.overflow_summary)) {
+    return fail("missing or invalid overflow_summary");
+  }
+
+  std::size_t carry_count = 0;
+  if (!expect("carry_atoms") || !read_size(carry_count)) {
+    return fail("missing or invalid carry atom count");
+  }
+  result.handoff.separator.carry_atoms.reserve(carry_count);
+  for (std::size_t i = 0; i < carry_count; ++i) {
+    CarryAtom atom;
+    if (!expect("carry_atom") || !read_int64(atom.id) ||
+        !read_uint64(atom.norm_sq)) {
+      return fail("missing or invalid carry atom");
+    }
+    result.handoff.separator.carry_atoms.push_back(atom);
+  }
+
+  std::size_t component_count = 0;
+  if (!expect("components") || !read_size(component_count)) {
+    return fail("missing or invalid component count");
+  }
+  result.handoff.separator.component_partition.reserve(component_count);
+  result.handoff.separator.source_bit_per_component.reserve(component_count);
+  for (std::size_t c = 0; c < component_count; ++c) {
+    std::uint64_t source_bit = 0;
+    std::size_t partition_count = 0;
+    if (!expect("component") || !read_uint64(source_bit) ||
+        source_bit > 1 || !read_size(partition_count)) {
+      return fail("missing or invalid component header");
+    }
+    std::vector<AtomId> partition;
+    partition.reserve(partition_count);
+    for (std::size_t i = 0; i < partition_count; ++i) {
+      AtomId id = 0;
+      if (!read_int64(id)) {
+        return fail("missing or invalid component atom");
+      }
+      partition.push_back(id);
+    }
+    result.handoff.separator.source_bit_per_component.push_back(source_bit !=
+                                                                0);
+    result.handoff.separator.component_partition.push_back(
+        std::move(partition));
+  }
+
+  if (!expect("END")) {
+    return fail("missing live handoff END marker");
+  }
+  if (in >> token) {
+    return fail("unexpected trailing live handoff tokens");
+  }
+
+  const std::string validation = validate_live_handoff(result.handoff,
+                                                       expected);
+  if (!validation.empty()) {
+    return fail(validation);
+  }
+  result.handoff = canonicalize_live_handoff(result.handoff);
+  return result;
+}
+
+LiveHandoffReadResult read_live_handoff(std::istream& in) {
+  return read_live_handoff(in, LiveHandoffExpectedContext{});
+}
+
+std::string live_handoff_to_string(const LiveHandoffV1& handoff) {
+  std::ostringstream out;
+  write_live_handoff(out, handoff);
+  return out.str();
+}
+
+LiveHandoffReadResult live_handoff_from_string(
+    std::string_view text, const LiveHandoffExpectedContext& expected) {
+  std::istringstream in{std::string(text)};
+  return read_live_handoff(in, expected);
+}
+
+LiveHandoffReadResult live_handoff_from_string(std::string_view text) {
+  return live_handoff_from_string(text, LiveHandoffExpectedContext{});
 }
 
 InventorySummary summarize_inventory(const std::vector<AtomId>& atom_ids) {

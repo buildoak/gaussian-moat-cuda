@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -14,6 +15,8 @@ using lb_source::AtomId;
 using lb_source::BandAtom;
 using lb_source::BandInput;
 using lb_source::CarryAtom;
+using lb_source::LiveHandoffExpectedContext;
+using lb_source::LiveHandoffV1;
 using lb_source::LiveProcessResult;
 using lb_source::LiveSeparator;
 using lb_source::ProcessResult;
@@ -701,6 +704,157 @@ void test_carry_manifest_rejects_malformed_partition() {
            std::string("component references non-carry atom"));
 }
 
+LiveHandoffV1 live_handoff_fixture() {
+  LiveHandoffV1 handoff;
+  handoff.k_sq = 36;
+  handoff.cut_radius = 20;
+  handoff.carry_width = 6;
+  handoff.source_mode = "ORIGIN_SOURCE";
+  handoff.source_id = "omega-axis-prime";
+  handoff.geometry_id = "full-octant";
+  handoff.build_id = "debug-build";
+  handoff.schedule_digest_algorithm =
+      "sha256:lb_source_k26_repaired_bz_schedule_v1";
+  handoff.schedule_digest_hex = "abcdef0123456789";
+  handoff.overflow_summary = "none";
+  handoff.separator.carry_atoms = {{4, 16}, {2, 4}, {3, 9}};
+  handoff.separator.component_partition = {{3, 2}, {4}};
+  handoff.separator.source_bit_per_component = {true, false};
+  return handoff;
+}
+
+LiveHandoffExpectedContext live_handoff_expected_context() {
+  LiveHandoffExpectedContext expected;
+  expected.k_sq = 36;
+  expected.cut_radius = 20;
+  expected.carry_width = 6;
+  expected.source_mode = "ORIGIN_SOURCE";
+  expected.source_id = "omega-axis-prime";
+  expected.geometry_id = "full-octant";
+  expected.build_id = "debug-build";
+  expected.schedule_digest_algorithm =
+      "sha256:lb_source_k26_repaired_bz_schedule_v1";
+  expected.schedule_digest_hex = "abcdef0123456789";
+  expected.overflow_summary = "none";
+  return expected;
+}
+
+void test_live_handoff_round_trip_is_canonical() {
+  const LiveHandoffV1 handoff = live_handoff_fixture();
+  const std::string encoded = lb_source::live_handoff_to_string(handoff);
+  CHECK_EQ(encoded,
+           std::string(
+               "LB_SOURCE_LIVE_HANDOFF_V1\n"
+               "k_sq 36\n"
+               "cut_radius 20\n"
+               "carry_width 6\n"
+               "source_mode ORIGIN_SOURCE\n"
+               "source_id omega-axis-prime\n"
+               "geometry_id full-octant\n"
+               "build_id debug-build\n"
+               "schedule_digest_algorithm "
+               "sha256:lb_source_k26_repaired_bz_schedule_v1\n"
+               "schedule_digest_hex abcdef0123456789\n"
+               "overflow_summary none\n"
+               "carry_atoms 3\n"
+               "carry_atom 2 4\n"
+               "carry_atom 3 9\n"
+               "carry_atom 4 16\n"
+               "components 2\n"
+               "component 1 2 2 3\n"
+               "component 0 1 4\n"
+               "END\n"));
+
+  const lb_source::LiveHandoffReadResult decoded =
+      lb_source::live_handoff_from_string(encoded,
+                                          live_handoff_expected_context());
+  CHECK_TRUE(decoded.accepted());
+
+  LiveHandoffV1 expected = handoff;
+  expected = lb_source::canonicalize_live_handoff(expected);
+  CHECK_EQ(decoded.handoff, expected);
+  CHECK_EQ(lb_source::live_handoff_to_string(decoded.handoff), encoded);
+
+  const lb_source::CarryManifestReadResult carry_decode =
+      lb_source::carry_manifest_from_string(encoded);
+  CHECK_TRUE(!carry_decode.accepted());
+  CHECK_EQ(carry_decode.diagnostic,
+           std::string("missing carry manifest header"));
+}
+
+void test_live_handoff_rejects_wrong_resume_context() {
+  const std::string encoded =
+      lb_source::live_handoff_to_string(live_handoff_fixture());
+
+  LiveHandoffExpectedContext expected = live_handoff_expected_context();
+  expected.cut_radius = 19;
+  lb_source::LiveHandoffReadResult decoded =
+      lb_source::live_handoff_from_string(encoded, expected);
+  CHECK_TRUE(!decoded.accepted());
+  CHECK_EQ(decoded.diagnostic, std::string("stale cut radius"));
+
+  expected = live_handoff_expected_context();
+  expected.k_sq = 37;
+  decoded = lb_source::live_handoff_from_string(encoded, expected);
+  CHECK_TRUE(!decoded.accepted());
+  CHECK_EQ(decoded.diagnostic, std::string("wrong k_sq"));
+
+  expected = live_handoff_expected_context();
+  expected.carry_width = 7;
+  decoded = lb_source::live_handoff_from_string(encoded, expected);
+  CHECK_TRUE(!decoded.accepted());
+  CHECK_EQ(decoded.diagnostic, std::string("wrong carry width"));
+}
+
+void test_live_handoff_accepts_diagnostic_source_mode() {
+  LiveHandoffV1 handoff = live_handoff_fixture();
+  handoff.source_mode = "ORIGIN_PREFIX_PORT_WITNESS";
+
+  const lb_source::LiveHandoffReadResult decoded =
+      lb_source::live_handoff_from_string(
+          lb_source::live_handoff_to_string(handoff));
+  CHECK_TRUE(decoded.accepted());
+  CHECK_EQ(decoded.handoff.source_mode,
+           std::string("ORIGIN_PREFIX_PORT_WITNESS"));
+}
+
+void test_live_handoff_rejects_malformed_separator() {
+  LiveHandoffV1 duplicate = live_handoff_fixture();
+  duplicate.separator.carry_atoms.push_back({2, 4});
+  lb_source::LiveHandoffReadResult decoded =
+      lb_source::live_handoff_from_string(
+          lb_source::live_handoff_to_string(duplicate));
+  CHECK_TRUE(!decoded.accepted());
+  CHECK_EQ(decoded.diagnostic, std::string("duplicate carry atom"));
+
+  LiveHandoffV1 missing_coverage = live_handoff_fixture();
+  missing_coverage.separator.component_partition = {{2, 3}};
+  missing_coverage.separator.source_bit_per_component = {true};
+  decoded = lb_source::live_handoff_from_string(
+      lb_source::live_handoff_to_string(missing_coverage));
+  CHECK_TRUE(!decoded.accepted());
+  CHECK_EQ(decoded.diagnostic,
+           std::string("component partition does not cover all carry atoms"));
+
+  LiveHandoffV1 unstable = live_handoff_fixture();
+  const AtomId unstable_id = std::numeric_limits<AtomId>::min();
+  unstable.separator.carry_atoms = {{unstable_id, 1}};
+  unstable.separator.component_partition = {{unstable_id}};
+  unstable.separator.source_bit_per_component = {true};
+  decoded = lb_source::live_handoff_from_string(
+      lb_source::live_handoff_to_string(unstable));
+  CHECK_TRUE(!decoded.accepted());
+  CHECK_EQ(decoded.diagnostic, std::string("unstable carry atom id"));
+
+  LiveHandoffV1 wrong_norm = live_handoff_fixture();
+  wrong_norm.separator.carry_atoms[0].norm_sq = 99;
+  decoded = lb_source::live_handoff_from_string(
+      lb_source::live_handoff_to_string(wrong_norm));
+  CHECK_TRUE(!decoded.accepted());
+  CHECK_EQ(decoded.diagnostic,
+           std::string("carry atom norm does not match coordinate atom"));
+}
+
 void test_make_carry_manifest_from_process_result() {
   const BandInput band{
       .k_sq = 36,
@@ -878,6 +1032,14 @@ int main() {
       test_carry_manifest_round_trip_is_canonical);
   run("carry_manifest_rejects_malformed_partition",
       test_carry_manifest_rejects_malformed_partition);
+  run("live_handoff_round_trip_is_canonical",
+      test_live_handoff_round_trip_is_canonical);
+  run("live_handoff_rejects_wrong_resume_context",
+      test_live_handoff_rejects_wrong_resume_context);
+  run("live_handoff_accepts_diagnostic_source_mode",
+      test_live_handoff_accepts_diagnostic_source_mode);
+  run("live_handoff_rejects_malformed_separator",
+      test_live_handoff_rejects_malformed_separator);
   run("make_carry_manifest_from_process_result",
       test_make_carry_manifest_from_process_result);
   run("inventory_summary_is_canonical",
