@@ -222,6 +222,48 @@ bool stable_atom_id(AtomId id) {
          decode_port_atom_id(id).has_value();
 }
 
+std::string validate_stable_atom_identity(AtomId id, std::uint64_t norm_sq,
+                                          std::string_view unstable_diagnostic,
+                                          std::string_view norm_diagnostic) {
+  const std::optional<CoordinateAtom> coordinate =
+      decode_coordinate_atom_id(id);
+  if (coordinate.has_value()) {
+    if (coordinate->norm_sq != norm_sq) {
+      return std::string(norm_diagnostic);
+    }
+    return "";
+  }
+  if (!decode_port_atom_id(id).has_value()) {
+    return std::string(unstable_diagnostic);
+  }
+  return "";
+}
+
+std::string validate_live_separator_atom_identities(
+    const LiveSeparator& state) {
+  for (const CarryAtom& atom : state.carry_atoms) {
+    const std::string validation = validate_stable_atom_identity(
+        atom.id, atom.norm_sq, "unstable carry atom id",
+        "carry atom norm does not match coordinate atom");
+    if (!validation.empty()) {
+      return validation;
+    }
+  }
+  return "";
+}
+
+std::string validate_band_atom_identities(const BandInput& band) {
+  for (const BandAtom& atom : band.atoms) {
+    const std::string validation = validate_stable_atom_identity(
+        atom.id, atom.norm_sq, "band atom has unstable id",
+        "band atom norm does not match coordinate atom");
+    if (!validation.empty()) {
+      return validation;
+    }
+  }
+  return "";
+}
+
 std::string validate_separator_manifest(const SeparatorState& state) {
   if (state.component_partition.size() !=
       state.source_bit_per_component.size()) {
@@ -778,15 +820,10 @@ std::string validate_live_handoff(
     return separator_validation;
   }
 
-  for (const CarryAtom& atom : handoff.separator.carry_atoms) {
-    const std::optional<CoordinateAtom> coordinate =
-        decode_coordinate_atom_id(atom.id);
-    if (coordinate.has_value() && coordinate->norm_sq != atom.norm_sq) {
-      return "carry atom norm does not match coordinate atom";
-    }
-    if (!coordinate.has_value() && !stable_atom_id(atom.id)) {
-      return "unstable carry atom id";
-    }
+  const std::string atom_identity_validation =
+      validate_live_separator_atom_identities(handoff.separator);
+  if (!atom_identity_validation.empty()) {
+    return atom_identity_validation;
   }
 
   if (expected.k_sq && handoff.k_sq != *expected.k_sq) {
@@ -1755,6 +1792,13 @@ LiveProcessResult process_band_live(
   const std::uint64_t carry_width = ceil_sqrt(band.k_sq);
   std::optional<SeparatorState> legacy_incoming;
 
+  const std::string band_atom_validation =
+      validate_band_atom_identities(band);
+  if (!band_atom_validation.empty()) {
+    return live_reject(RejectReason::kMalformed, band_atom_validation,
+                       carry_width);
+  }
+
   if (incoming) {
     for (const BandAtom& atom : band.atoms) {
       if (atom.certified_source) {
@@ -1769,6 +1813,14 @@ LiveProcessResult process_band_live(
     if (!validation.empty()) {
       return live_reject(RejectReason::kMalformed,
                          "incoming live separator " + validation,
+                         carry_width);
+    }
+    const std::string atom_identity_validation =
+        validate_live_separator_atom_identities(*incoming);
+    if (!atom_identity_validation.empty()) {
+      return live_reject(RejectReason::kMalformed,
+                         "incoming live separator " +
+                             atom_identity_validation,
                          carry_width);
     }
     const LiveSeparator canonical = canonicalize_live_separator(*incoming);

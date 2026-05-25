@@ -15,6 +15,7 @@ add_library(lb_source_propagation STATIC
   ../cpp-campaign-v2/src/sha256.cpp
   src/k26_bz_schedule.cpp
   src/source_propagation.cpp
+  src/stream_checkpoint.cpp
 )
 target_compile_options(lb_source_propagation PRIVATE -Wall -Wextra -Werror)
 
@@ -66,6 +67,20 @@ target_include_directories(lb_source_tileop_port_graph
     ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
+)
+
+add_library(lb_source_tileop_port_stream STATIC
+  src/tileop_port_stream.cpp
+)
+target_compile_options(lb_source_tileop_port_stream PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(lb_source_tileop_port_stream
+  PUBLIC
+    lb_source_propagation
+    lb_source_campaign_tileop
+)
+target_include_directories(lb_source_tileop_port_stream
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 add_executable(source_prop_smoke apps/source_prop_smoke.cpp)
@@ -127,10 +142,25 @@ target_link_libraries(source_tileop_port_runner
     lb_source_tileop_port_graph
 )
 
+add_executable(source_tileop_port_stream_runner
+  apps/source_tileop_port_stream_runner.cpp
+)
+target_link_libraries(source_tileop_port_stream_runner
+  PRIVATE
+    lb_source_tileop_port_stream
+)
+target_include_directories(source_tileop_port_stream_runner
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
+)
+
 enable_testing()
 
 add_executable(source_prop_tests tests/test_source_propagation.cpp)
 target_link_libraries(source_prop_tests PRIVATE lb_source_propagation)
+
+add_executable(stream_checkpoint_tests tests/test_stream_checkpoint.cpp)
+target_link_libraries(stream_checkpoint_tests PRIVATE lb_source_propagation)
 
 add_executable(source_prop_cpu_tileop_smoke
   tests/test_cpu_tileop_producer.cpp
@@ -149,12 +179,23 @@ target_link_libraries(source_prop_tileop_port_graph_tests
     lb_source_tileop_port_graph
 )
 
+add_executable(tileop_port_stream_tests
+  tests/test_tileop_port_stream.cpp
+)
+target_link_libraries(tileop_port_stream_tests
+  PRIVATE
+    lb_source_tileop_port_stream
+    lb_source_tileop_port_graph
+)
+
 add_test(NAME source_prop_tests COMMAND source_prop_tests)
+add_test(NAME stream_checkpoint COMMAND stream_checkpoint_tests)
 add_test(NAME source_prop_smoke COMMAND source_prop_smoke)
 add_test(NAME source_prop_cpu_tileop_smoke
   COMMAND source_prop_cpu_tileop_smoke)
 add_test(NAME source_prop_tileop_port_graph_tests
   COMMAND source_prop_tileop_port_graph_tests)
+add_test(NAME tileop_port_stream COMMAND tileop_port_stream_tests)
 add_test(NAME k26_tsuchimura_preflight
   COMMAND k26_tsuchimura_preflight)
 add_test(NAME k26_source_run_contract
@@ -318,6 +359,16 @@ add_test(NAME source_tileop_port_runner_resume_smoke
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_tileop_port_runner_resume.sh
     $<TARGET_FILE:source_tileop_port_runner>)
+add_test(NAME source_tileop_port_stream_runner_smoke
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_tileop_port_stream_runner.sh
+    $<TARGET_FILE:source_tileop_port_stream_runner>)
+add_test(NAME source_tileop_port_stream_equivalence
+  COMMAND bash
+    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_tileop_port_stream_equivalence.sh
+    $<TARGET_FILE:source_tileop_port_stream_runner>
+    $<TARGET_FILE:source_tileop_port_runner>
+    --out-dir ${CMAKE_CURRENT_BINARY_DIR}/source_tileop_port_stream_equivalence)
 add_test(NAME source_tileop_port_runner_wide_band_equivalence
   COMMAND bash
     ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_tileop_port_wide_band_equivalence.sh

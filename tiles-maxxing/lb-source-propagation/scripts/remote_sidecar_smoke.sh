@@ -149,6 +149,22 @@ ctest --test-dir "$verify_build_dir" --output-on-failure \
   | tee "$out_dir/source_tileop_cpu_runner_manifest_smoke.json" \
       "$out_dir/source_tileop_port_runner_live_handoff_smoke.json"
 
+"$build_dir/source_tileop_port_stream_runner" \
+  --r-start 248 \
+  --r-final 512 \
+  --microband-width 128 \
+  --seed-inner-flags \
+  --live-manifest-out "$out_dir/source_tileop_port_stream_live_handoff.txt" \
+  --checkpoint-out "$out_dir/source_tileop_port_stream_checkpoint.txt" \
+  --progress-out "$out_dir/source_tileop_port_stream_progress.jsonl" \
+  | tee "$out_dir/source_tileop_port_stream_runner_smoke.json"
+
+bash "$sidecar_dir/scripts/check_tileop_port_stream_equivalence.sh" \
+  "$build_dir/source_tileop_port_stream_runner" \
+  "$build_dir/source_tileop_port_runner" \
+  --out-dir "$out_dir/source_tileop_port_stream_equivalence" \
+  | tee "$out_dir/source_tileop_port_stream_equivalence.log"
+
 "$build_dir/k26_tsuchimura_preflight" \
   | tee "$out_dir/k26_tsuchimura_preflight.json"
 
@@ -169,7 +185,7 @@ ctest --test-dir "$verify_build_dir" --output-on-failure \
 
 cat > "$out_dir/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, TileOp-port live handoff smoke, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule evidence, K26 run profile draft, and K26 run command contract only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, TileOp-port live handoff smoke, diagnostic TileOp-port stream unit smoke/equivalence, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule evidence, K26 run profile draft, and K26 run command contract only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 

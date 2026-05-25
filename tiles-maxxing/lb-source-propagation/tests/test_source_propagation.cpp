@@ -342,14 +342,14 @@ void test_live_projection_matches_legacy_without_inventory() {
   const BandInput first{
       .k_sq = 36,
       .outer_radius = 10,
-      .atoms = {{1, 25, true}, {2, 100, false}, {3, 100, false}},
-      .edges = {{1, 2}},
+      .atoms = {{5, 25, true}, {10, 100, false}, {9, 81, false}},
+      .edges = {{5, 10}},
   };
   const BandInput second{
       .k_sq = 36,
       .outer_radius = 20,
-      .atoms = {{4, 400, false}, {5, 400, false}},
-      .edges = {{2, 3}, {3, 4}},
+      .atoms = {{20, 400, false}, {19, 361, false}},
+      .edges = {{10, 9}, {9, 20}},
   };
 
   const ProcessResult legacy_first =
@@ -371,15 +371,15 @@ void test_live_projection_matches_legacy_without_inventory() {
 
 void test_live_empty_inventory_bypasses_inventory_cap() {
   LiveSeparator incoming;
-  incoming.carry_atoms = {{2, 100}, {3, 100}};
-  incoming.component_partition = {{2, 3}};
+  incoming.carry_atoms = {{10, 100}, {11, 121}};
+  incoming.component_partition = {{10, 11}};
   incoming.source_bit_per_component = {true};
 
   const BandInput band{
       .k_sq = 36,
       .outer_radius = 20,
-      .atoms = {{4, 400, false}},
-      .edges = {{3, 4}},
+      .atoms = {{20, 400, false}},
+      .edges = {{11, 20}},
   };
   lb_source::ProcessOptions options;
   options.max_atoms = 16;
@@ -391,8 +391,8 @@ void test_live_empty_inventory_bypasses_inventory_cap() {
       lb_source::process_band_live(band, incoming, options);
   CHECK_TRUE(live.accepted());
   CHECK_EQ(live.outgoing, (LiveSeparator{
-                              .carry_atoms = {{4, 400}},
-                              .component_partition = {{4}},
+                              .carry_atoms = {{20, 400}},
+                              .component_partition = {{20}},
                               .source_bit_per_component = {true},
                           }));
   CHECK_TRUE(lb_source::separator_from_live_separator(live.outgoing)
@@ -401,15 +401,15 @@ void test_live_empty_inventory_bypasses_inventory_cap() {
 
 void test_live_still_enforces_non_inventory_caps() {
   LiveSeparator incoming;
-  incoming.carry_atoms = {{2, 100}};
-  incoming.component_partition = {{2}};
+  incoming.carry_atoms = {{10, 100}};
+  incoming.component_partition = {{10}};
   incoming.source_bit_per_component = {true};
 
   const BandInput band{
       .k_sq = 36,
       .outer_radius = 20,
-      .atoms = {{4, 400, false}},
-      .edges = {{2, 4}},
+      .atoms = {{20, 400, false}},
+      .edges = {{10, 20}},
   };
   lb_source::ProcessOptions options;
   options.max_atoms = 16;
@@ -428,13 +428,13 @@ void test_live_terminal_death_drops_listed_inventory() {
   const BandInput first{
       .k_sq = 36,
       .outer_radius = 10,
-      .atoms = {{1, 25, true}, {2, 100, false}},
-      .edges = {{1, 2}},
+      .atoms = {{5, 25, true}, {10, 100, false}},
+      .edges = {{5, 10}},
   };
   const BandInput second{
       .k_sq = 36,
       .outer_radius = 20,
-      .atoms = {{9, 400, false}},
+      .atoms = {{20, 400, false}},
       .edges = {},
   };
 
@@ -454,15 +454,15 @@ void test_live_terminal_death_drops_listed_inventory() {
 
 void test_live_rejects_fresh_source_with_incoming_handoff() {
   LiveSeparator incoming;
-  incoming.carry_atoms = {{2, 100}};
-  incoming.component_partition = {{2}};
+  incoming.carry_atoms = {{10, 100}};
+  incoming.component_partition = {{10}};
   incoming.source_bit_per_component = {true};
 
   const BandInput band{
       .k_sq = 36,
       .outer_radius = 20,
-      .atoms = {{4, 400, true}},
-      .edges = {{2, 4}},
+      .atoms = {{20, 400, true}},
+      .edges = {{10, 20}},
   };
 
   const LiveProcessResult result =
@@ -472,6 +472,102 @@ void test_live_rejects_fresh_source_with_incoming_handoff() {
            std::string(
                "fresh certified source is not allowed with incoming live "
                "handoff"));
+}
+
+void test_process_band_live_rejects_unstable_incoming_atom_id() {
+  const AtomId unstable_id = std::numeric_limits<AtomId>::min();
+  LiveSeparator incoming;
+  incoming.carry_atoms = {{unstable_id, 1}};
+  incoming.component_partition = {{unstable_id}};
+  incoming.source_bit_per_component = {true};
+
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {},
+      .edges = {},
+  };
+
+  const LiveProcessResult result =
+      lb_source::process_band_live(band, incoming);
+  CHECK_EQ(result.reject, RejectReason::kMalformed);
+  CHECK_EQ(result.diagnostic,
+           std::string("incoming live separator unstable carry atom id"));
+}
+
+void test_process_band_live_rejects_wrong_incoming_coordinate_norm() {
+  LiveSeparator incoming;
+  incoming.carry_atoms = {{10, 99}};
+  incoming.component_partition = {{10}};
+  incoming.source_bit_per_component = {true};
+
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {},
+      .edges = {},
+  };
+
+  const LiveProcessResult result =
+      lb_source::process_band_live(band, incoming);
+  CHECK_EQ(result.reject, RejectReason::kMalformed);
+  CHECK_EQ(result.diagnostic,
+           std::string(
+               "incoming live separator carry atom norm does not match "
+               "coordinate atom"));
+}
+
+void test_process_band_live_rejects_unstable_band_atom() {
+  const AtomId unstable_id = std::numeric_limits<AtomId>::min();
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{unstable_id, 1, false}},
+      .edges = {},
+  };
+
+  const LiveProcessResult result =
+      lb_source::process_band_live(band, std::nullopt);
+  CHECK_EQ(result.reject, RejectReason::kMalformed);
+  CHECK_EQ(result.diagnostic, std::string("band atom has unstable id"));
+}
+
+void test_process_band_live_rejects_wrong_band_coordinate_norm() {
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {{10, 99, false}},
+      .edges = {},
+  };
+
+  const LiveProcessResult result =
+      lb_source::process_band_live(band, std::nullopt);
+  CHECK_EQ(result.reject, RejectReason::kMalformed);
+  CHECK_EQ(result.diagnostic,
+           std::string("band atom norm does not match coordinate atom"));
+}
+
+void test_process_band_live_accepts_neutral_port_carry() {
+  const std::optional<AtomId> port = lb_source::port_atom_id(7, 11, 2, 3);
+  CHECK_TRUE(port.has_value());
+
+  LiveSeparator incoming;
+  incoming.carry_atoms = {{*port, 999}};
+  incoming.component_partition = {{*port}};
+  incoming.source_bit_per_component = {false};
+
+  const BandInput band{
+      .k_sq = 36,
+      .outer_radius = 20,
+      .atoms = {},
+      .edges = {},
+  };
+
+  const LiveProcessResult result =
+      lb_source::process_band_live(band, incoming);
+  CHECK_TRUE(result.accepted());
+  CHECK_EQ(result.outgoing, lb_source::canonicalize_live_separator(incoming));
+  CHECK_TRUE(!result.terminal_source_dead);
 }
 
 void test_overflow_reject_is_hard() {
@@ -1198,6 +1294,16 @@ int main() {
       test_live_terminal_death_drops_listed_inventory);
   run("live_rejects_fresh_source_with_incoming_handoff",
       test_live_rejects_fresh_source_with_incoming_handoff);
+  run("process_band_live_rejects_unstable_incoming_atom_id",
+      test_process_band_live_rejects_unstable_incoming_atom_id);
+  run("process_band_live_rejects_wrong_incoming_coordinate_norm",
+      test_process_band_live_rejects_wrong_incoming_coordinate_norm);
+  run("process_band_live_rejects_unstable_band_atom",
+      test_process_band_live_rejects_unstable_band_atom);
+  run("process_band_live_rejects_wrong_band_coordinate_norm",
+      test_process_band_live_rejects_wrong_band_coordinate_norm);
+  run("process_band_live_accepts_neutral_port_carry",
+      test_process_band_live_accepts_neutral_port_carry);
   run("overflow_reject_is_hard", test_overflow_reject_is_hard);
   run("k32_ceil_sqrt_carry_width_is_six",
       test_k32_ceil_sqrt_carry_width_is_six);

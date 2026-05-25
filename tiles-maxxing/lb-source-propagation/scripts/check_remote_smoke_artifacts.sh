@@ -8,9 +8,9 @@ Usage:
                                   [--expect-k-sq N]
 
 Validate pulled LB source-propagation remote smoke artifacts. This checks the
-sidecar and independent verifier CTest logs, the non-claim K26 preflight,
-contract, execution-plan JSON, K26 BZ schedule evidence, and optional
-deployed source provenance.
+sidecar and independent verifier CTest logs, the diagnostic TileOp-port stream
+unit, the non-claim K26 preflight, contract, execution-plan JSON, K26 BZ
+schedule evidence, and optional deployed source provenance.
 USAGE
 }
 
@@ -130,7 +130,7 @@ if [[ ! -d "$out_dir" ]]; then
   exit 1
 fi
 
-require_ctest_log "$out_dir/ctest.log" "sidecar" 28
+require_ctest_log "$out_dir/ctest.log" "sidecar" 35
 require_ctest_log "$out_dir/verification-ctest.log" "verification" 78
 
 for artifact in \
@@ -141,6 +141,11 @@ for artifact in \
   source_tileop_cpu_runner_smoke.json \
   source_origin_prefix_manifest_smoke.json \
   source_tileop_cpu_runner_manifest_smoke.json \
+  source_tileop_port_stream_runner_smoke.json \
+  source_tileop_port_stream_live_handoff.txt \
+  source_tileop_port_stream_checkpoint.txt \
+  source_tileop_port_stream_progress.jsonl \
+  source_tileop_port_stream_equivalence.log \
   k26_tsuchimura_preflight.json \
   k26_source_run_contract.json \
   k26_execution_plan.json \
@@ -154,6 +159,52 @@ require_grep "^REMOTE_SIDECAR_SMOKE_PASS$" "$out_dir/status.txt" \
   "remote smoke pass status"
 require_grep "Non-claim: this is not a sqrt\(26\) source/origin run and not a moat result\." \
   "$out_dir/status.txt" "remote smoke non-claim status"
+
+require_grep '"schema":"lb_source_tileop_port_stream_runner_v1"' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner schema"
+require_grep '"proof_status":"DIAGNOSTIC_NON_CLAIM"' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner non-claim status"
+require_grep '"source_mode":"GEO_I_PORT_DIAGNOSTIC"' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner source mode"
+require_grep '"accepted":true' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner accepted"
+require_grep '"terminal_source_dead":false' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner live source"
+require_grep '"has_source_carry":true' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner source carry"
+require_grep '"checkpoint_written":true' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner checkpoint"
+require_grep '"max_resident_microband_tiles":[1-9][0-9]*' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream telemetry resident tiles"
+require_grep '"max_checkpoint_bytes":[1-9][0-9]*' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream telemetry checkpoint bytes"
+require_grep '^LB_SOURCE_LIVE_HANDOFF_V1$' \
+  "$out_dir/source_tileop_port_stream_live_handoff.txt" \
+  "TileOp-port stream live handoff"
+require_grep '^LB_SOURCE_STREAM_CHECKPOINT_V1$' \
+  "$out_dir/source_tileop_port_stream_checkpoint.txt" \
+  "TileOp-port stream checkpoint"
+require_grep '"schema":"lb_source_tileop_port_stream_progress_v1"' \
+  "$out_dir/source_tileop_port_stream_progress.jsonl" \
+  "TileOp-port stream progress schema"
+require_grep '"max_resident_microband_tiles":[1-9][0-9]*' \
+  "$out_dir/source_tileop_port_stream_progress.jsonl" \
+  "TileOp-port stream progress resident tiles"
+require_grep 'MATERIALIZED_STREAM_HANDOFF_EQUIVALENCE_PASS' \
+  "$out_dir/source_tileop_port_stream_equivalence.log" \
+  "TileOp-port stream materialized equivalence"
+require_grep 'TILEOP_PORT_STREAM_EQUIVALENCE_PASS' \
+  "$out_dir/source_tileop_port_stream_equivalence.log" \
+  "TileOp-port stream equivalence pass"
 
 require_grep '"schema":"k26_tsuchimura_preflight_v1"' \
   "$out_dir/k26_tsuchimura_preflight.json" "K26 preflight schema"

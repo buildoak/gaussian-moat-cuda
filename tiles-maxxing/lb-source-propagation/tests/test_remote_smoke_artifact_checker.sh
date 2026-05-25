@@ -29,12 +29,12 @@ write_ctest_log() {
   } > "$path"
 }
 
-write_ctest_log "$tmp/ctest.log" 28
+write_ctest_log "$tmp/ctest.log" 35
 write_ctest_log "$tmp/verification-ctest.log" 78
 
 cat > "$tmp/status.txt" <<'STATUS'
 REMOTE_SIDECAR_SMOKE_PASS
-Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule evidence, K26 run profile draft, and K26 run command contract only.
+Scope: sidecar build/test, independent verification CTest, CPU TileOp producer smoke, small coordinate source runner, CPU TileOp-fed source runner, diagnostic TileOp-port stream unit smoke/equivalence, K26 non-claim run contract, K26 non-claim execution plan, K26 BZ schedule evidence, K26 run profile draft, and K26 run command contract only.
 Non-claim: this is not a sqrt(26) source/origin run and not a moat result.
 STATUS
 
@@ -64,6 +64,27 @@ JSON
 cat > "$tmp/source_tileop_cpu_runner_manifest_smoke.json" <<'JSON'
 {"schema":"lb_source_tileop_cpu_runner_v1","claim_label":"SOURCE_ORIGIN_TILEOP_CPU_DIAGNOSTIC","proof_status":"DIAGNOSTIC_NON_CLAIM","non_claim":"CPU TileOp-fed sidecar diagnostic; not a CUDA campaign or SOURCE_DEAD_CERT"}
 JSON
+
+cat > "$tmp/source_tileop_port_stream_runner_smoke.json" <<'JSON'
+{"schema":"lb_source_tileop_port_stream_runner_v1","runner_id":"source_tileop_port_stream_runner_v1","claim_label":"SOURCE_TILEOP_PORT_STREAM_DIAGNOSTIC","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"GEO_I_PORT_DIAGNOSTIC","k_sq":26,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"checkpoint_written":true,"max_resident_microband_tiles":4,"max_checkpoint_bytes":1693}
+JSON
+
+cat > "$tmp/source_tileop_port_stream_live_handoff.txt" <<'TXT'
+LB_SOURCE_LIVE_HANDOFF_V1
+TXT
+
+cat > "$tmp/source_tileop_port_stream_checkpoint.txt" <<'TXT'
+LB_SOURCE_STREAM_CHECKPOINT_V1
+TXT
+
+cat > "$tmp/source_tileop_port_stream_progress.jsonl" <<'JSONL'
+{"schema":"lb_source_tileop_port_stream_progress_v1","max_resident_microband_tiles":4}
+JSONL
+
+cat > "$tmp/source_tileop_port_stream_equivalence.log" <<'LOG'
+MATERIALIZED_STREAM_HANDOFF_EQUIVALENCE_PASS k_sq=26 cut_radius=512 carry_atoms=21 components=1
+TILEOP_PORT_STREAM_EQUIVALENCE_PASS out_dir=/tmp/stream-equivalence
+LOG
 
 cat > "$tmp/k26_tsuchimura_preflight.json" <<'JSON'
 {"schema":"k26_tsuchimura_preflight_v1","claim_label":"SOURCE_ORIGIN_K26","conservative_guard_min_r_final":1015645,"non_claim":"preflight only; no source/origin run executed"}
@@ -122,6 +143,27 @@ if "$checker" "$short_ctest" > "$tmp/short-ctest.log" 2>&1; then
 fi
 grep -q 'verification CTest summary is below Phase 1 baseline' \
   "$tmp/short-ctest.log"
+
+missing_stream="$tmp/missing-stream"
+mkdir "$missing_stream"
+cp "$tmp"/* "$missing_stream"/ 2>/dev/null || true
+rm "$missing_stream/source_tileop_port_stream_runner_smoke.json"
+if "$checker" "$missing_stream" > "$tmp/missing-stream.log" 2>&1; then
+  echo "checker accepted remote smoke artifacts without stream runner smoke JSON" >&2
+  exit 1
+fi
+grep -q 'missing required artifact' "$tmp/missing-stream.log"
+
+bad_stream="$tmp/bad-stream"
+mkdir "$bad_stream"
+cp "$tmp"/* "$bad_stream"/ 2>/dev/null || true
+perl -0pi -e 's/"proof_status":"DIAGNOSTIC_NON_CLAIM"/"proof_status":"SOURCE_DEAD_CERT_PASS"/' \
+  "$bad_stream/source_tileop_port_stream_runner_smoke.json"
+if "$checker" "$bad_stream" > "$tmp/bad-stream.log" 2>&1; then
+  echo "checker accepted claim-like stream runner smoke JSON" >&2
+  exit 1
+fi
+grep -q 'TileOp-port stream runner non-claim status' "$tmp/bad-stream.log"
 
 bad="$tmp/bad"
 mkdir "$bad"
