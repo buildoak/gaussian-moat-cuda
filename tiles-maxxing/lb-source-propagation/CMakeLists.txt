@@ -34,6 +34,7 @@ add_library(lb_source_campaign_tileop STATIC
   ../cpp-campaign-v2/src/process_tile.cpp
   ../cpp-campaign-v2/src/sha256.cpp
   ../cpp-campaign-v2/src/sieve.cpp
+  ../cpp-campaign-v2/src/streaming_compositor.cpp
   ../cpp-campaign-v2/src/tileop.cpp
   ../cpp-campaign-v2/src/union_find.cpp
 )
@@ -79,6 +80,19 @@ target_link_libraries(lb_source_tileop_port_stream
     lb_source_campaign_tileop
 )
 target_include_directories(lb_source_tileop_port_stream
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+add_library(lb_source_tileop_static_reach STATIC
+  src/tileop_static_reach.cpp
+)
+target_compile_options(lb_source_tileop_static_reach PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(lb_source_tileop_static_reach
+  PUBLIC
+    lb_source_tileop_port_stream
+)
+target_include_directories(lb_source_tileop_static_reach
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -154,6 +168,14 @@ target_include_directories(source_tileop_port_stream_runner
     ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
 )
 
+add_executable(tileop_static_reach_equivalence
+  apps/tileop_static_reach_equivalence.cpp
+)
+target_link_libraries(tileop_static_reach_equivalence
+  PRIVATE
+    lb_source_tileop_static_reach
+)
+
 enable_testing()
 
 add_executable(source_prop_tests tests/test_source_propagation.cpp)
@@ -188,6 +210,14 @@ target_link_libraries(tileop_port_stream_tests
     lb_source_tileop_port_graph
 )
 
+add_executable(tileop_static_reach_tests
+  tests/test_tileop_static_reach.cpp
+)
+target_link_libraries(tileop_static_reach_tests
+  PRIVATE
+    lb_source_tileop_static_reach
+)
+
 add_test(NAME source_prop_tests COMMAND source_prop_tests)
 add_test(NAME stream_checkpoint COMMAND stream_checkpoint_tests)
 add_test(NAME source_prop_smoke COMMAND source_prop_smoke)
@@ -196,6 +226,19 @@ add_test(NAME source_prop_cpu_tileop_smoke
 add_test(NAME source_prop_tileop_port_graph_tests
   COMMAND source_prop_tileop_port_graph_tests)
 add_test(NAME tileop_port_stream COMMAND tileop_port_stream_tests)
+add_test(NAME tileop_static_reach COMMAND tileop_static_reach_tests)
+add_test(NAME tileop_static_reach_equivalence_smoke
+  COMMAND tileop_static_reach_equivalence
+    --r-start 248
+    --r-final 512
+    --microband-width 128
+    --max-atoms 1000000
+    --tileop-threads 0)
+set_tests_properties(tileop_static_reach_equivalence_smoke PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "\"status\":\"STATIC_REACH_EQUIVALENCE_PASS\".*\"full_compositor_spanning\":(true|false).*\"full_static_reach_spanning\":(true|false).*\"stitched_static_reach_spanning\":(true|false)"
+  FAIL_REGULAR_EXPRESSION
+    "STATIC_REACH_EQUIVALENCE_FAIL|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_tsuchimura_preflight
   COMMAND k26_tsuchimura_preflight)
 add_test(NAME k26_source_run_contract

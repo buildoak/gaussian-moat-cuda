@@ -87,6 +87,7 @@ std::vector<PortRef> ports_for_face(
     }
     const bool source =
         seed_inner_flags && campaign::bit_test(op.inner_flags, label);
+    const bool sink = campaign::bit_test(op.outer_flags, label);
     ports.push_back({*id, label});
     if (decoded_ports != nullptr) {
       decoded_ports->push_back(TileOpDecodedPort{
@@ -95,6 +96,7 @@ std::vector<PortRef> ports_for_face(
           .ordinal = ordinal,
           .local_label = label,
           .certified_source = source,
+          .certified_sink = sink,
       });
     }
   }

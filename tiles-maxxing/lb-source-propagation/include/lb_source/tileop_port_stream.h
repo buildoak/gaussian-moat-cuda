@@ -26,6 +26,7 @@ struct TileOpDecodedPort {
   std::uint8_t ordinal = 0;
   std::uint8_t local_label = 0;
   bool certified_source = false;
+  bool certified_sink = false;
 
   friend bool operator==(const TileOpDecodedPort&,
                          const TileOpDecodedPort&) = default;

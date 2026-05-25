@@ -561,6 +561,11 @@ int main(int argc, char** argv) {
 
   if (config.checkpoint_in.has_value()) {
     checkpoint = read_checkpoint_or_die(*config.checkpoint_in);
+    if (checkpoint->source_mode != kFirstBandSourceMode ||
+        checkpoint->handoff.source_mode != kFirstBandSourceMode) {
+      std::cerr << "invalid --checkpoint-in: wrong source_mode\n";
+      return EXIT_FAILURE;
+    }
     live_incoming = checkpoint->handoff.separator;
     current_live_handoff = checkpoint->handoff;
     source_mode = checkpoint->source_mode;
