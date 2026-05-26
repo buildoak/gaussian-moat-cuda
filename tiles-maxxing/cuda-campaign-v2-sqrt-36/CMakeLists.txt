@@ -144,6 +144,7 @@ target_compile_definitions(campaign_main_cuda
 )
 
 add_library(cuda_lb_source_static_reach STATIC
+  ../lb-source-propagation/src/detector_band_handoff.cpp
   ../lb-source-propagation/src/source_propagation.cpp
   ../lb-source-propagation/src/tileop_port_stream.cpp
   ../lb-source-propagation/src/tileop_static_reach.cpp
