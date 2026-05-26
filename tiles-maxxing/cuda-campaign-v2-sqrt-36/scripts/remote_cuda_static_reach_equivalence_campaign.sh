@@ -7,7 +7,7 @@ Usage:
   remote_cuda_static_reach_equivalence_campaign.sh [--repo DIR]
       [--out-dir DIR] [--build-dir DIR] [--timeout-seconds N]
       [--cuda-arch ARCH] [--include-diagnostic-sub4096]
-      [--include-full-static-production]
+      [--include-full-static-production] [--static-reach-resident-width W]
 
 Build and run CUDA static-reach stitching equivalence gates on a remote CUDA
 host. Default rows use production-width microbands only. Outputs are
@@ -22,6 +22,7 @@ timeout_seconds="5400"
 cuda_arch="89"
 include_diagnostic_sub4096="0"
 include_full_static_production="0"
+static_reach_resident_width="4096"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -53,6 +54,10 @@ while [[ $# -gt 0 ]]; do
       include_full_static_production="1"
       shift
       ;;
+    --static-reach-resident-width)
+      static_reach_resident_width="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -71,6 +76,10 @@ if ! [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || [[ "$timeout_seconds" == "0" ]]; th
 fi
 if ! [[ "$cuda_arch" =~ ^[0-9]+$ ]] || [[ "$cuda_arch" == "0" ]]; then
   echo "--cuda-arch must be positive" >&2
+  exit 2
+fi
+if ! [[ "$static_reach_resident_width" =~ ^[0-9]+$ ]] || [[ "$static_reach_resident_width" == "0" ]]; then
+  echo "--static-reach-resident-width must be positive" >&2
   exit 2
 fi
 
@@ -97,6 +106,7 @@ write_environment() {
     echo "cuda_arch=$cuda_arch"
     echo "include_diagnostic_sub4096=$include_diagnostic_sub4096"
     echo "include_full_static_production=$include_full_static_production"
+    echo "static_reach_resident_width=$static_reach_resident_width"
     echo "proof_status=DIAGNOSTIC_NON_CLAIM"
     echo "time_bin=$(command -v time || true)"
     echo "timeout_bin=$(command -v timeout || true)"
@@ -140,6 +150,7 @@ run_case() {
     "--r-start=$r_start"
     "--r-final=$r_final"
     "--microband-width=$width"
+    "--static-reach-resident-width=$static_reach_resident_width"
     --chunk-size=200000
     --max-atoms=1000000000
     "$@"
@@ -192,6 +203,8 @@ required_payload_scalars = {
     "proof_status": "DIAGNOSTIC_NON_CLAIM",
 }
 required_numeric_fields = [
+    "static_reach_resident_width",
+    "resident_subsegments",
     "rss_bytes",
     "peak_rss_bytes",
     "max_resident_microband_tiles",
@@ -223,6 +236,11 @@ def telemetry_errors(payload):
     for key, expected in required_payload_scalars.items():
         if payload.get(key) != expected:
             errors.append(f"{key}_mismatch")
+    if payload.get("static_reach_materialization_mode") not in {
+        "streaming_dsu",
+        "materialized_band",
+    }:
+        errors.append("static_reach_materialization_mode_missing_or_invalid")
     for key in required_numeric_fields:
         value = payload.get(key)
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
@@ -289,7 +307,10 @@ for row in cases:
         f"- `{row['label']}`: exit `{row['exit_code']}`, status "
         f"`{payload.get('status')}`, full `{payload.get('full_spanning')}`, "
         f"stitched `{payload.get('stitched_spanning')}`, equivalent "
-        f"`{payload.get('equivalent')}`, total_ms `{(payload.get('timings_ms') or {}).get('total')}`"
+        f"`{payload.get('equivalent')}`, resident_width "
+        f"`{payload.get('static_reach_resident_width')}`, mode "
+        f"`{payload.get('static_reach_materialization_mode')}`, total_ms "
+        f"`{(payload.get('timings_ms') or {}).get('total')}`"
     )
 (out / "summary.md").write_text("\n".join(lines) + "\n")
 print(status)

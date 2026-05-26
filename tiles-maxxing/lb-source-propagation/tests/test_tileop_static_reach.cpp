@@ -206,6 +206,20 @@ void test_tileop_flags_drive_two_bit_reach() {
       lb_source::process_static_reach_band(microband.band);
   CHECK_TRUE(result.accepted());
   CHECK_TRUE(result.spanning);
+
+  const lb_source::TileOpStaticReachStreamingResult streaming =
+      lb_source::process_tileop_static_reach_microband_streaming({
+          .k_sq = campaign::k_sq_value,
+          .outer_radius = 573,
+          .coords = {coord(0, 0), coord(0, 1)},
+          .tileops = {lower, upper},
+      });
+  CHECK_TRUE(streaming.accepted());
+  CHECK_EQ(streaming.port_atoms, microband.port_atoms);
+  CHECK_EQ(streaming.inner_seed_ports, microband.inner_seed_ports);
+  CHECK_EQ(streaming.outer_seed_ports, microband.outer_seed_ports);
+  CHECK_EQ(streaming.process.spanning, result.spanning);
+  CHECK_EQ(streaming.process.outgoing, result.outgoing);
 }
 
 void test_tileop_seed_policy_counts_follow_global_boundary_role() {
@@ -283,6 +297,71 @@ void test_duplicate_boundary_tile_carries_reach_across_microbands() {
       lb_source::process_static_reach_band(b.band, first_result.outgoing);
   CHECK_TRUE(stitched.accepted());
   CHECK_TRUE(stitched.spanning);
+
+  const lb_source::TileOpStaticReachStreamingResult first_streaming =
+      lb_source::process_tileop_static_reach_microband_streaming({
+          .k_sq = campaign::k_sq_value,
+          .outer_radius = 362,
+          .coords = {coord(0, 0)},
+          .tileops = {first},
+          .seed_policy = lb_source::StaticReachSeedPolicy::kFirstBand,
+      });
+  CHECK_TRUE(first_streaming.accepted());
+  CHECK_EQ(first_streaming.process.outgoing, first_result.outgoing);
+
+  const lb_source::TileOpStaticReachStreamingResult stitched_streaming =
+      lb_source::process_tileop_static_reach_microband_streaming(
+          {.k_sq = campaign::k_sq_value,
+           .outer_radius = 368,
+           .coords = {coord(0, 0)},
+           .tileops = {second},
+           .seed_policy = lb_source::StaticReachSeedPolicy::kFinalBand},
+          first_streaming.process.outgoing);
+  CHECK_TRUE(stitched_streaming.accepted());
+  CHECK_TRUE(stitched_streaming.process.spanning);
+  CHECK_EQ(stitched_streaming.process.outgoing, stitched.outgoing);
+}
+
+void test_streaming_rejects_duplicate_tile_coordinates() {
+  campaign::TileOp op{};
+  add_port(op, campaign::Face::I, 1);
+
+  const lb_source::TileOpStaticReachStreamingResult streaming =
+      lb_source::process_tileop_static_reach_microband_streaming({
+          .k_sq = campaign::k_sq_value,
+          .outer_radius = 362,
+          .coords = {coord(0, 0), coord(0, 0)},
+          .tileops = {op, op},
+      });
+  CHECK_TRUE(!streaming.accepted());
+  CHECK_EQ(streaming.process.reject, lb_source::RejectReason::kMalformed);
+}
+
+void test_streaming_rejects_port_count_mismatch() {
+  campaign::TileOp lower{};
+  add_port(lower, campaign::Face::O, 1);
+
+  campaign::TileOp upper{};
+  add_port(upper, campaign::Face::I, 1);
+  add_port(upper, campaign::Face::I, 2);
+
+  const lb_source::TileOpStaticReachMicrobandResult materialized =
+      lb_source::build_tileop_static_reach_microband({
+          .k_sq = campaign::k_sq_value,
+          .outer_radius = 573,
+          .coords = {coord(0, 0), coord(0, 1)},
+          .tileops = {lower, upper},
+      });
+  const lb_source::TileOpStaticReachStreamingResult streaming =
+      lb_source::process_tileop_static_reach_microband_streaming({
+          .k_sq = campaign::k_sq_value,
+          .outer_radius = 573,
+          .coords = {coord(0, 0), coord(0, 1)},
+          .tileops = {lower, upper},
+      });
+  CHECK_TRUE(!materialized.accepted());
+  CHECK_TRUE(!streaming.accepted());
+  CHECK_EQ(streaming.process.reject, lb_source::RejectReason::kMalformed);
 }
 
 void run(const char* name, void (*fn)()) {
@@ -308,6 +387,10 @@ int main() {
       test_tileop_seed_policy_counts_follow_global_boundary_role);
   run("duplicate_boundary_tile_carries_reach_across_microbands",
       test_duplicate_boundary_tile_carries_reach_across_microbands);
+  run("streaming_rejects_duplicate_tile_coordinates",
+      test_streaming_rejects_duplicate_tile_coordinates);
+  run("streaming_rejects_port_count_mismatch",
+      test_streaming_rejects_port_count_mismatch);
 
   if (g_failures != 0) {
     std::cerr << g_failures << " test failure(s)\n";

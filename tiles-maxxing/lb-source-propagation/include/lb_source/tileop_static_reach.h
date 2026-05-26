@@ -88,6 +88,21 @@ struct TileOpStaticReachMicrobandResult {
   bool accepted() const noexcept { return diagnostic.empty(); }
 };
 
+struct TileOpStaticReachStreamingResult {
+  StaticReachProcessResult process;
+  std::uint64_t port_atoms = 0;
+  std::uint64_t internal_edges = 0;
+  std::uint64_t seam_edges = 0;
+  std::uint64_t overflow_tiles = 0;
+  std::uint64_t empty_tiles = 0;
+  std::uint64_t inner_seed_ports = 0;
+  std::uint64_t outer_seed_ports = 0;
+  std::uint64_t max_resident_atoms = 0;
+  std::uint64_t max_resident_edges = 0;
+
+  bool accepted() const noexcept { return process.accepted(); }
+};
+
 StaticReachSeparator canonicalize_static_reach_separator(
     const StaticReachSeparator& state);
 
@@ -96,6 +111,12 @@ std::string validate_static_reach_separator(
 
 TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
     const TileOpStaticReachInput& input);
+
+TileOpStaticReachStreamingResult
+process_tileop_static_reach_microband_streaming(
+    const TileOpStaticReachInput& input,
+    const std::optional<StaticReachSeparator>& incoming = std::nullopt,
+    const StaticReachProcessOptions& options = {});
 
 StaticReachProcessResult process_static_reach_band(
     const StaticReachBandInput& band,

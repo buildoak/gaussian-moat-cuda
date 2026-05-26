@@ -31,11 +31,13 @@ struct Config {
   std::uint64_t r_start = 60000000;
   std::uint64_t r_final = 60032768;
   std::uint64_t microband_width = 8192;
+  std::uint64_t static_reach_resident_width = 0;
   std::size_t chunk_size = 200000;
   std::size_t max_atoms = 1000000000ULL;
   bool skip_full_compositor = false;
   bool enable_full_static_handoff = false;
   bool allow_diagnostic_microband_width = false;
+  bool streaming_static_reach = true;
 };
 
 struct ColumnBatch {
@@ -54,6 +56,7 @@ struct Phase0Telemetry {
   std::uint64_t max_resident_edges = 0;
   std::uint64_t max_live_frontier_atoms = 0;
   std::uint64_t max_components = 0;
+  std::uint64_t resident_subsegments = 0;
   std::uint64_t materialization_ms = 0;
   std::uint64_t handoff_hash_ms = 0;
 
@@ -76,6 +79,14 @@ struct Phase0Telemetry {
     max_resident_edges =
         std::max<std::uint64_t>(max_resident_edges,
                                 band.internal_edges + band.seam_edges);
+  }
+
+  void observe_stream(
+      const lb_source::TileOpStaticReachStreamingResult& stream) {
+    max_resident_port_atoms =
+        std::max(max_resident_port_atoms, stream.port_atoms);
+    max_resident_edges =
+        std::max(max_resident_edges, stream.max_resident_edges);
   }
 
   void observe_frontier(const lb_source::StaticReachSeparator& frontier) {
@@ -114,8 +125,12 @@ void usage(const char* prog) {
       << "  --r-start R            start radius (default 60000000)\n"
       << "  --r-final R            final radius (default 60032768)\n"
       << "  --microband-width W    stitched segment width (default 8192)\n"
+      << "  --static-reach-resident-width W\n"
+      << "                         max resident static-reach subband width\n"
       << "  --chunk-size N         CUDA dispatch chunk size (default 200000)\n"
       << "  --max-atoms N          static reach per-band cap (default 1e9)\n"
+      << "  --materialized-static-reach\n"
+      << "                         use legacy materialized band graph path\n"
       << "  --skip-full-compositor skip full comparator, diagnostic only\n"
       << "  --enable-full-static-handoff\n"
       << "                         build bounded one-big static handoff comparator\n"
@@ -152,6 +167,8 @@ bool parse_args(int argc, char** argv, Config& config) {
       if (!parse_uint64(value, config.r_final)) return false;
     } else if (take("--microband-width", value)) {
       if (!parse_uint64(value, config.microband_width)) return false;
+    } else if (take("--static-reach-resident-width", value)) {
+      if (!parse_uint64(value, config.static_reach_resident_width)) return false;
     } else if (take("--chunk-size", value)) {
       std::uint64_t parsed = 0;
       if (!parse_uint64(value, parsed) || parsed == 0 ||
@@ -168,6 +185,8 @@ bool parse_args(int argc, char** argv, Config& config) {
       config.max_atoms = static_cast<std::size_t>(parsed);
     } else if (arg == "--skip-full-compositor") {
       config.skip_full_compositor = true;
+    } else if (arg == "--materialized-static-reach") {
+      config.streaming_static_reach = false;
     } else if (arg == "--enable-full-static-handoff") {
       config.enable_full_static_handoff = true;
     } else if (arg == "--allow-diagnostic-microband-width") {
@@ -181,9 +200,18 @@ bool parse_args(int argc, char** argv, Config& config) {
       config.microband_width == 0 || config.chunk_size == 0) {
     return false;
   }
+  if (config.static_reach_resident_width == 0) {
+    config.static_reach_resident_width = config.microband_width;
+  }
   if (config.microband_width < 4096 &&
       !config.allow_diagnostic_microband_width) {
     std::cerr << "--microband-width below 4096 requires "
+                 "--allow-diagnostic-microband-width\n";
+    return false;
+  }
+  if (config.static_reach_resident_width < 4096 &&
+      !config.allow_diagnostic_microband_width) {
+    std::cerr << "--static-reach-resident-width below 4096 requires "
                  "--allow-diagnostic-microband-width\n";
     return false;
   }
@@ -247,20 +275,6 @@ const char* seed_policy_name(lb_source::StaticReachSeedPolicy policy) {
       return "kFinalBand";
   }
   return "unknown";
-}
-
-lb_source::StaticReachSeedPolicy stitched_seed_policy(std::size_t segment,
-                                                      std::size_t segments) {
-  if (segments == 1) {
-    return lb_source::StaticReachSeedPolicy::kOneBand;
-  }
-  if (segment == 0) {
-    return lb_source::StaticReachSeedPolicy::kFirstBand;
-  }
-  if (segment + 1 == segments) {
-    return lb_source::StaticReachSeedPolicy::kFinalBand;
-  }
-  return lb_source::StaticReachSeedPolicy::kInteriorBand;
 }
 
 std::string hex64(std::uint64_t value) {
@@ -582,8 +596,6 @@ int main(int argc, char** argv) {
   for (std::size_t segment = 0; segment < segment_count; ++segment) {
     const std::uint64_t r_inner = schedule[segment];
     const std::uint64_t r_outer = schedule[segment + 1];
-    const lb_source::StaticReachSeedPolicy seed_policy =
-        stitched_seed_policy(segment, segment_count);
     const auto segment_begin = Clock::now();
     auto emit_segment_end = [&](std::string_view result,
                                 std::uint64_t tiles,
@@ -598,90 +610,167 @@ int main(int argc, char** argv) {
     std::cerr << "phase=stitched_segment begin segment=" << segment
               << " segments=" << (schedule.size() - 1)
               << " r_inner=" << r_inner << " r_outer=" << r_outer
+              << " resident_width=" << config.static_reach_resident_width
               << "\n";
-    campaign::Grid grid;
-    try {
-      grid = campaign::Grid::build(r_inner, r_outer, campaign::k_sq_value);
-    } catch (const std::exception& ex) {
-      stitched_rejected = true;
-      stitched_diagnostic = std::string("segment grid failed: ") + ex.what();
-      emit_segment_end("rejected_grid", 0, 0);
-      break;
-    }
-    const std::string invariant_error = grid.verify_invariants();
-    if (!invariant_error.empty()) {
-      stitched_rejected = true;
-      stitched_diagnostic = "segment grid invariant failed: " + invariant_error;
-      emit_segment_end("rejected_grid_invariant", 0, 0);
-      break;
-    }
-    const std::vector<campaign::TileCoord> coords =
-        grid.enumerate_active_tiles();
-    telemetry.observe_microband_tiles(coords.size());
-    cuda_campaign::DispatchStats local_stats;
-    const std::vector<campaign::TileOp> tileops =
-        dispatch_all_tileops(coords, dispatcher, local_stats);
-    stitched_dispatch.tiles += local_stats.tiles;
-    stitched_dispatch.chunks += local_stats.chunks;
-    stitched_dispatch.slabs += local_stats.slabs;
-    stitched_dispatch.k1_cand_overflow_count +=
-        local_stats.k1_cand_overflow_count;
-    stitched_dispatch.k4_prime_overflow_count +=
-        local_stats.k4_prime_overflow_count;
-    stitched_dispatch.k4_group_overflow_count +=
-        local_stats.k4_group_overflow_count;
-    stitched_dispatch.k5_port_overflow_count +=
-        local_stats.k5_port_overflow_count;
+    std::uint64_t segment_tiles = 0;
+    std::uint64_t segment_carry_atoms = 0;
+    for (std::uint64_t resident_inner = r_inner; resident_inner < r_outer;) {
+      const std::uint64_t resident_outer =
+          std::min<std::uint64_t>(resident_inner +
+                                      config.static_reach_resident_width,
+                                  r_outer);
+      const bool first_global_resident =
+          segment == 0 && resident_inner == r_inner;
+      const bool final_global_resident =
+          segment + 1 == segment_count && resident_outer == r_outer;
+      lb_source::StaticReachSeedPolicy resident_seed_policy =
+          lb_source::StaticReachSeedPolicy::kInteriorBand;
+      if (first_global_resident && final_global_resident) {
+        resident_seed_policy = lb_source::StaticReachSeedPolicy::kOneBand;
+      } else if (first_global_resident) {
+        resident_seed_policy = lb_source::StaticReachSeedPolicy::kFirstBand;
+      } else if (final_global_resident) {
+        resident_seed_policy = lb_source::StaticReachSeedPolicy::kFinalBand;
+      }
 
-    const auto materialization_begin = Clock::now();
-    const lb_source::TileOpStaticReachMicrobandResult band =
-        lb_source::build_tileop_static_reach_microband({
-            .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
-            .outer_radius = r_outer,
-            .coords = coords,
-            .tileops = tileops,
-            .seed_policy = seed_policy,
-        });
-    telemetry.materialization_ms +=
-        elapsed_ms(materialization_begin, Clock::now());
-    telemetry.observe_band(band);
-    if (!band.accepted()) {
-      stitched_rejected = true;
-      stitched_diagnostic = band.diagnostic;
-      emit_segment_end("rejected_materialization", coords.size(), 0);
-      break;
-    }
-    lb_source::StaticReachProcessResult step =
-        lb_source::process_static_reach_band(
+      campaign::Grid grid;
+      try {
+        grid = campaign::Grid::build(resident_inner, resident_outer,
+                                     campaign::k_sq_value);
+      } catch (const std::exception& ex) {
+        stitched_rejected = true;
+        stitched_diagnostic =
+            std::string("resident grid failed: ") + ex.what();
+        emit_segment_end("rejected_grid", segment_tiles, segment_carry_atoms);
+        break;
+      }
+      const std::string invariant_error = grid.verify_invariants();
+      if (!invariant_error.empty()) {
+        stitched_rejected = true;
+        stitched_diagnostic =
+            "resident grid invariant failed: " + invariant_error;
+        emit_segment_end("rejected_grid_invariant", segment_tiles,
+                         segment_carry_atoms);
+        break;
+      }
+      const std::vector<campaign::TileCoord> coords =
+          grid.enumerate_active_tiles();
+      telemetry.observe_microband_tiles(coords.size());
+      ++telemetry.resident_subsegments;
+      cuda_campaign::DispatchStats local_stats;
+      const std::vector<campaign::TileOp> tileops =
+          dispatch_all_tileops(coords, dispatcher, local_stats);
+      stitched_dispatch.tiles += local_stats.tiles;
+      stitched_dispatch.chunks += local_stats.chunks;
+      stitched_dispatch.slabs += local_stats.slabs;
+      stitched_dispatch.k1_cand_overflow_count +=
+          local_stats.k1_cand_overflow_count;
+      stitched_dispatch.k4_prime_overflow_count +=
+          local_stats.k4_prime_overflow_count;
+      stitched_dispatch.k4_group_overflow_count +=
+          local_stats.k4_group_overflow_count;
+      stitched_dispatch.k5_port_overflow_count +=
+          local_stats.k5_port_overflow_count;
+
+      lb_source::StaticReachProcessResult step;
+      std::uint64_t resident_port_atoms = 0;
+      std::uint64_t resident_internal_edges = 0;
+      std::uint64_t resident_seam_edges = 0;
+      std::uint64_t resident_inner_seed_ports = 0;
+      std::uint64_t resident_outer_seed_ports = 0;
+      const auto materialization_begin = Clock::now();
+      if (config.streaming_static_reach) {
+        const lb_source::TileOpStaticReachStreamingResult stream =
+            lb_source::process_tileop_static_reach_microband_streaming(
+                {.k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
+                 .outer_radius = resident_outer,
+                 .coords = coords,
+                 .tileops = tileops,
+                 .seed_policy = resident_seed_policy},
+                state,
+                {.max_atoms = config.max_atoms,
+                 .max_carry_atoms = config.max_atoms,
+                 .max_components = config.max_atoms});
+        telemetry.materialization_ms +=
+            elapsed_ms(materialization_begin, Clock::now());
+        telemetry.observe_stream(stream);
+        if (!stream.accepted()) {
+          stitched_rejected = true;
+          stitched_diagnostic = stream.process.diagnostic;
+          emit_segment_end("rejected_stream", segment_tiles,
+                           segment_carry_atoms);
+          break;
+        }
+        step = stream.process;
+        resident_port_atoms = stream.port_atoms;
+        resident_internal_edges = stream.internal_edges;
+        resident_seam_edges = stream.seam_edges;
+        resident_inner_seed_ports = stream.inner_seed_ports;
+        resident_outer_seed_ports = stream.outer_seed_ports;
+      } else {
+        const lb_source::TileOpStaticReachMicrobandResult band =
+            lb_source::build_tileop_static_reach_microband({
+                .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
+                .outer_radius = resident_outer,
+                .coords = coords,
+                .tileops = tileops,
+                .seed_policy = resident_seed_policy,
+            });
+        telemetry.materialization_ms +=
+            elapsed_ms(materialization_begin, Clock::now());
+        telemetry.observe_band(band);
+        if (!band.accepted()) {
+          stitched_rejected = true;
+          stitched_diagnostic = band.diagnostic;
+          emit_segment_end("rejected_materialization", segment_tiles,
+                           segment_carry_atoms);
+          break;
+        }
+        step = lb_source::process_static_reach_band(
             band.band, state,
             {.max_atoms = config.max_atoms,
              .max_carry_atoms = config.max_atoms,
              .max_components = config.max_atoms});
-    if (!step.accepted()) {
-      stitched_rejected = true;
-      stitched_diagnostic = step.diagnostic;
-      emit_segment_end("rejected_process", coords.size(), 0);
+        if (!step.accepted()) {
+          stitched_rejected = true;
+          stitched_diagnostic = step.diagnostic;
+          emit_segment_end("rejected_process", segment_tiles,
+                           segment_carry_atoms);
+          break;
+        }
+        resident_port_atoms = band.port_atoms;
+        resident_internal_edges = band.internal_edges;
+        resident_seam_edges = band.seam_edges;
+        resident_inner_seed_ports = band.inner_seed_ports;
+        resident_outer_seed_ports = band.outer_seed_ports;
+      }
+
+      stitched_tiles += coords.size();
+      segment_tiles += coords.size();
+      stitched_port_atoms += resident_port_atoms;
+      stitched_internal_edges += resident_internal_edges;
+      stitched_seam_edges += resident_seam_edges;
+      stitched_inner_seed_ports += resident_inner_seed_ports;
+      stitched_outer_seed_ports += resident_outer_seed_ports;
+      if (resident_seed_policy ==
+          lb_source::StaticReachSeedPolicy::kInteriorBand) {
+        interior_inner_seed_ports += resident_inner_seed_ports;
+        interior_outer_seed_ports += resident_outer_seed_ports;
+      }
+      segment_carry_atoms =
+          static_cast<std::uint64_t>(step.outgoing.carry_atoms.size());
+      telemetry.observe_frontier(step.outgoing);
+      max_carry_atoms = std::max<std::uint64_t>(max_carry_atoms,
+                                                segment_carry_atoms);
+      final_carry_width = step.carry_width;
+      stitched_spanning = stitched_spanning || step.spanning;
+      state = std::move(step.outgoing);
+      resident_inner = resident_outer;
+    }
+    if (stitched_rejected) {
       break;
     }
-    stitched_tiles += coords.size();
-    stitched_port_atoms += band.port_atoms;
-    stitched_internal_edges += band.internal_edges;
-    stitched_seam_edges += band.seam_edges;
-    stitched_inner_seed_ports += band.inner_seed_ports;
-    stitched_outer_seed_ports += band.outer_seed_ports;
-    if (seed_policy == lb_source::StaticReachSeedPolicy::kInteriorBand) {
-      interior_inner_seed_ports += band.inner_seed_ports;
-      interior_outer_seed_ports += band.outer_seed_ports;
-    }
-    const std::uint64_t segment_carry_atoms =
-        static_cast<std::uint64_t>(step.outgoing.carry_atoms.size());
-    telemetry.observe_frontier(step.outgoing);
-    max_carry_atoms = std::max<std::uint64_t>(max_carry_atoms,
-                                              segment_carry_atoms);
-    final_carry_width = step.carry_width;
-    stitched_spanning = stitched_spanning || step.spanning;
-    state = std::move(step.outgoing);
-    emit_segment_end("accepted", coords.size(), segment_carry_atoms);
+    emit_segment_end("accepted", segment_tiles, segment_carry_atoms);
   }
   const auto stitched_done = Clock::now();
 
@@ -762,7 +851,15 @@ int main(int argc, char** argv) {
             << ",\"r_start\":" << config.r_start
             << ",\"r_final\":" << config.r_final
             << ",\"microband_width\":" << config.microband_width
+            << ",\"static_reach_resident_width\":"
+            << config.static_reach_resident_width
+            << ",\"static_reach_materialization_mode\":\""
+            << (config.streaming_static_reach ? "streaming_dsu"
+                                               : "materialized_band")
+            << "\""
             << ",\"segments\":" << (schedule.empty() ? 0 : schedule.size() - 1)
+            << ",\"resident_subsegments\":"
+            << telemetry.resident_subsegments
             << ",\"microband_width_class\":\""
             << (config.microband_width < 4096 ? "diagnostic_sub_4096"
                                                : "production")

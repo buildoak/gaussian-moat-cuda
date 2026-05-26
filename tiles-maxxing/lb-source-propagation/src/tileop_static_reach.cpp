@@ -19,10 +19,19 @@ namespace {
 
 class Dsu {
  public:
+  Dsu() = default;
+
   explicit Dsu(std::size_t n) : parent_(n), rank_(n, 0) {
     for (std::size_t i = 0; i < n; ++i) {
       parent_[i] = i;
     }
+  }
+
+  std::size_t add() {
+    const std::size_t index = parent_.size();
+    parent_.push_back(index);
+    rank_.push_back(0);
+    return index;
   }
 
   std::size_t find(std::size_t x) {
@@ -416,6 +425,337 @@ TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
       result.band.edges.push_back(edge);
       ++result.seam_edges;
     }
+  }
+  return result;
+}
+
+TileOpStaticReachStreamingResult
+process_tileop_static_reach_microband_streaming(
+    const TileOpStaticReachInput& input,
+    const std::optional<StaticReachSeparator>& incoming,
+    const StaticReachProcessOptions& options) {
+  TileOpStaticReachStreamingResult result;
+  const std::uint64_t carry_width = ceil_sqrt(input.k_sq);
+  auto reject_stream = [&](RejectReason reason, std::string diagnostic) {
+    result.process = reject(reason, std::move(diagnostic), carry_width);
+    return result;
+  };
+
+  if (input.k_sq == 0 || input.outer_radius == 0) {
+    return reject_stream(RejectReason::kMalformed,
+                         "k_sq and outer_radius must be positive");
+  }
+  if (input.outer_radius >
+      std::numeric_limits<std::uint64_t>::max() / input.outer_radius) {
+    return reject_stream(RejectReason::kMalformed,
+                         "outer radius square overflows");
+  }
+  if (input.coords.size() != input.tileops.size()) {
+    return reject_stream(RejectReason::kMalformed,
+                         "coords and tileops size mismatch");
+  }
+
+  std::vector<StaticReachBandAtom> all_atoms;
+  all_atoms.reserve(input.coords.size() * 4 +
+                    (incoming ? incoming->carry_atoms.size() : 0));
+  std::unordered_map<AtomId, std::size_t> index_by_id;
+  index_by_id.reserve(all_atoms.capacity());
+  std::unordered_map<CoordKey, std::size_t, CoordKeyHash> index_by_coord;
+  index_by_coord.reserve(input.coords.size());
+  std::unordered_map<FaceKey, std::vector<PortRef>, FaceKeyHash> ports_by_face;
+  ports_by_face.reserve(input.coords.size() * 2);
+  std::set<AtomId> seen_band_atom;
+  Dsu dsu;
+
+  auto observe_atom_residency = [&]() {
+    result.max_resident_atoms =
+        std::max<std::uint64_t>(result.max_resident_atoms,
+                                static_cast<std::uint64_t>(all_atoms.size()));
+  };
+  auto add_atom = [&](StaticReachBandAtom atom,
+                      bool allow_existing) -> std::optional<std::size_t> {
+    if ((atom.reach & ~kStaticReachBoth) != 0) {
+      result.process = reject(RejectReason::kMalformed,
+                              "invalid band atom reach bits", carry_width);
+      return std::nullopt;
+    }
+    if (!stable_atom_id(atom.id)) {
+      result.process = reject(RejectReason::kMalformed,
+                              "band atom has unstable id", carry_width);
+      return std::nullopt;
+    }
+    const std::optional<CoordinateAtom> coordinate =
+        decode_coordinate_atom_id(atom.id);
+    if (coordinate.has_value() && coordinate->norm_sq != atom.norm_sq) {
+      result.process = reject(RejectReason::kMalformed,
+                              "band atom norm does not match coordinate atom",
+                              carry_width);
+      return std::nullopt;
+    }
+
+    const auto existing = index_by_id.find(atom.id);
+    if (existing != index_by_id.end()) {
+      StaticReachBandAtom& current = all_atoms[existing->second];
+      if (!allow_existing && !seen_band_atom.insert(atom.id).second) {
+        result.process = reject(RejectReason::kMalformed,
+                                "duplicate band atom id", carry_width);
+        return std::nullopt;
+      }
+      if (current.norm_sq != atom.norm_sq) {
+        result.process = reject(
+            RejectReason::kMalformed,
+            "incoming carry atom norm does not match band atom", carry_width);
+        return std::nullopt;
+      }
+      current.reach |= atom.reach;
+      current.allow_outer_overshoot_carry =
+          current.allow_outer_overshoot_carry ||
+          atom.allow_outer_overshoot_carry;
+      observe_atom_residency();
+      return existing->second;
+    }
+
+    if (!allow_existing) {
+      seen_band_atom.insert(atom.id);
+    }
+    const std::size_t index = dsu.add();
+    assert(index == all_atoms.size());
+    index_by_id.emplace(atom.id, index);
+    all_atoms.push_back(atom);
+    observe_atom_residency();
+    return index;
+  };
+  auto union_atoms = [&](AtomId lhs, AtomId rhs,
+                         bool internal_edge) -> bool {
+    if (lhs == rhs) {
+      return true;
+    }
+    const auto ia = index_by_id.find(lhs);
+    const auto ib = index_by_id.find(rhs);
+    if (ia == index_by_id.end() || ib == index_by_id.end()) {
+      result.process = reject(RejectReason::kMalformed,
+                              "edge references missing atom", carry_width);
+      return false;
+    }
+    dsu.unite(ia->second, ib->second);
+    if (internal_edge) {
+      ++result.internal_edges;
+    } else {
+      ++result.seam_edges;
+    }
+    return true;
+  };
+
+  std::optional<StaticReachSeparator> canonical_incoming;
+  const StaticReachSeparator* incoming_state = nullptr;
+  if (incoming) {
+    canonical_incoming = canonicalize_static_reach_separator(*incoming);
+    incoming_state = &*canonical_incoming;
+    const std::string validation =
+        validate_static_reach_separator(*incoming_state);
+    if (!validation.empty()) {
+      return reject_stream(RejectReason::kMalformed,
+                           "incoming static reach separator " + validation);
+    }
+    for (const CarryAtom& atom : incoming_state->carry_atoms) {
+      const std::optional<std::size_t> added = add_atom(
+          StaticReachBandAtom{
+              .id = atom.id,
+              .norm_sq = atom.norm_sq,
+              .reach = 0,
+              .allow_outer_overshoot_carry =
+                  decode_port_atom_id(atom.id).has_value(),
+          },
+          true);
+      if (!added.has_value()) {
+        return result;
+      }
+    }
+    for (const auto& component : incoming_state->component_partition) {
+      const AtomId first_id = component.front();
+      const auto first = index_by_id.find(first_id);
+      assert(first != index_by_id.end());
+      for (std::size_t i = 1; i < component.size(); ++i) {
+        const auto it = index_by_id.find(component[i]);
+        assert(it != index_by_id.end());
+        dsu.unite(first->second, it->second);
+      }
+    }
+  }
+
+  for (std::size_t t = 0; t < input.coords.size(); ++t) {
+    const campaign::TileCoord& coord = input.coords[t];
+    const campaign::TileOp& op = input.tileops[t];
+    const CoordKey key{coord.i, coord.j};
+    if (!index_by_coord.emplace(key, t).second) {
+      return reject_stream(RejectReason::kMalformed,
+                           "duplicate TileOp coordinate");
+    }
+
+    const TileOpPortDecodedTile decoded =
+        decode_tileop_ports(coord, op, policy_seeds_inner(input.seed_policy));
+    if (!decoded.accepted()) {
+      return reject_stream(RejectReason::kMalformed, decoded.diagnostic);
+    }
+    if (decoded.overflow) {
+      ++result.overflow_tiles;
+      return reject_stream(RejectReason::kOverflow, "band marked overflow");
+    }
+    if (decoded.empty) {
+      ++result.empty_tiles;
+      continue;
+    }
+
+    std::map<std::uint8_t, std::uint8_t> reach_by_label;
+    for (const TileOpDecodedPort& port : decoded.ports) {
+      std::uint8_t reach = 0;
+      if (port.certified_source) {
+        reach |= kStaticReachInner;
+      }
+      if (policy_seeds_outer(input.seed_policy) && port.certified_sink) {
+        reach |= kStaticReachOuter;
+      }
+      reach_by_label[port.local_label] |= reach;
+    }
+
+    for (const TileOpDecodedPort& port : decoded.ports) {
+      const std::uint8_t reach = reach_by_label[port.local_label];
+      if ((reach & kStaticReachInner) != 0) {
+        ++result.inner_seed_ports;
+      }
+      if ((reach & kStaticReachOuter) != 0) {
+        ++result.outer_seed_ports;
+      }
+      const std::optional<std::size_t> added = add_atom(
+          StaticReachBandAtom{
+              .id = port.id,
+              .norm_sq = decoded.support_norm_sq,
+              .reach = reach,
+              .allow_outer_overshoot_carry = true,
+          },
+          false);
+      if (!added.has_value()) {
+        return result;
+      }
+      ++result.port_atoms;
+    }
+    for (const auto& edge : decoded.internal_edges) {
+      if (!union_atoms(edge.first, edge.second, true)) {
+        return result;
+      }
+    }
+
+    for (const TileOpDecodedPort& port : decoded.ports) {
+      ports_by_face[{key, port.face}].push_back(PortRef{port.id});
+    }
+  }
+
+  if (all_atoms.size() > options.max_atoms) {
+    return reject_stream(RejectReason::kOverflow,
+                         "atom count exceeds reach cap");
+  }
+
+  for (const auto& [coord, t] : index_by_coord) {
+    const campaign::TileOp& op = input.tileops[t];
+    if ((op.tile_flags & campaign::OVERFLOW_BIT) != 0) {
+      continue;
+    }
+
+    const CoordKey above{coord.first, coord.second + 1};
+    const auto above_it = index_by_coord.find(above);
+    if (above_it != index_by_coord.end() &&
+        (input.tileops[above_it->second].tile_flags &
+         campaign::OVERFLOW_BIT) == 0) {
+      const auto& lower_ports =
+          face_ports_or_empty(ports_by_face, coord, campaign::Face::O);
+      const auto& upper_ports =
+          face_ports_or_empty(ports_by_face, above, campaign::Face::I);
+      if (lower_ports.size() != upper_ports.size()) {
+        return reject_stream(RejectReason::kMalformed,
+                             "I/O TileOp port count mismatch");
+      }
+      for (std::size_t p = 0; p < lower_ports.size(); ++p) {
+        if (!union_atoms(lower_ports[p].id, upper_ports[p].id, false)) {
+          return result;
+        }
+      }
+    }
+
+    const CoordKey right{coord.first + 1, coord.second};
+    const auto right_it = index_by_coord.find(right);
+    if (right_it != index_by_coord.end() &&
+        (input.tileops[right_it->second].tile_flags &
+         campaign::OVERFLOW_BIT) == 0) {
+      const auto& left_ports =
+          face_ports_or_empty(ports_by_face, coord, campaign::Face::R);
+      const auto& right_ports =
+          face_ports_or_empty(ports_by_face, right, campaign::Face::L);
+      if (left_ports.size() != right_ports.size()) {
+        return reject_stream(RejectReason::kMalformed,
+                             "L/R TileOp port count mismatch");
+      }
+      for (std::size_t p = 0; p < left_ports.size(); ++p) {
+        if (!union_atoms(left_ports[p].id, right_ports[p].id, false)) {
+          return result;
+        }
+      }
+    }
+  }
+
+  std::vector<std::uint8_t> root_reach(all_atoms.size(), 0);
+  for (std::size_t i = 0; i < all_atoms.size(); ++i) {
+    root_reach[dsu.find(i)] |= all_atoms[i].reach;
+  }
+  if (incoming_state != nullptr) {
+    for (std::size_t c = 0; c < incoming_state->component_partition.size();
+         ++c) {
+      const AtomId id = incoming_state->component_partition[c].front();
+      const auto it = index_by_id.find(id);
+      assert(it != index_by_id.end());
+      root_reach[dsu.find(it->second)] |=
+          incoming_state->reach_per_component[c];
+    }
+  }
+
+  std::map<std::size_t, std::vector<AtomId>> carry_by_root;
+  std::unordered_map<AtomId, std::uint64_t> norm_by_id;
+  norm_by_id.reserve(all_atoms.size());
+  bool spanning = false;
+  for (std::size_t i = 0; i < all_atoms.size(); ++i) {
+    norm_by_id.emplace(all_atoms[i].id, all_atoms[i].norm_sq);
+    const std::size_t root = dsu.find(i);
+    if ((root_reach[root] & kStaticReachBoth) == kStaticReachBoth) {
+      spanning = true;
+    }
+    if (in_final_carry_window(
+            all_atoms[i].norm_sq, input.outer_radius, carry_width,
+            all_atoms[i].allow_outer_overshoot_carry)) {
+      carry_by_root[root].push_back(all_atoms[i].id);
+    }
+  }
+
+  result.process.carry_width = carry_width;
+  result.process.spanning = spanning;
+  result.process.outgoing.component_partition.reserve(carry_by_root.size());
+  result.process.outgoing.reach_per_component.reserve(carry_by_root.size());
+  for (auto& [root, ids] : carry_by_root) {
+    sort_unique_atom_ids(ids);
+    if (ids.empty()) {
+      continue;
+    }
+    result.process.outgoing.component_partition.push_back(ids);
+    result.process.outgoing.reach_per_component.push_back(root_reach[root]);
+    for (const AtomId id : ids) {
+      result.process.outgoing.carry_atoms.push_back({id, norm_by_id.at(id)});
+    }
+  }
+  result.process.outgoing =
+      canonicalize_static_reach_separator(result.process.outgoing);
+  if (result.process.outgoing.carry_atoms.size() > options.max_carry_atoms ||
+      result.process.outgoing.component_partition.size() >
+          options.max_components) {
+    return reject_stream(RejectReason::kOverflow,
+                         "separator state exceeds reach caps");
   }
   return result;
 }
