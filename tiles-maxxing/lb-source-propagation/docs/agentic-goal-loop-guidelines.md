@@ -26,6 +26,9 @@ If any field is missing, the loop must fill it in conservatively before
 changing code. If the goal needs paid Vast execution, current-session user
 authorization is required before renting or using a paid instance.
 
+Before changing code, also read `code-quality-guidelines.md` and name the
+owned files in the loop contract.
+
 ## Default Goal
 
 For LB code alignment, the default goal is:
@@ -41,6 +44,8 @@ claims that explicitly require certified source survival or death.
 - Declare one mode: `resumable-band`, `source-origin`, `proof-refinement`, or
   `static-annulus`.
 - Touch only the impact area needed for that mode.
+- Keep new code modular; do not grow oversized files without naming why
+  extraction is not the smaller safe move.
 - Prefer small artifact contracts and verifier checks over broad architecture.
 - Keep generated outputs under ignored `artifacts/`, `runs/`, `tmp/`, or
   `_archive/workbench/`.

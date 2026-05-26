@@ -100,14 +100,16 @@ read in this order:
 3. `tiles-maxxing/lb-source-propagation/README.md`;
 4. `tiles-maxxing/lb-source-propagation/docs/lb-code-alignment-goal.md`
    before code-alignment work;
-5. `tiles-maxxing/lb-source-propagation/docs/agentic-goal-loop-guidelines.md`
+5. `tiles-maxxing/lb-source-propagation/docs/code-quality-guidelines.md`
+   before code changes;
+6. `tiles-maxxing/lb-source-propagation/docs/agentic-goal-loop-guidelines.md`
    before autonomous, remote, or goal-loop work;
-6. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
-7. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
+7. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
+8. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
    only when touching streaming;
-8. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
+9. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
    only when touching K26;
-9. remote/overnight runbooks only when paid remote execution is explicitly
+10. remote/overnight runbooks only when paid remote execution is explicitly
    authorized.
 
 `reference/current-verification-spine.md` is the static-annulus verification

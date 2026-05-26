@@ -49,11 +49,12 @@ Current first-read docs:
 
 1. `../../methodology/source-propagation-band-stitching.md`
 2. `docs/lb-code-alignment-goal.md` before code-alignment work
-3. `docs/agentic-goal-loop-guidelines.md` before autonomous or remote loops
-4. `docs/lb-handoff-redesign.md`
-5. `docs/tile-frontier-streaming-redesign.md` when touching streaming
-6. `docs/k26-tsuchimura-readiness.md` when touching K26
-7. Remote/overnight runbooks only when paid remote execution is explicitly
+3. `docs/code-quality-guidelines.md` before code changes
+4. `docs/agentic-goal-loop-guidelines.md` before autonomous or remote loops
+5. `docs/lb-handoff-redesign.md`
+6. `docs/tile-frontier-streaming-redesign.md` when touching streaming
+7. `docs/k26-tsuchimura-readiness.md` when touching K26
+8. Remote/overnight runbooks only when paid remote execution is explicitly
    authorized.
 
 The sidecar models a band handoff as:

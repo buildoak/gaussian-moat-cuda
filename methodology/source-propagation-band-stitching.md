@@ -24,6 +24,54 @@ source/origin reachability across bands. The sidecar does not change the
 existing TileOp layout, CUDA kernels, current campaign CLIs, current
 compositors, or current static-annulus verdicts.
 
+## Mental Model
+
+Think in three layers:
+
+```text
+Layer 0: static-annulus CUDA detector
+  local TileOp/CUDA evidence for ANY-SPAN or ANY-SHELL-MOAT
+
+Layer 1: resumable band workbench
+  checkpoint, restart, harvest, replay, and stitch detector bands with low
+  overhead
+
+Layer 2: source/origin overlay
+  carry certified source reachability through exact frontier handoff only when
+  the task asks for source survival, death, refinement, or certificates
+```
+
+Layer 0 and Layer 1 are valid LB campaign work without source propagation. They
+must be reported as detector or workbench evidence, not source/origin evidence.
+
+Layer 2 begins only when a certified source enters the run. From that point on,
+the only live mathematical state after a cut is:
+
+```text
+H_i = carry_atoms + component_partition + source_bit_per_component
+```
+
+The intuition is simple:
+
+- carry every frontier atom that can still affect future connectivity;
+- preserve how those frontier atoms are already connected through the processed
+  prefix;
+- mark which frontier components are certified-source connected;
+- discard historical inventory from the hot path;
+- collect proof-tier inventory or path evidence only around the last-live /
+  first-dead region or when a certificate requires it.
+
+Two mistakes break the model:
+
+- treating geometric `geo_I` contact as source reachability after the first
+  band;
+- dropping neutral carry because it is not source-marked yet.
+
+Neutral carry is load-bearing because it can weld into the source component in
+a later band. Source bits are load-bearing because treating all carry as source
+invents reachability. The partition is load-bearing because future bands need
+the exact prefix connectivity, not just a boolean verdict.
+
 ## Problem
 
 The current production campaign answers a static-annulus question:
