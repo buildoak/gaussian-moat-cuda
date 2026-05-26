@@ -59,6 +59,29 @@ struct PortRef {
   AtomId id = 0;
 };
 
+struct CoordKeyHash {
+  std::size_t operator()(const CoordKey& key) const noexcept {
+    const auto a = static_cast<std::uint32_t>(key.first);
+    const auto b = static_cast<std::uint32_t>(key.second);
+    return (static_cast<std::uint64_t>(a) << 32) ^ b;
+  }
+};
+
+struct FaceKey {
+  CoordKey coord;
+  int face = 0;
+
+  friend bool operator==(const FaceKey&, const FaceKey&) = default;
+};
+
+struct FaceKeyHash {
+  std::size_t operator()(const FaceKey& key) const noexcept {
+    const std::uint64_t coord_hash = CoordKeyHash{}(key.coord);
+    return static_cast<std::size_t>(
+        coord_hash ^ (static_cast<std::uint64_t>(key.face) << 1));
+  }
+};
+
 StaticReachProcessResult reject(RejectReason reason, std::string diagnostic,
                                 std::uint64_t carry_width = 0) {
   StaticReachProcessResult result;
@@ -84,6 +107,11 @@ void sort_unique_atom_ids(std::vector<AtomId>& ids) {
   ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
 }
 
+void sort_unique_edges(std::vector<std::pair<AtomId, AtomId>>& edges) {
+  std::sort(edges.begin(), edges.end());
+  edges.erase(std::unique(edges.begin(), edges.end()), edges.end());
+}
+
 bool is_sorted_unique_atom_ids(const std::vector<AtomId>& ids) {
   return std::adjacent_find(ids.begin(), ids.end(),
                             [](AtomId lhs, AtomId rhs) {
@@ -96,7 +124,7 @@ bool stable_atom_id(AtomId id) {
          decode_port_atom_id(id).has_value();
 }
 
-void add_edge(std::set<std::pair<AtomId, AtomId>>& edges, AtomId lhs,
+void add_edge(std::vector<std::pair<AtomId, AtomId>>& edges, AtomId lhs,
               AtomId rhs) {
   if (lhs == rhs) {
     return;
@@ -104,11 +132,12 @@ void add_edge(std::set<std::pair<AtomId, AtomId>>& edges, AtomId lhs,
   if (rhs < lhs) {
     std::swap(lhs, rhs);
   }
-  edges.insert({lhs, rhs});
+  edges.push_back({lhs, rhs});
 }
 
 const std::vector<PortRef>& face_ports_or_empty(
-    const std::map<std::pair<CoordKey, int>, std::vector<PortRef>>& by_face,
+    const std::unordered_map<FaceKey, std::vector<PortRef>, FaceKeyHash>&
+        by_face,
     const CoordKey& coord,
     campaign::Face face) {
   static const std::vector<PortRef> kEmpty;
@@ -223,9 +252,12 @@ TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
     return result;
   }
 
-  std::map<CoordKey, std::size_t> index_by_coord;
-  std::map<std::pair<CoordKey, int>, std::vector<PortRef>> ports_by_face;
-  std::set<std::pair<AtomId, AtomId>> edges;
+  std::unordered_map<CoordKey, std::size_t, CoordKeyHash> index_by_coord;
+  std::unordered_map<FaceKey, std::vector<PortRef>, FaceKeyHash> ports_by_face;
+  std::vector<std::pair<AtomId, AtomId>> internal_edges;
+  std::vector<std::pair<AtomId, AtomId>> seam_edges;
+  index_by_coord.reserve(input.coords.size());
+  ports_by_face.reserve(input.coords.size() * 2);
 
   for (std::size_t t = 0; t < input.coords.size(); ++t) {
     const campaign::TileCoord& coord = input.coords[t];
@@ -281,11 +313,7 @@ TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
       ++result.port_atoms;
     }
     for (const auto& edge : decoded.internal_edges) {
-      const std::size_t before = edges.size();
-      add_edge(edges, edge.first, edge.second);
-      if (edges.size() != before) {
-        ++result.internal_edges;
-      }
+      add_edge(internal_edges, edge.first, edge.second);
     }
 
     for (const TileOpDecodedPort& port : decoded.ports) {
@@ -313,11 +341,7 @@ TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
         return result;
       }
       for (std::size_t p = 0; p < lower_ports.size(); ++p) {
-        const std::size_t before = edges.size();
-        add_edge(edges, lower_ports[p].id, upper_ports[p].id);
-        if (edges.size() != before) {
-          ++result.seam_edges;
-        }
+        add_edge(seam_edges, lower_ports[p].id, upper_ports[p].id);
       }
     }
 
@@ -335,16 +359,24 @@ TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
         return result;
       }
       for (std::size_t p = 0; p < left_ports.size(); ++p) {
-        const std::size_t before = edges.size();
-        add_edge(edges, left_ports[p].id, right_ports[p].id);
-        if (edges.size() != before) {
-          ++result.seam_edges;
-        }
+        add_edge(seam_edges, left_ports[p].id, right_ports[p].id);
       }
     }
   }
 
-  result.band.edges.assign(edges.begin(), edges.end());
+  sort_unique_edges(internal_edges);
+  sort_unique_edges(seam_edges);
+  result.internal_edges = internal_edges.size();
+  result.seam_edges = 0;
+  result.band.edges = std::move(internal_edges);
+  result.band.edges.reserve(result.band.edges.size() + seam_edges.size());
+  for (const auto& edge : seam_edges) {
+    if (!std::binary_search(result.band.edges.begin(), result.band.edges.end(),
+                            edge)) {
+      result.band.edges.push_back(edge);
+      ++result.seam_edges;
+    }
+  }
   return result;
 }
 

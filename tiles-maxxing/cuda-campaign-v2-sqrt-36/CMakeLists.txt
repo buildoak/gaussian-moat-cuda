@@ -143,6 +143,43 @@ target_compile_definitions(campaign_main_cuda
     GAUSSIAN_MOAT_CUDA_ARCH="${CMAKE_CUDA_ARCHITECTURES}"
 )
 
+add_library(cuda_lb_source_static_reach STATIC
+  ../lb-source-propagation/src/source_propagation.cpp
+  ../lb-source-propagation/src/tileop_port_stream.cpp
+  ../lb-source-propagation/src/tileop_static_reach.cpp
+)
+target_include_directories(cuda_lb_source_static_reach
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../lb-source-propagation/include
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
+)
+target_link_libraries(cuda_lb_source_static_reach
+  PUBLIC
+    campaign
+)
+target_compile_definitions(cuda_lb_source_static_reach
+  PUBLIC
+    K_SQ=${K_SQ}
+)
+
+add_executable(cuda_static_reach_equivalence
+  apps/cuda_static_reach_equivalence.cpp
+)
+target_include_directories(cuda_static_reach_equivalence
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
+)
+target_link_libraries(cuda_static_reach_equivalence
+  PRIVATE
+    campaign_cuda
+    cuda_lb_source_static_reach
+)
+target_compile_definitions(cuda_static_reach_equivalence
+  PRIVATE
+    K_SQ=${K_SQ}
+)
+
 add_executable(cuda_golden_dump
   apps/cuda_golden_dump.cpp
 )
