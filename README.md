@@ -52,8 +52,7 @@ See:
 - `reference/current-verification-spine.md` for static-annulus verification gates.
 - `reference/attached-static-annulus-moats.md` for attached lower-K36 and
   local K34 static-annulus moat evidence.
-- `reference/archive/campaign-ledgers/k26-static-annulus-diagnostics.md` for
-  the K26 Tsuchimura-endpoint static-annulus diagnostic archive; it is not the
-  active LB source-propagation first-read path.
+- `reference/README.md` for the compact reference map and archived evidence
+  pointers.
 - `methodology/tile-operator-definition-v-claude.md` for the mathematical
   implementation contract.
