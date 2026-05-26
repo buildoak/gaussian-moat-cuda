@@ -464,7 +464,8 @@ process_tileop_static_reach_microband_streaming(
   index_by_coord.reserve(input.coords.size());
   std::unordered_map<FaceKey, std::vector<PortRef>, FaceKeyHash> ports_by_face;
   ports_by_face.reserve(input.coords.size() * 2);
-  std::set<AtomId> seen_band_atom;
+  std::vector<std::uint8_t> seen_band_atom_by_index;
+  seen_band_atom_by_index.reserve(all_atoms.capacity());
   Dsu dsu;
 
   auto observe_atom_residency = [&]() {
@@ -496,10 +497,13 @@ process_tileop_static_reach_microband_streaming(
     const auto existing = index_by_id.find(atom.id);
     if (existing != index_by_id.end()) {
       StaticReachBandAtom& current = all_atoms[existing->second];
-      if (!allow_existing && !seen_band_atom.insert(atom.id).second) {
-        result.process = reject(RejectReason::kMalformed,
-                                "duplicate band atom id", carry_width);
-        return std::nullopt;
+      if (!allow_existing) {
+        if (seen_band_atom_by_index[existing->second] != 0) {
+          result.process = reject(RejectReason::kMalformed,
+                                  "duplicate band atom id", carry_width);
+          return std::nullopt;
+        }
+        seen_band_atom_by_index[existing->second] = 1;
       }
       if (current.norm_sq != atom.norm_sq) {
         result.process = reject(
@@ -515,13 +519,11 @@ process_tileop_static_reach_microband_streaming(
       return existing->second;
     }
 
-    if (!allow_existing) {
-      seen_band_atom.insert(atom.id);
-    }
     const std::size_t index = dsu.add();
     assert(index == all_atoms.size());
     index_by_id.emplace(atom.id, index);
     all_atoms.push_back(atom);
+    seen_band_atom_by_index.push_back(allow_existing ? 0 : 1);
     observe_atom_residency();
     return index;
   };
