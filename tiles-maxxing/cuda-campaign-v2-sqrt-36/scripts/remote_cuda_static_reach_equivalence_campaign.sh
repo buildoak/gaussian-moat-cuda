@@ -6,7 +6,8 @@ usage() {
 Usage:
   remote_cuda_static_reach_equivalence_campaign.sh [--repo DIR]
       [--out-dir DIR] [--build-dir DIR] [--timeout-seconds N]
-      [--include-diagnostic-sub4096] [--include-full-static-production]
+      [--cuda-arch ARCH] [--include-diagnostic-sub4096]
+      [--include-full-static-production]
 
 Build and run CUDA static-reach stitching equivalence gates on a remote CUDA
 host. Default rows use production-width microbands only. Outputs are
@@ -18,6 +19,7 @@ repo_dir="$(pwd)"
 out_dir="/workspace/cuda-static-reach-equivalence"
 build_dir="/tmp/gm-cuda-static-reach-equivalence"
 timeout_seconds="5400"
+cuda_arch="89"
 include_diagnostic_sub4096="0"
 include_full_static_production="0"
 
@@ -37,6 +39,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --timeout-seconds)
       timeout_seconds="$2"
+      shift 2
+      ;;
+    --cuda-arch)
+      cuda_arch="$2"
       shift 2
       ;;
     --include-diagnostic-sub4096)
@@ -63,6 +69,10 @@ if ! [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || [[ "$timeout_seconds" == "0" ]]; th
   echo "--timeout-seconds must be positive" >&2
   exit 2
 fi
+if ! [[ "$cuda_arch" =~ ^[0-9]+$ ]] || [[ "$cuda_arch" == "0" ]]; then
+  echo "--cuda-arch must be positive" >&2
+  exit 2
+fi
 
 repo_dir="$(cd "$repo_dir" && pwd)"
 cuda_dir="$repo_dir/tiles-maxxing/cuda-campaign-v2-sqrt-36"
@@ -84,6 +94,7 @@ write_environment() {
     echo "branch=$(git -C "$repo_dir" branch --show-current 2>/dev/null || echo unknown)"
     echo "commit=$(git -C "$repo_dir" rev-parse HEAD 2>/dev/null || echo unknown)"
     echo "timeout_seconds=$timeout_seconds"
+    echo "cuda_arch=$cuda_arch"
     echo "include_diagnostic_sub4096=$include_diagnostic_sub4096"
     echo "include_full_static_production=$include_full_static_production"
     echo "proof_status=DIAGNOSTIC_NON_CLAIM"
@@ -288,7 +299,7 @@ PY
 echo "CUDA_STATIC_REACH_EQUIVALENCE_CAMPAIGN_RUNNING" > "$out_dir/status.txt"
 write_environment
 run_logged cmake-configure cmake -S "$cuda_dir" -B "$build_dir" \
-  -DK_SQ=36 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=89
+  -DK_SQ=36 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="$cuda_arch"
 run_logged cmake-build cmake --build "$build_dir" \
   --target cuda_static_reach_equivalence -j"$(nproc 2>/dev/null || echo 8)"
 
