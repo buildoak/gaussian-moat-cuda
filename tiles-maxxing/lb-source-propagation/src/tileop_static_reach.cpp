@@ -466,16 +466,19 @@ StaticReachProcessResult process_static_reach_band(
     }
   }
 
+  std::optional<StaticReachSeparator> canonical_incoming;
+  const StaticReachSeparator* incoming_state = nullptr;
   if (incoming) {
-    const StaticReachSeparator canonical =
-        canonicalize_static_reach_separator(*incoming);
-    const std::string validation = validate_static_reach_separator(canonical);
+    canonical_incoming = canonicalize_static_reach_separator(*incoming);
+    incoming_state = &*canonical_incoming;
+    const std::string validation =
+        validate_static_reach_separator(*incoming_state);
     if (!validation.empty()) {
       return reject(RejectReason::kMalformed,
                     "incoming static reach separator " + validation,
                     carry_width);
     }
-    for (const CarryAtom& atom : canonical.carry_atoms) {
+    for (const CarryAtom& atom : incoming_state->carry_atoms) {
       const auto existing = index_by_id.find(atom.id);
       if (existing == index_by_id.end()) {
         const std::size_t idx = all_atoms.size();
@@ -501,10 +504,8 @@ StaticReachProcessResult process_static_reach_band(
   }
 
   Dsu dsu(all_atoms.size());
-  if (incoming) {
-    const StaticReachSeparator canonical =
-        canonicalize_static_reach_separator(*incoming);
-    for (const auto& component : canonical.component_partition) {
+  if (incoming_state != nullptr) {
+    for (const auto& component : incoming_state->component_partition) {
       const AtomId first_id = component.front();
       const auto first = index_by_id.find(first_id);
       assert(first != index_by_id.end());
@@ -530,14 +531,14 @@ StaticReachProcessResult process_static_reach_band(
   for (std::size_t i = 0; i < all_atoms.size(); ++i) {
     root_reach[dsu.find(i)] |= all_atoms[i].reach;
   }
-  if (incoming) {
-    const StaticReachSeparator canonical =
-        canonicalize_static_reach_separator(*incoming);
-    for (std::size_t c = 0; c < canonical.component_partition.size(); ++c) {
-      const AtomId id = canonical.component_partition[c].front();
+  if (incoming_state != nullptr) {
+    for (std::size_t c = 0; c < incoming_state->component_partition.size();
+         ++c) {
+      const AtomId id = incoming_state->component_partition[c].front();
       const auto it = index_by_id.find(id);
       assert(it != index_by_id.end());
-      root_reach[dsu.find(it->second)] |= canonical.reach_per_component[c];
+      root_reach[dsu.find(it->second)] |=
+          incoming_state->reach_per_component[c];
     }
   }
 
@@ -603,7 +604,9 @@ StaticReachProcessResult process_static_reach_bands(
     if (spanning) {
       return last;
     }
-    state = last.outgoing;
+    if (i + 1 < bands.size()) {
+      state = std::move(last.outgoing);
+    }
   }
   return last;
 }

@@ -574,7 +574,7 @@ int main(int argc, char** argv) {
       stitched_diagnostic = band.diagnostic;
       break;
     }
-    const lb_source::StaticReachProcessResult step =
+    lb_source::StaticReachProcessResult step =
         lb_source::process_static_reach_band(
             band.band, state,
             {.max_atoms = config.max_atoms,
@@ -595,17 +595,18 @@ int main(int argc, char** argv) {
       interior_inner_seed_ports += band.inner_seed_ports;
       interior_outer_seed_ports += band.outer_seed_ports;
     }
-    max_carry_atoms =
-        std::max<std::uint64_t>(max_carry_atoms,
-                                step.outgoing.carry_atoms.size());
+    const std::uint64_t segment_carry_atoms =
+        static_cast<std::uint64_t>(step.outgoing.carry_atoms.size());
+    max_carry_atoms = std::max<std::uint64_t>(max_carry_atoms,
+                                              segment_carry_atoms);
     final_carry_width = step.carry_width;
     stitched_spanning = stitched_spanning || step.spanning;
-    state = step.outgoing;
+    state = std::move(step.outgoing);
     if (segment == 0 || segment + 2 == schedule.size() ||
         segment % 8 == 0 || stitched_spanning) {
       std::cerr << "phase=stitched_segment end segment=" << segment
                 << " tiles=" << coords.size()
-                << " carry_atoms=" << step.outgoing.carry_atoms.size()
+                << " carry_atoms=" << segment_carry_atoms
                 << " spanning=" << (stitched_spanning ? "true" : "false")
                 << " elapsed_ms=" << elapsed_ms(segment_begin, Clock::now())
                 << "\n";
