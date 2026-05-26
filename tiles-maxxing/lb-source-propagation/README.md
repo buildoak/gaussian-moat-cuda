@@ -48,10 +48,12 @@ inventory gates pass.
 Current first-read docs:
 
 1. `../../methodology/source-propagation-band-stitching.md`
-2. `docs/lb-handoff-redesign.md`
-3. `docs/tile-frontier-streaming-redesign.md` when touching streaming
-4. `docs/k26-tsuchimura-readiness.md` when touching K26
-5. Remote/overnight runbooks only when paid remote execution is explicitly
+2. `docs/lb-code-alignment-goal.md` before code-alignment work
+3. `docs/agentic-goal-loop-guidelines.md` before autonomous or remote loops
+4. `docs/lb-handoff-redesign.md`
+5. `docs/tile-frontier-streaming-redesign.md` when touching streaming
+6. `docs/k26-tsuchimura-readiness.md` when touching K26
+7. Remote/overnight runbooks only when paid remote execution is explicitly
    authorized.
 
 The sidecar models a band handoff as:

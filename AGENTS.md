@@ -8,8 +8,8 @@ campaign ledgers as provenance only.
 
 1. User direction in the current session.
 2. `methodology/tile-operator-definition-v-claude.md` - strongest math canon.
-3. `methodology/source-propagation-band-stitching.md` - lower-bound source
-   propagation and exact frontier handoff canon.
+3. `methodology/source-propagation-band-stitching.md` - source/origin overlay
+   and exact source-frontier handoff canon.
 4. `tiles-maxxing/` - current derived C++/CUDA implementation, evidence but
    not proof.
 5. `verification/` - independent post-flight and stats verifier surface.
@@ -29,7 +29,7 @@ independent verification.
 | `tiles-maxxing/cuda-campaign-v2-sqrt-36/` | CUDA campaign implementation and 4090 execution surface. |
 | `tiles-maxxing/lb-source-propagation/` | Active lower-bound source-propagation sidecar, live handoffs, diagnostics, and LB gates. |
 | `verification/` | Independent BZ, boundary, sample, span-cert, postflight, and stats checks. |
-| `methodology/source-propagation-band-stitching.md` | LB source/frontier stitching semantics and first-principles handoff model. |
+| `methodology/source-propagation-band-stitching.md` | Source/origin overlay semantics and first-principles source handoff model. |
 | `reference/experiment-contract.md` | Operational contract for running/reporting experiments. |
 | `reference/current-verification-spine.md` | Static-annulus gate spine and status vocabulary. |
 | `reference/archive/` | Historical evidence and implemented plans; not current authority. |
@@ -92,17 +92,22 @@ work unless the task explicitly asks for that stronger claim mode.
 
 ## LB First-Read Order
 
-For lower-bound source-propagation work, read in this order:
+For LB code-alignment, source/origin, autonomous-loop, or remote-loop work,
+read in this order:
 
 1. this file;
 2. `methodology/source-propagation-band-stitching.md`;
 3. `tiles-maxxing/lb-source-propagation/README.md`;
-4. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
-5. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
+4. `tiles-maxxing/lb-source-propagation/docs/lb-code-alignment-goal.md`
+   before code-alignment work;
+5. `tiles-maxxing/lb-source-propagation/docs/agentic-goal-loop-guidelines.md`
+   before autonomous, remote, or goal-loop work;
+6. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
+7. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
    only when touching streaming;
-6. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
+8. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
    only when touching K26;
-7. remote/overnight runbooks only when paid remote execution is explicitly
+9. remote/overnight runbooks only when paid remote execution is explicitly
    authorized.
 
 `reference/current-verification-spine.md` is the static-annulus verification

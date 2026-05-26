@@ -42,6 +42,41 @@ PORT=12345
 SSH_CMD="ssh -o StrictHostKeyChecking=accept-new -p $PORT root@$HOST"
 ```
 
+## Instance Ownership
+
+Vast is shared across workstreams. Gaussian Moat CUDA agents must not stop or
+destroy instances that belong to other workstreams, including Gaussian
+Splatting.
+
+Treat an instance as Gaussian Moat CUDA-owned only when at least one of these is
+true:
+
+- the current agent created it for this Gaussian Moat CUDA task and recorded
+  the id in the session report;
+- a local ledger row says `owner=gaussian-moat-cuda` for that exact instance
+  id;
+- the user explicitly identifies that exact instance id as Gaussian Moat CUDA
+  owned in the current session.
+
+Use a local ignored ledger for rented instances:
+
+```bash
+mkdir -p tiles-maxxing/vast-ai/artifacts/instance-ledger
+cat >> tiles-maxxing/vast-ai/artifacts/instance-ledger/instances.tsv <<EOF
+$(date -u +%Y-%m-%dT%H:%M:%SZ)	owner=gaussian-moat-cuda	instance_id=$ID	offer_id=$OFFER_ID	purpose=<task>	branch=$(git branch --show-current)	commit=$(git rev-parse --short HEAD)
+EOF
+```
+
+Before cleanup, inspect all live instances and match by exact id:
+
+```bash
+$VASTAI show instances
+rg "instance_id=$ID\\b" tiles-maxxing/vast-ai/artifacts/instance-ledger/instances.tsv
+```
+
+If ownership is ambiguous, do not destroy the instance. Report the ambiguity
+and ask for an explicit cleanup decision.
+
 ## Architecture Mapping
 
 | GPU | SM | CMake architecture | Notes |
@@ -196,14 +231,19 @@ rsync -avz \
 Use `tmux` for any command over 5 seconds. SSH drops are common; `tmux` keeps builds and sweeps alive.
 
 If the task explicitly includes cleanup or the user asks you to stop billing,
-destroy the instance immediately after pulling results:
+destroy only a Gaussian Moat CUDA-owned instance after pulling results and
+confirming ownership by exact id:
 
 ```bash
+rg "instance_id=$ID\\b" tiles-maxxing/vast-ai/artifacts/instance-ledger/instances.tsv
 $VASTAI destroy instance $ID
 $VASTAI show instances
 ```
 
-If the instance was already running before your task, do not destroy it unless the user explicitly asks.
+If the instance was already running before your task, do not destroy it unless
+the user explicitly asks and identifies that exact instance id as safe to clean
+up. Never infer ownership from GPU type, price, age, host, or the presence of
+`/workspace/gaussian-moat-cuda` alone.
 
 ## References
 
