@@ -196,6 +196,19 @@ const std::vector<PortRef>& face_ports_or_empty(
   return it->second;
 }
 
+std::size_t estimated_streaming_port_atom_capacity(
+    std::size_t tile_count, std::size_t incoming_atoms) {
+  constexpr std::size_t kObservedK36PortsPerTile = 160;
+  const std::size_t max_size = std::numeric_limits<std::size_t>::max();
+  const std::size_t tile_capacity =
+      tile_count > max_size / kObservedK36PortsPerTile
+          ? max_size
+          : tile_count * kObservedK36PortsPerTile;
+  return tile_capacity > max_size - incoming_atoms
+             ? max_size
+             : tile_capacity + incoming_atoms;
+}
+
 }  // namespace
 
 StaticReachSeparator canonicalize_static_reach_separator(
@@ -455,11 +468,12 @@ process_tileop_static_reach_microband_streaming(
                          "coords and tileops size mismatch");
   }
 
+  const std::size_t expected_atoms = estimated_streaming_port_atom_capacity(
+      input.coords.size(), incoming ? incoming->carry_atoms.size() : 0);
   std::vector<StaticReachBandAtom> all_atoms;
-  all_atoms.reserve(input.coords.size() * 4 +
-                    (incoming ? incoming->carry_atoms.size() : 0));
+  all_atoms.reserve(expected_atoms);
   std::unordered_map<AtomId, std::size_t> index_by_id;
-  index_by_id.reserve(all_atoms.capacity());
+  index_by_id.reserve(expected_atoms);
   std::unordered_map<CoordKey, std::size_t, CoordKeyHash> index_by_coord;
   index_by_coord.reserve(input.coords.size());
   std::unordered_map<FaceKey, std::vector<PortRef>, FaceKeyHash> ports_by_face;
