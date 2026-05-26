@@ -10,16 +10,19 @@ Profile, Independent Tile Sample, SPANNING Cert, and MOAT Hardening. Current
 K38/K40 rows remain local `ANY-SPAN` / `ANY-SHELL-MOAT` detector evidence, not
 origin-component moat proofs.
 
-The active lower-bound front is source propagation. It carries a certified
-source signal across stacked bands by exact frontier handoff:
+The active source/origin lower-bound front is source propagation. It carries a
+certified source signal across stacked bands by exact frontier handoff:
 
 ```text
 H_i = carry_atoms + component_partition + source_bit_per_component
 ```
 
-The LB hot path should reuse TileOp as the local connectivity oracle, stitch
-frontier state between bands, and fine-ify only near the last-live /
-first-dead transition. Static-reach, high-radius, overnight, and K26 bundle
+For `source-origin` mode, the LB hot path should reuse TileOp as the local
+connectivity oracle, stitch frontier state between bands, and fine-ify only
+near the last-live / first-dead transition. Ordinary static-annulus CUDA,
+high-K scout, and prolonged detector campaigns stay on the lighter
+checkpoint/restart/harvest/replay path unless a task explicitly asks for
+source/origin semantics. Static-reach, high-radius, overnight, and K26 bundle
 machinery are diagnostic/proof-debt surfaces unless explicitly promoted by an
 independent gate.
 

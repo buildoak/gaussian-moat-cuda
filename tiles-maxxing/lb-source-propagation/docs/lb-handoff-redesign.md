@@ -84,6 +84,13 @@ partition classes, not individual atoms.
 The hot handoff must not contain `component_inventory`, historical member
 lists, summary source counts, or `geo_I` / `geo_O` continuation summaries.
 
+Current implementation status: the checked-in `LiveHandoffV1` is a V1 subset of
+this target envelope. It carries `k_sq`, `cut_radius`, `carry_width`,
+`source_mode`, `source_id`, `geometry_id`, `build_id`, schedule digest fields,
+`overflow_summary`, and the live separator. Fields such as explicit
+`band_index`, named carry-window predicates, full oracle identity, and
+port-overhang policy are target-envelope fields until code and tests bind them.
+
 ### Transition Rule
 
 For each band:

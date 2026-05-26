@@ -1,10 +1,28 @@
-# Source Propagation Band Stitching
+# Source-Origin Propagation Band Stitching
 
-This note defines the Phase 1 lower-bound source-propagation protocol. The
-sidecar does not change the existing TileOp layout, CUDA kernels, current
-campaign CLIs, current compositors, or current static-annulus verdicts. It uses
-the existing TileOp and band machinery as the local connectivity engine, then
-adds an explicit handoff object for source/origin reachability across bands.
+This note defines the source/origin overlay for lower-bound work. It does not
+define the whole LB campaign.
+
+The default prolonged LB campaign should stay lighter than this overlay:
+
+```text
+CUDA band evidence
+-> checkpoint/restart
+-> band-to-band continuation
+-> harvest/replay ledger
+-> targeted refinement near the interesting transition
+```
+
+That base mode uses the existing TileOp/CUDA band machinery and current
+static-annulus verdicts. It does not need source bits, terminal inventories, or
+source-death certificates unless the declared task is `source-origin` or a
+claim-grade `proof-refinement`.
+
+This source/origin overlay uses the same TileOp and band machinery as the local
+connectivity engine, then adds an explicit handoff object for certified
+source/origin reachability across bands. The sidecar does not change the
+existing TileOp layout, CUDA kernels, current campaign CLIs, current
+compositors, or current static-annulus verdicts.
 
 ## Problem
 
@@ -18,14 +36,23 @@ That is `ANY-SPAN` or `ANY-SHELL-MOAT` evidence. It is not source/origin
 evidence, because a component can touch the geometric inner boundary without
 being connected to the origin through all previously processed bands.
 
-The source-propagation sidecar answers a different question:
+The source-propagation sidecar answers a different, optional question:
 
 ```text
 Does the certified source component survive from the processed prefix into the
 next band, and if it dies, what source-connected inventory died with it?
 ```
 
+Use this question only when the campaign mode requires source/origin semantics.
+For static-annulus rows, high-K scout rows, and ordinary resumable CUDA band
+runs, the absence of source propagation is not a gap in the hot path.
+
 ## Terms
+
+`RESUMABLE_BAND_CHECKPOINT` is operational state for restarting or replaying a
+plain CUDA band campaign. It binds geometry, build/oracle identity, command,
+profile/sample/cert artifacts, and harvest status. It is not a source handoff
+and does not carry `source_bit_per_component`.
 
 `CERTIFIED_SEED` is an atom that may be marked source-connected before a band is
 processed. A seed is valid only when a prior proof, origin-prefix witness, or
@@ -49,8 +76,10 @@ atoms are compacted away.
 
 `SOURCE_TERMINAL` is the diagnostic state reached when a processed band had a
 source-connected component but no source-connected carry component remains at
-the outer guard. The terminal inventory is the complete inventory of the
-retired source-connected component, not merely the final carry atoms.
+the outer guard. The terminal event is separate from terminal proof payload. A
+runner may report the event with compact summaries, but a certificate-grade
+terminal inventory must cover the complete retired source-connected coordinate
+component, not merely the final carry atoms.
 
 `SOURCE_DEAD_CERT` is a claim-grade certificate. It requires a positive
 coordinate Gaussian-prime source path to the claimed endpoint, a negative final
@@ -72,6 +101,11 @@ the same local connectivity relation used by the campaign machinery.
 The sidecar may add source labels and separator bookkeeping around that graph,
 but it must not reinterpret static-annulus verdicts as source claims. Local
 TileOp equivalence is a local graph equivalence only.
+
+Conversely, ordinary static-annulus or resumable-band campaigns do not inherit
+the source overlay merely because they use the same TileOp oracle. They remain
+plain detector campaigns unless their declared mode imports a certified source
+and emits source handoffs.
 
 ## Lemma 2: Separator-State Sufficiency
 
@@ -98,12 +132,19 @@ component after non-carry atoms have been compacted.
 
 For coordinate atoms the carry predicate is the literal final guard
 `[R - ceil(sqrt(K)), R]`. TileOp port atoms are abstract tile-support atoms,
-not point primes. Their stable identity is the TileOp `(tile, face, ordinal)`,
-and their stable radial support may overshoot the current band's `R` when the
-same tile/port is needed to overlap the next independently tiled band. The
-sidecar therefore allows TileOp port atoms, and only those abstract support
-atoms, to remain carry-eligible when their stable support norm is above
-`R^2` but still above the lower guard threshold. This preserves stable port
+not point primes. Their stable identity is the TileOp `(tile, face, ordinal)`.
+Their carry predicate must be a bounded support predicate, not an unbounded
+norm exception:
+
+```text
+port_support(tile, face, ordinal) intersects the next-band overlap window
+and is within the accepted TileOp schedule/support envelope.
+```
+
+The support envelope must be bound by `K`, the tile grid, the cut radius, the
+band schedule, and the exact TileOp oracle identity. Within that envelope, a
+port support may overshoot the current band's `R` when the same tile/port is
+needed to overlap the next independently tiled band. This preserves stable port
 identity across independently built bands without weakening coordinate-source
 terminal death.
 
@@ -128,7 +169,16 @@ property inferred from `geo_I` in later bands.
 
 If every band emits an exact separator state and the next band imports it
 without rewiring, then processing a sequence of stitched bands produces the same
-separator state as processing the same atoms and edges as one big band.
+separator state as processing the same atoms and edges as one big band, provided
+the stitched run and the one-big-band comparison use:
+
+- the same stable atom universe;
+- the same accepted local edge universe;
+- the same cut ownership for atoms on shared boundaries;
+- complete bridge coverage for cross-cut edges;
+- identical oracle, BZ/schedule, overflow, and TileOp support-envelope
+  identities;
+- deterministic canonicalization of carry atoms, partitions, and source bits.
 
 The acceptance comparison is separator equality:
 
@@ -156,8 +206,9 @@ stable tile support beyond `R` is still live evidence for the next band, not
 proof of terminal death. Treating such an overhanging port as dead would create
 a false terminal certificate at a band boundary.
 
-For a coordinate-prefix to TileOp-port continuation, an unbridged coordinate
-carry atom needs one more distinction:
+For a coordinate-prefix to TileOp-port continuation, every legal next-band
+Gaussian-prime candidate for every source-relevant coordinate carry atom must
+be classified. An unbridged coordinate carry atom needs one more distinction:
 
 - if there is no legal next-band Gaussian-prime candidate within distance
   `sqrt(K)`, the atom has no continuation into that band;
@@ -169,10 +220,13 @@ carry atom needs one more distinction:
   dead-end component, the continuation is unsafe for a source-death claim.
 
 Thus a claim-grade continuation cannot require "all coordinate carry atoms must
-bridge." That is too strong. It must require that every source-connected carry
-atom either bridges into the next local graph or is proven to have no legal
-next-band candidate or only dead-end candidates. Any unbridged
-source-connected atom with an unsafe candidate is a stop condition for
+bridge." That is too strong. It must require that every source-relevant carry
+atom either bridges into the next local graph, is proven to have no legal
+next-band candidate, or is proven to have only dead-end candidates. "Source
+relevant" must be evaluated after closure under the first-band local edges and
+incoming partition, or conservatively checked for all incoming coordinate carry
+atoms, because neutral carry can weld to source inside the band. Any unbridged
+source-relevant atom with an unsafe candidate is a stop condition for
 `SOURCE_DEAD_CERT`.
 
 The TileOp-port diagnostic runner reports this distinction explicitly:
@@ -187,9 +241,10 @@ source_bridge_rejected_candidate_atoms
 ```
 
 For a source-death certificate,
-`source_unbridged_unsafe_candidate_atoms` must be zero. Non-source unbridged
-carry atoms still matter for composed-band equivalence, but they do not by
-themselves keep the source component alive.
+`source_unbridged_unsafe_candidate_atoms` must be zero after this closure-aware
+classification. Non-source unbridged carry atoms still matter for composed-band
+equivalence; they can be ignored for source death only after they are proven not
+to become source-relevant in the local closure being certified.
 
 ## Lemma 6: Last-Band Transfer Sufficiency
 
@@ -199,18 +254,22 @@ the exact live separator at the inner cut of the first dead band, including all
 source and neutral carry atoms, the full carry partition, and source bits. Let
 `T_D` be a source-free transfer summary for the dead band `[R_L, R_D]`.
 
+This lemma applies only to source-survival, source-death, or certificate
+refinement modes. It is not the ordinary restart contract for plain
+static-annulus band campaigns.
+
 `T_D` must bind:
 
 ```text
 K, R_L, R_D, carry width, schedule/oracle identity, overflow status,
 inner boundary atoms or ports, outer continuation atoms or ports,
 the local boundary partition induced by accepted local edges and bridges,
-and per local boundary component coordinate max summaries.
+and per boundary-reachable local component coordinate max summaries.
 ```
 
-Then `H_L + T_D` is enough to identify which local components in the dead band
-are source-connected and to locate the furthest coordinate Gaussian-prime
-candidate inside that band. The algorithm is:
+Then `H_L + T_D` is enough to identify which boundary-reachable local
+components in the dead band are source-connected and to locate the furthest
+coordinate Gaussian-prime candidate inside those components. The algorithm is:
 
 1. Union the partition blocks from `H_L`.
 2. Union the local boundary partition blocks from `T_D`.
@@ -219,7 +278,8 @@ candidate inside that band. The algorithm is:
 4. Death is confirmed iff no source root touches an outer continuation atom or
    valid TileOp port overhang.
 5. The diagnostic furthest candidate is the maximum coordinate atom summary
-   among source roots.
+   among source roots, including dead-end interior attachments reachable from
+   those roots.
 
 The incoming source is not inferred from `geo_I`. The `geo_I` and `geo_O`
 surfaces in `T_D` bind the local annulus and guard predicates only. TileOp port
@@ -236,11 +296,12 @@ The following weakenings are invalid:
 - using port atoms as coordinate endpoint evidence without coordinate-path
   expansion.
 
-## Lemma 7: First-Plus-Rolling-Last Campaign State
+## Lemma 7: First-Plus-Rolling-Last Source Campaign State
 
-For source-survival execution, the only mathematical continuation state after a
-cut is the exact live separator for that cut. Therefore a W-scale campaign does
-not need to retain all prior band artifacts in the hot path.
+For source-survival execution, the only mathematical source-continuation state
+after a cut is the exact live separator for that cut. Therefore a source-origin
+W-scale campaign does not need to retain all prior band artifacts in the hot
+path.
 
 The minimal campaign state is:
 
@@ -264,12 +325,25 @@ targeted replay, coordinate path expansion, or an independent accumulator for
 terminal coordinate inventory; those artifacts belong to the proof tier, not to
 the hot continuation state.
 
-## Engineering Constraints
+For non-source resumable CUDA band campaigns, this lemma should be read only as
+an analogy: keep the restart state compact and replayable, and do not carry
+proof-tier payload through the hot path. The exact `H_i` separator is required
+only after a certified source is in scope.
+
+## Hot-Path Constraints
 
 - The carry width is `ceil(sqrt(K))`; for `K = 32`, this is `6`.
 - Source reachability and geometric boundary flags remain separate.
+- Source-origin continuation state is `H_i`, not historical inventory.
+- Plain resumable CUDA band checkpoints, K>40 scouts, and prolonged
+  static-annulus harvest ledgers are valid LB campaign artifacts without this
+  source overlay, as long as they are reported with detector semantics only.
+
+## Proof-Tier Constraints
+
 - Source/origin proof rows reject overflow.
-- Terminal inventory must preserve retired source components before compaction.
+- Terminal inventory must preserve retired source coordinate components before
+  compaction when a source-death certificate is claimed.
 - Summary-only terminal inventory accumulators are non-claim evidence. A
   claim-grade accumulator must use an explicit claim-grade mode and claim-grade
   acceptance flag before it can substitute for a literal inventory listing. It

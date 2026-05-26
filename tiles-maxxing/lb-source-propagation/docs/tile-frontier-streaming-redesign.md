@@ -13,6 +13,14 @@ equivalence gates. They are implementation/regression surfaces, not W-scale
 claim machinery. The remaining target is still a true bounded streaming fold:
 active microband plus live frontier, with proof/replay outside the hot path.
 
+Implementation status: the current `source_tileop_port_stream_runner` is a
+diagnostic MVP. It supports `GEO_I_PORT_DIAGNOSTIC` seeding with
+`--seed-inner-flags` and resume-equivalence through its own checkpoint path. It
+does not yet accept certified/incoming live source handoffs as a campaign
+source, and `--death-out` is deliberately unsupported. Any death or
+source/origin claim must still use the materialized diagnostics plus independent
+proof gates, not this streaming runner alone.
+
 ## Objective
 
 The current LB TileOp-port runner is useful as a diagnostic oracle, but it is
@@ -71,6 +79,14 @@ LiveHandoffV1 {
   }
 }
 ```
+
+Current implementation status: the checked-in `LiveHandoffV1` is narrower than
+this target envelope. It carries `k_sq`, `cut_radius`, `carry_width`,
+`source_mode`, `source_id`, `geometry_id`, `build_id`, schedule digest fields,
+`overflow_summary`, and the live separator. `band_or_schedule_index`,
+`first_source_artifact_hash`, explicit oracle identity, carry-window predicate
+id, and port-overhang policy id are target fields until implementation and
+tests bind them.
 
 Hot state must not contain historical component inventories, dense union-find
 roots, transient local TileOp labels, full TileOp slabs, whole-band port graphs,
