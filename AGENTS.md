@@ -8,11 +8,13 @@ campaign ledgers as provenance only.
 
 1. User direction in the current session.
 2. `methodology/tile-operator-definition-v-claude.md` - strongest math canon.
-3. `tiles-maxxing/` - current derived C++/CUDA implementation, evidence but
+3. `methodology/source-propagation-band-stitching.md` - lower-bound source
+   propagation and exact frontier handoff canon.
+4. `tiles-maxxing/` - current derived C++/CUDA implementation, evidence but
    not proof.
-4. `verification/` - independent post-flight and stats verifier surface.
-5. `reference/` - compact operational docs and archived evidence pointers.
-6. `legacy/` and `reference/archive/` - prior art and provenance only.
+5. `verification/` - independent post-flight and stats verifier surface.
+6. `reference/` - compact operational docs and archived evidence pointers.
+7. `legacy/` and `reference/archive/` - prior art and provenance only.
 
 If these disagree, follow the stronger layer and name the conflict. Do not let
 old run ledgers, goldens, or generated profiles override methodology or current
@@ -29,7 +31,7 @@ independent verification.
 | `verification/` | Independent BZ, boundary, sample, span-cert, postflight, and stats checks. |
 | `methodology/source-propagation-band-stitching.md` | LB source/frontier stitching semantics and first-principles handoff model. |
 | `agents-directives/experiment-contract.md` | Operational contract for running/reporting experiments. |
-| `reference/current-verification-spine.md` | Compact gate spine and status vocabulary. |
+| `reference/current-verification-spine.md` | Static-annulus gate spine and status vocabulary. |
 | `reference/archive/` | Historical evidence and implemented plans; not current authority. |
 
 Do not recreate root-level `docs/`, `artifacts/`, `results/`, or old campaign
@@ -44,6 +46,26 @@ only; do not introduce root `workbench/` or `_workbench/` surfaces.
 directories, or archived remote repos are evidence from that snapshot only.
 They do not override this root file and should not be treated as live routing
 instructions unless the task is explicitly auditing that artifact.
+This includes `AGENTS.md` files under
+`tiles-maxxing/cuda-campaign-v2-sqrt-36/artifacts/`.
+
+## LB First-Read Order
+
+For lower-bound source-propagation work, read in this order:
+
+1. this file;
+2. `methodology/source-propagation-band-stitching.md`;
+3. `tiles-maxxing/lb-source-propagation/README.md`;
+4. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
+5. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
+   only when touching streaming;
+6. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
+   only when touching K26;
+7. remote/overnight runbooks only when paid remote execution is explicitly
+   authorized.
+
+`reference/current-verification-spine.md` is the static-annulus verification
+spine. It is not the LB source-propagation first-read contract.
 
 ## Current Claim Semantics
 
@@ -80,6 +102,25 @@ requires it.
 Before adding LB machinery, ask whether it preserves this model. If a design
 cannot be explained as bounded frontier state plus local TileOp evidence plus
 targeted refinement, treat it as suspect and surface the tradeoff.
+
+### LB Surface Taxonomy
+
+- **Core spine:** TileOp local oracle, canonical coordinate/port atoms, exact
+  `LiveHandoffV1` / `H_i`, `process_band_live`, optional stream checkpoints,
+  and last-band summaries only for targeted refinement.
+- **Diagnostics/regression:** materialized TileOp-port runners, materialized
+  port graphs, wide-vs-stitched checks, stream equivalence checks, static-reach
+  equivalence, and CUDA static-reach equivalence.
+- **Proof debt:** coordinate-to-port bridge proofs, prefix witnesses, target
+  paths, terminal accumulators, BZ bindings, source-death certificates, and
+  claim-grade inventory/replay.
+- **Quarantine/provenance:** K26 full-run bundles, overnight/remote campaign
+  machinery, generated artifacts, timing ledgers, and anything explicitly
+  labeled `DIAGNOSTIC_NON_CLAIM`.
+
+Static-reach, high-radius, overnight, and remote timing machinery can be useful
+verification or performance evidence. They are not the LB hot path and do not
+prove source survival, moat death, or claim-grade certificates by themselves.
 
 ## Compact Verification Spine
 

@@ -1,302 +1,279 @@
 # Source Propagation Band Stitching
 
-Updated: 2026-05-22.
+This note defines the Phase 1 lower-bound source-propagation protocol. The
+sidecar does not change the existing TileOp layout, CUDA kernels, current
+campaign CLIs, current compositors, or current static-annulus verdicts. It uses
+the existing TileOp and band machinery as the local connectivity engine, then
+adds an explicit handoff object for source/origin reachability across bands.
 
-## Purpose
+## Problem
 
-The current TileOp campaign answers a static-annulus question:
+The current production campaign answers a static-annulus question:
 
 ```text
 Does any component connect geo_I to geo_O inside this annulus?
 ```
 
-That is `ANY-SPAN` / `ANY-SHELL-MOAT` evidence. It is not an origin-component
-or source-connected claim.
+That is `ANY-SPAN` or `ANY-SHELL-MOAT` evidence. It is not source/origin
+evidence, because a component can touch the geometric inner boundary without
+being connected to the origin through all previously processed bands.
 
-The lower-bound source-propagation campaign answers a different question:
-
-```text
-Given a certified source, does that same source-connected component survive
-through this band into the next band?
-```
-
-The implementation should reuse the existing TileOp and band machinery as the
-local connectivity engine, but it needs a separate protocol for what crosses
-between bands.
-
-## Source Model
-
-For squared step bound `K`, let `G_K` be the graph whose vertices are Gaussian
-primes and whose edges connect primes at squared Euclidean distance at most
-`K`.
-
-For origin mode, add a virtual source vertex `Omega`. `Omega` is adjacent to
-every Gaussian prime whose squared norm is at most `K`. The origin component is
-the component of `Omega` in this augmented graph.
-
-A source seed is accepted only if it is certified:
-
-- `ORIGIN_SOURCE`: source begins at `Omega` and its first Gaussian-prime
-  attachments are checked by the origin rule.
-- `WIRED_SOURCE`: source begins from an explicitly declared wired set. This can
-  prove wired-source claims, not origin claims.
-- `CERTIFIED_SEED`: source begins from a coordinate or frontier that is
-  hash-linked to a prior accepted source certificate.
-
-Static `geo_I` membership is not source certification.
-
-## Band And Carry Window
-
-For a radial cut at radius `R`, any edge crossing from one side of the cut to
-the other has both endpoints within `sqrt(K)` of the cut. The carry window must
-therefore use integer width:
+The source-propagation sidecar answers a different question:
 
 ```text
-rho = ceil_sqrt(K)
+Does the certified source component survive from the processed prefix into the
+next band, and if it dies, what source-connected inventory died with it?
 ```
 
-For a band ending at `R_j`, the guard/carry window is:
+## Terms
+
+`CERTIFIED_SEED` is an atom that may be marked source-connected before a band is
+processed. A seed is valid only when a prior proof, origin-prefix witness, or
+explicit test fixture establishes its connection to the source. Geometric
+membership in `geo_I` is not a certified seed by itself.
+
+`SOURCE_CARRY` is the separator state emitted after processing a band:
 
 ```text
-B_j = { p : R_j - sqrt(K) <= |p| <= R_j }
+H_i = (carry_atoms, component_partition, source_bit_per_component,
+       component_inventory)
 ```
 
-Implementations should use exact integer norm predicates for this window, not
-floating comparisons.
+`carry_atoms` are the atoms in the final radial guard window of width
+`ceil(sqrt(K))`. `component_partition` records which carry atoms are already
+connected through the processed prefix. `source_bit_per_component` marks which
+carry components are connected to the certified source. `component_inventory`
+preserves the atoms that belong to each component before non-carry atoms are
+compacted away.
 
-For non-square `K`, the acceptance-side carry predicate is the conservative
-integer shell:
+`SOURCE_TERMINAL` is the diagnostic state reached when a processed band had a
+source-connected component but no source-connected carry component remains at
+the outer guard. The terminal inventory is the complete inventory of the
+retired source-connected component, not merely the final carry atoms.
 
-```text
-R_j - ceil_sqrt(K) <= |p| <= R_j
-```
-
-This may carry extra atoms, but must not under-carry. A proof layer may later
-promote a tighter exact irrational-bound predicate only if the verifier and BZ
-contract accept it explicitly.
-
-## Separator State
-
-At a seam, the next band must not receive all of `geo_I` as source. It may only
-receive the connectivity information proved by the processed prefix.
-
-The separator state is:
-
-```text
-H_i = (carry_atoms, component_partition, source_bit_per_component)
-```
-
-Where:
-
-- `carry_atoms` are the seam/carry objects that can participate in future
-  edges.
-- `component_partition` records which carry atoms are already connected inside
-  the processed prefix.
-- `source_bit_per_component` records which partition classes are connected to
-  the declared source.
-
-This is stronger than exporting only source-connected boundary atoms and weaker
-than wiring every boundary atom as source. It is the exact information a future
-band needs from the past.
-
-`carry_atoms` must be stable, edge-recomputable identifiers. In the first CPU
-sidecar they are explicit atom ids with exact norm payloads; in the TileOp
-integration they should become stable coordinate or canonical port atoms, not
-transient union-find roots, dense component ids, or compacted frontier labels.
-The separator partition is canonicalized over these stable ids before it is
-persisted or compared.
-
-Reachability only needs `H_i`. Certificates need one more payload: per-class
-inventory for already-ingested vertices represented by each carry component.
-This payload does not grant new connectivity. It exists so a component that is
-neutral at seam `i` but later merges into the source can still contribute its
-retired vertices to a terminal certificate.
-
-## Coordinate-To-Port Seam Bridge
-
-The coordinate sidecar and the TileOp port graph use different stable atoms.
-Coordinate atoms identify Gaussian-prime coordinates. Port atoms identify
-canonical TileOp face/ordinal positions. Moving a prefix manifest from
-coordinate atoms into a TileOp-port band is therefore not a free relabeling.
-
-A coordinate carry atom below a radial seam may influence the first TileOp-port
-band only through a first-band prime within squared distance `K`. That
-first-band prime then bridges to every canonical port atom carrying its
-TileOp-visible local component.
-
-The safe diagnostic handoff is hybrid: keep the original coordinate separator
-as `incoming`, add bridge edges from coordinate carry atoms to canonical port
-atoms in the first TileOp-port band, and let the normal source propagator decide
-which port atoms survive into the next carry window. This avoids turning the
-handoff into a lossy pre-projection of source state.
-
-This seam bridge is diagnostic until accepted by an explicit seam lemma or
-verifier gate. The runner must report:
-
-- coordinate carry atoms consumed from the manifest,
-- coordinate carry atoms that bridged to at least one TileOp port,
-- coordinate carry atoms that had no first-band port bridge,
-- resulting canonical port carry atoms,
-- bridge edges inserted between coordinate atoms and port atoms.
-
-A seam bridge can be useful evidence for where source appears to die, but it is
-not by itself a `SOURCE_DEAD_CERT`. If the first TileOp-port band reports
-source death, the certificate layer must still prove that unbridged coordinate
-carry atoms have no future continuation and that the port graph representation
-preserves every possible source attachment needed by the terminal guard.
-
-For the diagnostic TileOp-port runner, "unbridged" is not a single logical
-state. The runner must distinguish source-connected coordinate carry atoms that:
-
-- bridge into at least one first-band TileOp port;
-- have no legal next-band Gaussian-prime candidate within squared distance
-  `K`;
-- have only dead-end next-band candidates whose local TileOp components have no
-  encoded face ports; or
-- have an unsafe next-band candidate that could carry source reachability
-  farther.
-
-A claim-grade source-death certificate cannot require every coordinate carry
-atom to bridge, because that would reject legitimate dead-end source death. It
-also cannot ignore bridge failures. The required stop condition is:
-
-```text
-source_unbridged_unsafe_candidate_atoms == 0
-```
-
-The current K26 bridge evidence is therefore accepted only as non-claim
-diagnostic evidence unless a verifier-accepted seam lemma binds the coordinate
-carry atoms, TileOp-port components, dead-end classification, terminal
-inventory, and BZ schedule into one certificate contract.
-
-When a coordinate carry atom is bridged to a TileOp port, the diagnostic runner
-must also be able to reconstruct a local Gaussian-prime path from the coordinate
-side of the bridge to a representative prime of that port component. This
-reconstruction is not allowed to change TileOp bytes or labels; it is a
-post-encoding witness built from the same sorted tile primes after the emitted
-TileOp is checked byte-for-byte against the local rebuild. The witness upgrades
-the mixed coordinate/port atom chain from "unexpanded port edge" to
-"locally expanded non-claim evidence", while still leaving the final
-`SOURCE_DEAD_CERT` blocked until the full coordinate path, terminal inventory,
-and BZ schedule are verified together.
+`SOURCE_DEAD_CERT` is a claim-grade certificate. It requires a positive
+coordinate Gaussian-prime source path to the claimed endpoint, a negative final
+guard proving no legal continuation survives, bound BZ/schedule evidence,
+artifact hashes, and a verifier-accepted terminal inventory summary. For very
+large components, the inventory may be accepted through a claim-grade digest
+accumulator instead of a literal JSON listing, but the accumulator must
+explicitly identify itself as claim-grade evidence. A `SOURCE_TERMINAL`
+diagnostic is necessary evidence for such a certificate but is not sufficient
+by itself.
 
 ## Lemma 1: Local TileOp Equivalence
 
-For a fixed band, the existing TileOp construction and port stitching represent
-the same connectivity relation among visible Gaussian-prime components as the
-underlying prime graph restricted to that band, subject to the existing TileOp
-methodology assumptions.
+Within one radial band, the sidecar treats the existing TileOp machinery as the
+local connectivity oracle. For a fixed `K`, radius interval, grid, and TileOp
+configuration, the local graph atoms and edges are a CPU-side representation of
+the same local connectivity relation used by the campaign machinery.
 
-This source-propagation layer does not modify that local claim. It treats the
-current TileOp/band machinery as the local connectivity engine.
+The sidecar may add source labels and separator bookkeeping around that graph,
+but it must not reinterpret static-annulus verdicts as source claims. Local
+TileOp equivalence is a local graph equivalence only.
 
-## Lemma 2: Separator Sufficiency
+## Lemma 2: Separator-State Sufficiency
 
-Given a processed prefix `P` and an unprocessed suffix `S`, future
-source-reachability in `S` depends on `P` only through `H_i`.
+For future bands, the processed prefix can affect connectivity only through
+atoms within distance `sqrt(K)` of the next band. Therefore a carry window of
+width `ceil(sqrt(K))` is sufficient: any future edge from an already processed
+atom to an unprocessed atom must touch a carry atom.
 
-Proof sketch:
+The handoff must contain all carry atoms, not only source carry atoms. It must
+also contain the partition of carry atoms and one source bit per partition
+component:
 
-Any path from the source in `P` to a future vertex in `S` must cross the seam
-through a carry atom. The prefix contributes only two facts about seam atoms:
-which seam atoms are equivalent through prefix paths, and which of those
-equivalence classes are source-connected. These are exactly the partition and
-source bits in `H_i`.
+```text
+H_i = carry_atoms + component_partition + source_bit_per_component
+```
+
+Carrying only source atoms can lose later merges through non-source carry.
+Carrying all carry atoms as source can invent reachability. Carrying the full
+partition plus source bits preserves exactly what the prefix proved.
+
+The implementation also carries `component_inventory` so terminal death can
+report the retired source component after non-carry atoms have been compacted.
+
+For coordinate atoms the carry predicate is the literal final guard
+`[R - ceil(sqrt(K)), R]`. TileOp port atoms are abstract tile-support atoms,
+not point primes. Their stable identity is the TileOp `(tile, face, ordinal)`,
+and their stable radial support may overshoot the current band's `R` when the
+same tile/port is needed to overlap the next independently tiled band. The
+sidecar therefore allows TileOp port atoms, and only those abstract support
+atoms, to remain carry-eligible when their stable support norm is above
+`R^2` but still above the lower guard threshold. This preserves stable port
+identity across independently built bands without weakening coordinate-source
+terminal death.
 
 ## Lemma 3: No-Rewire
 
-Replacing `H_i` with all `geo_I` atoms marked source can create source paths
-that do not exist in `G_K`.
+When the next band is processed, the incoming separator components may be wired
+only according to `component_partition`. The next band may connect to those
+carry atoms through real local edges, but it may not reassign source status from
+geometric boundary flags or transient component IDs.
 
-Replacing `H_i` with only currently source-marked atoms can destroy future
-paths, because non-source carry atoms may later merge with source atoms in the
-suffix.
+This prevents two false moves:
 
-Therefore the correct handoff is the full separator partition plus source bits,
-not a boolean span verdict and not a raw boundary set.
+- false weld: merging components merely because they touch the same geometric
+  side of a band;
+- false source: treating every inner-boundary atom as source-connected after
+  the first band.
+
+Source reachability is data carried by `source_bit_per_component`, not a
+property inferred from `geo_I` in later bands.
 
 ## Lemma 4: Composed-Band Equivalence
 
-Processing a large band in one pass is equivalent to processing it as composed
-sub-bands if each seam passes the exact separator state `H_i` and each sub-band
-uses a carry window of width at least `ceil_sqrt(K)`.
+If every band emits an exact separator state and the next band imports it
+without rewiring, then processing a sequence of stitched bands produces the same
+separator state as processing the same atoms and edges as one big band.
 
-The equivalence check must compare:
+The acceptance comparison is separator equality:
 
-- final source reachability,
-- source-reached outer/carry atoms,
-- separator partition at each cut,
-- source bit per separator partition class,
-- rejection behavior for malformed or ambiguous seams.
+```text
+canonical(carry_atoms, component_partition, source_bit_per_component,
+          component_inventory)
+```
 
-Matching only final `SPANNING` / `MOAT` verdicts is insufficient.
+It is not enough to compare only final `SPANNING`, `MOAT`, or "has source"
+booleans. The fixtures must compare the carry partition and source bits, because
+those are the state that future bands consume.
 
-## Lemma 5: Terminal Guard
+## Lemma 5: Terminal Guard And Death Logic
 
-If, after full guarded ingestion, no source-connected component intersects the
-final guard band `[R - sqrt(K), R]`, then no future Gaussian prime with radius
-greater than `R` can attach to the source component.
+After a band ending at radius `R`, a source component is dead only when no
+source-connected component intersects the final carry window
+`[R - ceil(sqrt(K)), R]`. If there is no such source carry component, no future
+prime outside radius `R` can be adjacent to the retired source component,
+because every allowed edge has length at most `sqrt(K)`.
 
-Proof sketch:
+For TileOp-port continuation, "intersects the final carry window" is evaluated
+through the abstract support rule above: a source-connected TileOp port with
+stable tile support beyond `R` is still live evidence for the next band, not
+proof of terminal death. Treating such an overhanging port as dead would create
+a false terminal certificate at a band boundary.
 
-Assume a future prime `q` with `|q| > R` first attaches to the processed source
-component by an edge to some source-connected prime `p` in the processed region.
-Since the edge length is at most `sqrt(K)`, `|p| >= |q| - sqrt(K) > R -
-sqrt(K)`. Thus `p` lies in the final guard band, contradicting the assumption
-that no source-connected component intersects it.
+For a coordinate-prefix to TileOp-port continuation, an unbridged coordinate
+carry atom needs one more distinction:
 
-## Claim Vocabulary
+- if there is no legal next-band Gaussian-prime candidate within distance
+  `sqrt(K)`, the atom has no continuation into that band;
+- if a legal next-band candidate exists and its local component has no encoded
+  TileOp face ports, the candidate is a dead-end attachment inside the next
+  band; it cannot carry source reachability farther, but claim-grade inventory
+  must still account for it;
+- if a legal next-band candidate exists and the bridge failure is not such a
+  dead-end component, the continuation is unsafe for a source-death claim.
 
-- `ANY-SPAN`: current static-annulus claim; some component connects `geo_I` to
-  `geo_O`.
-- `ANY-SHELL-MOAT`: current static-annulus full-ingest detector claim; no
-  component connects `geo_I` to `geo_O`.
-- `CERTIFIED_SEED`: a declared source coordinate/frontier is accepted by an
-  origin rule, wired-source declaration, or prior certificate chain.
-- `SOURCE_CARRY`: a certified source component reaches the next carry window.
-- `SOURCE_TERMINAL`: a detector state where source no longer reaches the next
-  carry window and terminal source-component inventory has been emitted.
-- `SOURCE_DEAD_CERT`: an accepted terminal proof that source cannot continue
-  beyond the guard radius.
-
-`SOURCE_TERMINAL` is not enough for an endpoint claim by itself. Exact endpoint
-claims need both a positive source path to the endpoint and a
+Thus a claim-grade continuation cannot require "all coordinate carry atoms must
+bridge." That is too strong. It must require that every source-connected carry
+atom either bridges into the next local graph or is proven to have no legal
+next-band candidate or only dead-end candidates. Any unbridged
+source-connected atom with an unsafe candidate is a stop condition for
 `SOURCE_DEAD_CERT`.
 
-A `SOURCE_DEAD_CERT` contains two logically separate objects:
+The TileOp-port diagnostic runner reports this distinction explicitly:
 
-1. a negative guard proof: after full guarded ingestion, no source-connected
-   class intersects the final guard window; and
-2. a positive terminal inventory: the complete source-connected payload retained
-   before carry/frontier compaction dropped retired vertices.
+```text
+source_bridged_coordinate_carry_atoms
+source_unbridged_without_next_band_candidates
+source_unbridged_with_next_band_candidates
+source_unbridged_dead_end_candidate_atoms
+source_unbridged_unsafe_candidate_atoms
+source_bridge_rejected_candidate_atoms
+```
 
-The inventory records at least the stable component/member digest, count,
-maximum norm, max-coordinate tie set, and enough witness linkage to audit the
-claimed endpoint against the certified source chain. If the source merges into a
-previously neutral carry class, that class's prior inventory becomes source
-inventory at the merge.
+For a source-death certificate,
+`source_unbridged_unsafe_candidate_atoms` must be zero. Non-source unbridged
+carry atoms still matter for composed-band equivalence, but they do not by
+themselves keep the source component alive.
 
-## Engineering Consequences
+## Lemma 6: Last-Band Transfer Sufficiency
 
-- Geometric `inner_flags` and `outer_flags` are not source flags.
-- Source state must not depend on transient compacted component IDs.
-- Carry exports need stable carry atoms, their partition, and source bits.
-- Terminal mode must inventory retired source components before compaction drops
-  them.
-- Overflow is a hard reject for source/origin claims. Conservative overflow
-  `SPANNING` is valid only as current detector safety behavior.
-- Non-square `K` requires exact external BZ evidence until the acceptance layer
-  fully promotes non-square BZ support.
-- Full-octant/static-annulus closure rules do not automatically transfer to
-  arbitrary source claims. Origin mode can use the origin's symmetry, but
-  `WIRED_SOURCE` and arbitrary `CERTIFIED_SEED` claims must either process the
-  full required domain, carry side-boundary separator state, or state an
-  explicit symmetry restriction.
+For diagnostic lower-bound refinement, a dead progress row is not sufficient,
+but all earlier band artifacts are not mathematically necessary. Let `H_L` be
+the exact live separator at the inner cut of the first dead band, including all
+source and neutral carry atoms, the full carry partition, and source bits. Let
+`T_D` be a source-free transfer summary for the dead band `[R_L, R_D]`.
 
-## First Verification Gates
+`T_D` must bind:
 
-1. Compare 5 to 10 small composed-band fixtures against one big band.
-2. Include fixtures for false welding, source-only carry loss, non-source
-   partition merges, terminal death, overflow reject, and `K=32` carry width
-   `ceil_sqrt(32)=6`.
-3. Compare separator partitions and source bits, not only final verdicts.
+```text
+K, R_L, R_D, carry width, schedule/oracle identity, overflow status,
+inner boundary atoms or ports, outer continuation atoms or ports,
+the local boundary partition induced by accepted local edges and bridges,
+and per local boundary component coordinate max summaries.
+```
+
+Then `H_L + T_D` is enough to identify which local components in the dead band
+are source-connected and to locate the furthest coordinate Gaussian-prime
+candidate inside that band. The algorithm is:
+
+1. Union the partition blocks from `H_L`.
+2. Union the local boundary partition blocks from `T_D`.
+3. Mark a root as source iff it contains an incoming source-bit component from
+   `H_L`.
+4. Death is confirmed iff no source root touches an outer continuation atom or
+   valid TileOp port overhang.
+5. The diagnostic furthest candidate is the maximum coordinate atom summary
+   among source roots.
+
+The incoming source is not inferred from `geo_I`. The `geo_I` and `geo_O`
+surfaces in `T_D` bind the local annulus and guard predicates only. TileOp port
+support may keep continuation alive, but a port support norm is not a coordinate
+furthest atom.
+
+The following weakenings are invalid:
+
+- storing only source-marked ports or source-marked carry;
+- dropping neutral carry classes, because they may weld to source inside the
+  dead band;
+- treating all carry as source;
+- using a dead progress row without `H_L` or an equivalent boundary transfer;
+- using port atoms as coordinate endpoint evidence without coordinate-path
+  expansion.
+
+## Lemma 7: First-Plus-Rolling-Last Campaign State
+
+For source-survival execution, the only mathematical continuation state after a
+cut is the exact live separator for that cut. Therefore a W-scale campaign does
+not need to retain all prior band artifacts in the hot path.
+
+The minimal campaign state is:
+
+```text
+first_source_artifact
+current_live_handoff
+previous_live_handoff
+active_last_band_transfer_summary
+terminal_summary_if_dead
+```
+
+`first_source_artifact` certifies the seed/source identity and global geometry.
+`current_live_handoff` continues the next band. `previous_live_handoff` is kept
+only while processing the active band, so that if the active band kills the
+source, `previous_live_handoff + active_last_band_transfer_summary` forms the
+local diagnostic refinement artifact.
+
+Sparse checkpoints and older band summaries are operational restart evidence,
+not mathematical continuation state. Claim-grade certificates may still require
+targeted replay, coordinate path expansion, or an independent accumulator for
+terminal coordinate inventory; those artifacts belong to the proof tier, not to
+the hot continuation state.
+
+## Engineering Constraints
+
+- The carry width is `ceil(sqrt(K))`; for `K = 32`, this is `6`.
+- Source reachability and geometric boundary flags remain separate.
+- Source/origin proof rows reject overflow.
+- Terminal inventory must preserve retired source components before compaction.
+- Summary-only terminal inventory accumulators are non-claim evidence. A
+  claim-grade accumulator must use an explicit claim-grade mode and claim-grade
+  acceptance flag before it can substitute for a literal inventory listing. It
+  must also attest that the terminal inventory stream was observed completely,
+  emitted in canonical order, duplicate-free, finalized for the retired source
+  component, and overflow-checked.
+- Certificates must bind seed mode, geometry, commit, build, BZ/schedule
+  evidence, artifact hashes, endpoint path, and terminal inventory.
+- Static-annulus `ANY-SPAN` and `ANY-SHELL-MOAT` rows remain diagnostics for
+  this protocol unless a separate source/origin certificate accepts them.

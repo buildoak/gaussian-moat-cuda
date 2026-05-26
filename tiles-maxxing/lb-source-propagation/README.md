@@ -5,7 +5,54 @@ replacement for the existing TileOp/CUDA campaign; it is the source-stitching
 protocol plus smoke contact with the existing CPU TileOp producer.
 
 The proof model is documented in
-`methodology/source-propagation-band-stitching.md`.
+`../../methodology/source-propagation-band-stitching.md`.
+
+## Current LB Contract
+
+LB source propagation is not a static-annulus verdict. It carries one certified
+source signal across stacked bands:
+
+```text
+H_i = carry_atoms + component_partition + source_bit_per_component
+```
+
+- `carry_atoms`: every stable coordinate or port frontier atom that can affect
+  future connectivity, source or neutral.
+- `component_partition`: exact prefix connectivity among those carry atoms.
+- `source_bit_per_component`: which partition classes are connected to the
+  certified source.
+
+Each band imports `H_{i-1}`, applies local TileOp connectivity plus accepted
+bridges, and emits `H_i`. Later bands never reseed from `geo_I`.
+
+The hot coarse sweep must carry bounded live frontier state only. Historical
+`component_inventory`, proof ledgers, terminal accumulators, BZ bindings,
+coordinate paths, K26 bundle artifacts, full TileOp slabs, and whole-band port
+graphs are proof-tier or diagnostic evidence, not hot state.
+
+The intended campaign shape is first-plus-rolling-last:
+
+```text
+first_source_artifact
+current_live_handoff
+previous_live_handoff
+active_last_band_transfer_summary
+terminal_summary_if_dead
+```
+
+The coarse sweep finds the last-live / first-dead window. Expensive proof work
+is on-demand in that window. All terminal/progress outputs remain
+`DIAGNOSTIC_NON_CLAIM` until independent path, bridge, BZ, negative-guard, and
+inventory gates pass.
+
+Current first-read docs:
+
+1. `../../methodology/source-propagation-band-stitching.md`
+2. `docs/lb-handoff-redesign.md`
+3. `docs/tile-frontier-streaming-redesign.md` when touching streaming
+4. `docs/k26-tsuchimura-readiness.md` when touching K26
+5. Remote/overnight runbooks only when paid remote execution is explicitly
+   authorized.
 
 The sidecar models a band handoff as:
 
@@ -189,6 +236,10 @@ round-trip/rejection, exact draft JSON output, CPU TileOp producer smoke, and
 sqrt(26) Tsuchimura preflight/run-contract constants.
 
 ## Remote Smoke
+
+This section is a historical/conditional runbook. It does not grant standing
+permission to rent Vast instances. Use it only when paid remote execution is
+explicitly authorized in the current session.
 
 Find a qualifying Vast 4090 without renting:
 

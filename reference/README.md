@@ -4,20 +4,41 @@ This directory is for compact operational references. Historical plans, campaign
 ledgers, and long evidence reports live under `reference/archive/` so they can
 be cited without competing with the current verification doctrine.
 
-First-read order:
+Always read first:
 
 1. `../AGENTS.md` - repo authority, claim semantics, compact gate spine.
-2. `current-verification-spine.md` - executable gate spine and proof-status vocabulary.
-3. `../agents-directives/experiment-contract.md` - how to run and report
+2. `../agents-directives/experiment-contract.md` - how to run and report
    campaign experiments.
-4. `../verification/README.md` and `../verification/postflight/README.md` -
+3. `../verification/README.md` and `../verification/postflight/README.md` -
    independent verifier tools and post-flight runner usage.
+
+Static-annulus first-read:
+
+1. `current-verification-spine.md` - static-annulus gate spine and proof-status
+   vocabulary.
+2. `attached-static-annulus-moats.md` - attached lower-K static-annulus rows and
+   proof-status cautions.
+
+Lower-bound source-propagation first-read:
+
+1. `../methodology/source-propagation-band-stitching.md` - separator state,
+   no-rewire, bridge obligations, and first-plus-rolling-last state.
+2. `../tiles-maxxing/lb-source-propagation/README.md` - current LB
+   implementation surfaces, gates, and non-claim boundaries.
+3. `../tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md` - live
+   handoff and targeted last-band refinement design.
+4. `../tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
+   only when touching streaming.
+5. `../tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
+   only when touching K26.
+6. Remote/overnight runbooks only when paid remote execution is explicitly
+   authorized.
 
 ## Live References
 
 | File | Role |
 |---|---|
-| `current-verification-spine.md` | Active compact verification gates, demoted tools, and sample policy. |
+| `current-verification-spine.md` | Active static-annulus verification gates, demoted tools, and sample policy. |
 | `attached-static-annulus-moats.md` | Attached lower-K36 and local K34 static-annulus moat evidence, with proof-status cautions. |
 | `k34-current-campaign-plan-20260507.md` | Current-gate rerun plan for attaching K34 local static-annulus moat rows. |
 | `k34-tsuchimura-campaign-comparison-20260507.md` | Computational comparison between Tsuchimura's K34 campaign and the local CUDA K34 effective-width campaign. |
@@ -29,6 +50,7 @@ First-read order:
 | `k40-current-gate-campaign-20260509.md` | Current-gate K40 campaign: W32768 bracket `978M SPAN -> 979.5M MOAT`, larger-width W49152 bracket `937.5M SPAN -> 940.625M MOAT`, and profile-free early-exit W65536/W131072/W262144 scout branch points. |
 | `k40-w786432-840m-candidate-and-w720896-clean-run-20260518.md` | W786432 `840M` timeout branch and W720896 no-timeout follow-up, which eventually found a late clean span after ~19h51m. |
 | `k26-k36-telemetry-calibration-20260508.md` | Lower-K telemetry calibration pilot for K40 moat-search triage. |
+| `lb-source-propagation-goal-plan-20260522.md` | Historical seed plan for LB source propagation; use methodology and LB README as current first-read. |
 | `agentic-optimization-workflow.md` | Branch/report workflow for long optimization work. |
 | `optimization-safety-checklist.md` | Do-not-break checklist for math/TileOp/port/verdict changes. |
 | `performance-report-template.md` | Performance report shape. |

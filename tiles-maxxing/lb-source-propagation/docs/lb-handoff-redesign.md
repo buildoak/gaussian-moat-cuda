@@ -1,6 +1,6 @@
 # LB Handoff Redesign
 
-Status: design decision, not implementation.
+Status: accepted design and partial implementation contract, not proof evidence.
 Date: 2026-05-24.
 
 ## Objective

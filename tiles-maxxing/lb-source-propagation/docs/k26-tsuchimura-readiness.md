@@ -1,7 +1,10 @@
 # sqrt(26) Tsuchimura Readiness
 
 This note is the execution guard for the first source/origin comparison target.
-It is not a result claim.
+It is not a result claim and it is not a first-read LB architecture document.
+Read it only when touching K26. Remote budget values and Vast commands below
+are historical/conditional runbook material, not standing authorization for
+paid compute.
 
 ## Target
 

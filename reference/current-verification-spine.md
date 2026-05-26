@@ -1,14 +1,19 @@
-# Current Verification Spine
+# Current Static-Annulus Verification Spine
 
 Updated: 2026-05-06 for the compact verification spine.
 
-This board defines the current active gates for accepted static-annulus campaign
-evidence. Long campaign ledgers and stale gate boards are provenance under
+This board defines the current active gates for accepted static-annulus
+campaign evidence. It does not define lower-bound source-propagation
+acceptance. For LB work, start with
+`../methodology/source-propagation-band-stitching.md` and
+`../tiles-maxxing/lb-source-propagation/README.md`.
+
+Long campaign ledgers and stale gate boards are provenance under
 `reference/archive/`; they do not define current acceptance.
 
 ## Active Gates
 
-The active gates are exactly:
+The active static-annulus gates are exactly:
 
 | Gate | Fires | Answers |
 |---|---|---|

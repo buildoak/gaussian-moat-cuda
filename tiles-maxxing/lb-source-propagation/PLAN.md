@@ -1,8 +1,17 @@
 # LB Source Propagation Implementation Plan
 
-Status: execution plan, not implementation.
+Status: historical implementation plan plus execution record.
 Date: 2026-05-24.
 Branch context: `ttc/lb-source-propagation`.
+
+This file is no longer the first-read LB plan. Phases 0-5 were implemented and
+recorded below; later stream/static-reach work landed in follow-up commits.
+Use `../../methodology/source-propagation-band-stitching.md`, `README.md`,
+`docs/lb-handoff-redesign.md`, and `docs/tile-frontier-streaming-redesign.md`
+as the current design/instruction layer.
+
+Remote budget values in this file are historical execution constraints, not
+standing authorization for paid compute.
 
 ## Objective
 

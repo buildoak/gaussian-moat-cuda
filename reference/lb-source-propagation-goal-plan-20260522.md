@@ -1,5 +1,11 @@
 # LB Source Propagation Goal Plan
 
+Status: historical seed plan. This file preserves the May 22 kickoff contract.
+It is no longer the LB first-read source of truth. For current work, read
+`../methodology/source-propagation-band-stitching.md`,
+`../tiles-maxxing/lb-source-propagation/README.md`, and
+`../tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`.
+
 Updated: 2026-05-22.
 
 ## Objective
