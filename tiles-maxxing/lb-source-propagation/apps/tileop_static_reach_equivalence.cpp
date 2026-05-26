@@ -1,3 +1,4 @@
+#include "lb_source/detector_band_handoff.h"
 #include "lb_source/tileop_static_reach.h"
 
 #include <algorithm>
@@ -233,6 +234,90 @@ std::vector<std::uint64_t> build_schedule(std::uint64_t r_start,
   return radii;
 }
 
+const char* seed_policy_name(lb_source::StaticReachSeedPolicy policy) {
+  switch (policy) {
+    case lb_source::StaticReachSeedPolicy::kOneBand:
+      return "kOneBand";
+    case lb_source::StaticReachSeedPolicy::kFirstBand:
+      return "kFirstBand";
+    case lb_source::StaticReachSeedPolicy::kInteriorBand:
+      return "kInteriorBand";
+    case lb_source::StaticReachSeedPolicy::kFinalBand:
+      return "kFinalBand";
+  }
+  return "unknown";
+}
+
+lb_source::StaticReachSeedPolicy stitched_seed_policy(std::size_t segment,
+                                                      std::size_t segments) {
+  if (segments == 1) {
+    return lb_source::StaticReachSeedPolicy::kOneBand;
+  }
+  if (segment == 0) {
+    return lb_source::StaticReachSeedPolicy::kFirstBand;
+  }
+  if (segment + 1 == segments) {
+    return lb_source::StaticReachSeedPolicy::kFinalBand;
+  }
+  return lb_source::StaticReachSeedPolicy::kInteriorBand;
+}
+
+std::string hex64(std::uint64_t value) {
+  constexpr char kHex[] = "0123456789abcdef";
+  std::string out(16, '0');
+  for (int i = 15; i >= 0; --i) {
+    out[static_cast<std::size_t>(i)] = kHex[value & 0xfU];
+    value >>= 4;
+  }
+  return out;
+}
+
+std::string schedule_digest_hex(const std::vector<std::uint64_t>& schedule,
+                                std::uint64_t width) {
+  std::uint64_t hash = 1469598103934665603ULL;
+  auto mix = [&](std::uint64_t value) {
+    for (int i = 0; i < 8; ++i) {
+      hash ^= (value >> (8 * i)) & 0xffU;
+      hash *= 1099511628211ULL;
+    }
+  };
+  mix(width);
+  mix(schedule.size());
+  for (const std::uint64_t radius : schedule) {
+    mix(radius);
+  }
+  const std::uint64_t a = hash;
+  mix(hash ^ 0x9e3779b97f4a7c15ULL);
+  const std::uint64_t b = hash;
+  mix(hash ^ 0xbf58476d1ce4e5b9ULL);
+  const std::uint64_t c = hash;
+  mix(hash ^ 0x94d049bb133111ebULL);
+  return hex64(a) + hex64(b) + hex64(c) + hex64(hash);
+}
+
+lb_source::DetectorBandHandoffV1 make_final_handoff(
+    const lb_source::StaticReachProcessResult& reach,
+    const std::vector<std::uint64_t>& schedule,
+    const Config& config) {
+  lb_source::DetectorBandHandoffV1 handoff;
+  handoff.k_sq = static_cast<std::uint64_t>(campaign::k_sq_value);
+  handoff.cut_radius = config.r_final;
+  handoff.carry_width = reach.carry_width;
+  handoff.schedule_index = schedule.empty() ? 0 : schedule.size() - 1;
+  handoff.schedule_digest_algorithm =
+      "fnv1a64x4:tileop-static-reach-equivalence-schedule-v1";
+  handoff.schedule_digest_hex =
+      schedule_digest_hex(schedule, config.microband_width);
+  handoff.geometry_id = "gaussian-octant-grid-full-static-annulus-v1";
+  handoff.oracle_id = "tileop-static-reach-cpu-v1";
+  handoff.build_id = "local-cmake-k" + std::to_string(campaign::k_sq_value);
+  handoff.support_envelope_id = "tileop-port-carry-ceil-sqrt-k-v1";
+  handoff.port_identity_scheme_id = "tileop-local-port-atom-v1";
+  handoff.boundary_policy_id = "closed-tile-boundary-v1";
+  handoff.separator = reach.outgoing;
+  return lb_source::canonicalize_detector_band_handoff(handoff);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -281,6 +366,7 @@ int main(int argc, char** argv) {
           .outer_radius = config.r_final,
           .coords = full_coords,
           .tileops = full_tileops,
+          .seed_policy = lb_source::StaticReachSeedPolicy::kOneBand,
       });
   if (!full_reach_band.accepted()) {
     std::cerr << "full static reach band rejected: "
@@ -312,12 +398,18 @@ int main(int argc, char** argv) {
   std::uint64_t stitched_seam_edges = 0;
   std::uint64_t stitched_inner_seed_ports = 0;
   std::uint64_t stitched_outer_seed_ports = 0;
+  std::uint64_t interior_inner_seed_ports = 0;
+  std::uint64_t interior_outer_seed_ports = 0;
   std::uint64_t max_stitched_carry_atoms = 0;
   const auto stitched_begin = Clock::now();
 
-  for (std::size_t segment = 0; segment + 1 < schedule.size(); ++segment) {
+  const std::size_t segment_count =
+      schedule.empty() ? 0 : schedule.size() - 1;
+  for (std::size_t segment = 0; segment < segment_count; ++segment) {
     const std::uint64_t r_inner = schedule[segment];
     const std::uint64_t r_outer = schedule[segment + 1];
+    const lb_source::StaticReachSeedPolicy seed_policy =
+        stitched_seed_policy(segment, segment_count);
     campaign::Grid grid;
     try {
       grid = campaign::Grid::build(r_inner, r_outer, campaign::k_sq_value);
@@ -344,6 +436,7 @@ int main(int argc, char** argv) {
             .outer_radius = r_outer,
             .coords = coords,
             .tileops = tileops,
+            .seed_policy = seed_policy,
         });
     if (!band.accepted()) {
       std::cerr << "stitched static reach band rejected: "
@@ -368,20 +461,46 @@ int main(int argc, char** argv) {
     stitched_seam_edges += band.seam_edges;
     stitched_inner_seed_ports += band.inner_seed_ports;
     stitched_outer_seed_ports += band.outer_seed_ports;
+    if (seed_policy == lb_source::StaticReachSeedPolicy::kInteriorBand) {
+      interior_inner_seed_ports += band.inner_seed_ports;
+      interior_outer_seed_ports += band.outer_seed_ports;
+    }
     max_stitched_carry_atoms =
         std::max<std::uint64_t>(max_stitched_carry_atoms,
                                 step.outgoing.carry_atoms.size());
     stitched_spanning = stitched_spanning || step.spanning;
     stitched_state = step.outgoing;
-    if (stitched_spanning) {
-      break;
-    }
   }
   const auto stitched_done = Clock::now();
 
+  if (!stitched_state.has_value()) {
+    std::cerr << "stitched static reach produced no final state\n";
+    return EXIT_FAILURE;
+  }
+
+  const lb_source::DetectorBandHandoffV1 full_handoff =
+      make_final_handoff(full_reach, schedule, config);
+  const lb_source::StaticReachProcessResult stitched_final{
+      .reject = lb_source::RejectReason::kNone,
+      .carry_width = full_reach.carry_width,
+      .outgoing = *stitched_state,
+      .spanning = stitched_spanning,
+  };
+  const lb_source::DetectorBandHandoffV1 stitched_handoff =
+      make_final_handoff(stitched_final, schedule, config);
+  const std::string full_handoff_sha256 =
+      lb_source::detector_band_handoff_sha256_hex(full_handoff);
+  const std::string stitched_handoff_sha256 =
+      lb_source::detector_band_handoff_sha256_hex(stitched_handoff);
+  const bool handoff_equal =
+      !full_handoff_sha256.empty() &&
+      full_handoff_sha256 == stitched_handoff_sha256 &&
+      full_handoff == stitched_handoff;
+  const bool verdict_equal = full_reach.spanning == stitched_spanning;
   const bool pass =
       full_compositor == full_reach.spanning &&
-      full_reach.spanning == stitched_spanning;
+      verdict_equal &&
+      handoff_equal;
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_static_reach_equivalence_v1\""
@@ -393,7 +512,20 @@ int main(int argc, char** argv) {
             << ",\"r_start\":" << config.r_start
             << ",\"r_final\":" << config.r_final
             << ",\"microband_width\":" << config.microband_width
-            << ",\"segments\":" << (schedule.empty() ? 0 : schedule.size() - 1)
+            << ",\"segments\":" << segment_count
+            << ",\"seed_policy\":{\"full\":\""
+            << seed_policy_name(lb_source::StaticReachSeedPolicy::kOneBand)
+            << "\",\"stitched_first\":\""
+            << seed_policy_name(segment_count == 1
+                                    ? lb_source::StaticReachSeedPolicy::kOneBand
+                                    : lb_source::StaticReachSeedPolicy::kFirstBand)
+            << "\",\"stitched_interior\":\""
+            << seed_policy_name(lb_source::StaticReachSeedPolicy::kInteriorBand)
+            << "\",\"stitched_final\":\""
+            << seed_policy_name(segment_count == 1
+                                    ? lb_source::StaticReachSeedPolicy::kOneBand
+                                    : lb_source::StaticReachSeedPolicy::kFinalBand)
+            << "\"}"
             << ",\"full_tiles\":" << full_coords.size()
             << ",\"stitched_tiles_processed\":" << stitched_tiles
             << ",\"full_port_atoms\":" << full_reach_band.port_atoms
@@ -406,8 +538,17 @@ int main(int argc, char** argv) {
             << ",\"stitched_inner_seed_ports\":" << stitched_inner_seed_ports
             << ",\"full_outer_seed_ports\":" << full_reach_band.outer_seed_ports
             << ",\"stitched_outer_seed_ports\":" << stitched_outer_seed_ports
+            << ",\"interior_inner_seed_ports\":" << interior_inner_seed_ports
+            << ",\"interior_outer_seed_ports\":" << interior_outer_seed_ports
             << ",\"max_stitched_carry_atoms\":"
             << max_stitched_carry_atoms
+            << ",\"max_live_frontier_ports\":" << max_stitched_carry_atoms
+            << ",\"full_handoff_sha256\":\"" << full_handoff_sha256
+            << "\",\"stitched_handoff_sha256\":\"" << stitched_handoff_sha256
+            << "\",\"final_handoff_sha256\":\""
+            << (handoff_equal ? full_handoff_sha256 : "")
+            << "\",\"handoff_equal\":" << (handoff_equal ? "true" : "false")
+            << ",\"verdict_equal\":" << (verdict_equal ? "true" : "false")
             << ",\"full_compositor_spanning\":"
             << (full_compositor ? "true" : "false")
             << ",\"full_static_reach_spanning\":"

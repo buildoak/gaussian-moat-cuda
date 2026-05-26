@@ -190,7 +190,7 @@ add_executable(tileop_static_reach_equivalence
 )
 target_link_libraries(tileop_static_reach_equivalence
   PRIVATE
-    lb_source_tileop_static_reach
+    lb_source_detector_band_handoff
 )
 
 enable_testing()
@@ -272,7 +272,7 @@ add_test(NAME tileop_static_reach_equivalence_smoke
     --tileop-threads 0)
 set_tests_properties(tileop_static_reach_equivalence_smoke PROPERTIES
   PASS_REGULAR_EXPRESSION
-    "\"status\":\"STATIC_REACH_EQUIVALENCE_PASS\".*\"full_compositor_spanning\":(true|false).*\"full_static_reach_spanning\":(true|false).*\"stitched_static_reach_spanning\":(true|false)"
+    "\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\".*\"status\":\"STATIC_REACH_EQUIVALENCE_PASS\".*\"interior_inner_seed_ports\":0.*\"interior_outer_seed_ports\":0.*\"handoff_equal\":true.*\"verdict_equal\":true.*\"full_compositor_spanning\":(true|false).*\"full_static_reach_spanning\":(true|false).*\"stitched_static_reach_spanning\":(true|false)"
   FAIL_REGULAR_EXPRESSION
     "STATIC_REACH_EQUIVALENCE_FAIL|SOURCE_DEAD_CERT_PASS|MOAT_PROOF_PASS|SPAN_PROOF_PASS")
 add_test(NAME k26_tsuchimura_preflight
