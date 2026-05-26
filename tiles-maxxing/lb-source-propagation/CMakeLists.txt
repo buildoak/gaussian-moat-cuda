@@ -13,6 +13,7 @@ find_package(OpenMP QUIET)
 
 add_library(lb_source_propagation STATIC
   ../cpp-campaign-v2/src/sha256.cpp
+  src/diagnostic_telemetry.cpp
   src/k26_bz_schedule.cpp
   src/resumable_band_checkpoint.cpp
   src/source_propagation.cpp
@@ -209,6 +210,14 @@ target_link_libraries(resumable_band_checkpoint_tests
     lb_source_propagation
 )
 
+add_executable(diagnostic_telemetry_tests
+  tests/test_diagnostic_telemetry.cpp
+)
+target_link_libraries(diagnostic_telemetry_tests
+  PRIVATE
+    lb_source_propagation
+)
+
 add_executable(source_prop_cpu_tileop_smoke
   tests/test_cpu_tileop_producer.cpp
 )
@@ -255,6 +264,7 @@ add_test(NAME source_prop_tests COMMAND source_prop_tests)
 add_test(NAME stream_checkpoint COMMAND stream_checkpoint_tests)
 add_test(NAME resumable_band_checkpoint
   COMMAND resumable_band_checkpoint_tests)
+add_test(NAME diagnostic_telemetry COMMAND diagnostic_telemetry_tests)
 add_test(NAME source_prop_smoke COMMAND source_prop_smoke)
 add_test(NAME source_prop_cpu_tileop_smoke
   COMMAND source_prop_cpu_tileop_smoke)
