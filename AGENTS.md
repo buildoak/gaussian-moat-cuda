@@ -32,6 +32,7 @@ independent verification.
 | `methodology/source-propagation-band-stitching.md` | Source/origin overlay semantics and first-principles source handoff model. |
 | `reference/experiment-contract.md` | Operational contract for running/reporting experiments. |
 | `reference/current-verification-spine.md` | Static-annulus gate spine and status vocabulary. |
+| `reference/lb-detector-band-stitching-plan.md` | Layer 1 detector handoff implementation plan and verification gates. |
 | `reference/archive/` | Historical evidence and implemented plans; not current authority. |
 
 Do not recreate root-level `docs/`, `artifacts/`, `results/`, or old campaign
@@ -58,8 +59,10 @@ This repo has three active streams:
    origin/global proof.
 2. **Resumable CUDA band campaigns:** use the battle-tested CUDA band engine
    for lightweight, checkpointable, prolonged static-annulus and high-K hunts.
-   The first objective is reliable band-to-band continuation, restart, harvest,
-   and replay with low overhead.
+   The first objective is reliable band-to-band detector stitching, restart,
+   harvest, and replay with low overhead. Operational checkpoints are not
+   mathematical continuation unless they reference the compact seam handoff
+   that compounds prior-band connectivity into the next band.
 3. **Source/origin proof work:** use source propagation when the task explicitly
    asks for source/origin survival, source death, last-live/first-dead
    refinement, or certificates.
@@ -104,12 +107,14 @@ read in this order:
    before code changes;
 6. `tiles-maxxing/lb-source-propagation/docs/agentic-goal-loop-guidelines.md`
    before autonomous, remote, or goal-loop work;
-7. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
-8. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
+7. `reference/lb-detector-band-stitching-plan.md` before implementing Layer 1
+   detector handoff/stitching;
+8. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
+9. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
    only when touching streaming;
-9. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
+10. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
    only when touching K26;
-10. remote/overnight runbooks only when paid remote execution is explicitly
+11. remote/overnight runbooks only when paid remote execution is explicitly
    authorized.
 
 `reference/current-verification-spine.md` is the static-annulus verification
@@ -159,11 +164,55 @@ Before adding LB machinery, ask whether it preserves this model. If a design
 cannot be explained as bounded frontier state plus local TileOp evidence plus
 targeted refinement, treat it as suspect and surface the tradeoff.
 
+For ordinary `resumable-band` work, the missing simple object is the detector
+band handoff:
+
+```text
+D_i = seam/carry ports + component_partition + reach_flags_per_component
+```
+
+The cut invariant is `geo_O(N-1) == geo_I(N)` under the same grid, TileOp
+oracle, port identity scheme, support envelope, schedule digest, and boundary
+ownership rules. Store compact port-seam state, not whole-band graphs or full
+tile inventories. A tile is too coarse because one tile may contain multiple
+disconnected components; the exact primitive is a stable boundary/carry port
+atom, or equivalently `(tile_id, local_port_id)`.
+
+Detector reach flags are global-annulus facts. In stitched detector runs, only
+the first band may seed `INNER_REACHED` from the global `geo_I`, only the final
+band may seed `OUTER_REACHED` from the global `geo_O`, and interior seams must
+receive reach only from the imported handoff. Reusing local per-band
+`geo_I/geo_O` flags as global reach is a correctness bug.
+
+Keep the distinction sharp:
+
+- checkpoint = operational restart metadata;
+- handoff = mathematical continuation state;
+- source handoff = detector handoff plus certified source bits when the mode is
+  `source-origin`.
+
+For production `resumable-band` runs, the detector handoff is a deterministic
+binary `DETECTOR_BAND_HANDOFF_V1` blob. The checkpoint references only the
+handoff path, hash, schema, and byte count; it must not embed separator state.
+Resume follows the checkpoint's referenced blob or rejects. It must never scan
+for a "latest" handoff and must never continue from schedule position alone.
+
+Default runtime keeps at most one durable live detector handoff per run.
+Temporary files, stale blobs, and optional debug history are not mathematical
+history. Cleanup must never delete the blob referenced by the current
+checkpoint.
+
+Carry width is the `ceil(sqrt(K))` locality bound. Production CUDA/TileOp band
+width is a separate policy and should normally be `4096+` unless the task is an
+explicit test or diagnostic. Do not let toy-width fixtures define campaign
+architecture.
+
 ### LB Surface Taxonomy
 
 - **Core spine:** TileOp local oracle, canonical coordinate/port atoms, exact
-  `LiveHandoffV1` / `H_i`, `process_band_live`, optional stream checkpoints,
-  and last-band summaries only for targeted refinement.
+  detector handoff `D_i`, source `LiveHandoffV1` / `H_i`, `process_band_live`,
+  optional stream checkpoints, and last-band summaries only for targeted
+  refinement.
 - **Diagnostics/regression:** materialized TileOp-port runners, materialized
   port graphs, wide-vs-stitched checks, stream equivalence checks, static-reach
   equivalence, and CUDA static-reach equivalence.

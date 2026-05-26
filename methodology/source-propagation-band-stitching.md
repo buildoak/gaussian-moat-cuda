@@ -44,6 +44,41 @@ Layer 2: source/origin overlay
 Layer 0 and Layer 1 are valid LB campaign work without source propagation. They
 must be reported as detector or workbench evidence, not source/origin evidence.
 
+For Layer 1, "continuation" is not a claim that a process can restart at the
+next radius. A restart ledger is only operational state. The mathematical
+continuation object is a compact detector handoff across the shared seam:
+
+```text
+D_i = seam/carry ports + component_partition + reach_flags_per_component
+```
+
+The invariant is:
+
+```text
+geo_O(band N-1) == geo_I(band N)
+```
+
+under the same grid, TileOp oracle, port identity scheme, support envelope,
+schedule digest, and boundary ownership rules. That equality means the outgoing
+cut of the previous band and incoming cut of the next band name the same
+geometric seam. The handoff then carries only the equivalence relation over the
+ports/atoms that can still affect future connectivity, plus per-component
+detector flags such as `INNER_REACHED` and `OUTER_REACHED`.
+
+The handoff must not be a full tile inventory. A tile is too coarse: one tile
+can contain several disconnected local components. The minimal exact primitive
+is a boundary/carry port atom, or equivalently a stable `(tile_id, local_port_id)`
+record. A memory-efficient production layout may store:
+
+```text
+TileRecord(tile_id, first_port_record, port_count)
+PortRecord(local_port_id, component_id)
+ComponentRecord(reach_flags)
+```
+
+This is the simple Layer 1 shape: compact seam state compounded into the next
+band's DSU, not a heavyweight campaign database.
+
 Layer 2 begins only when a certified source enters the run. From that point on,
 the only live mathematical state after a cut is:
 
@@ -101,6 +136,43 @@ runs, the absence of source propagation is not a gap in the hot path.
 plain CUDA band campaign. It binds geometry, build/oracle identity, command,
 profile/sample/cert artifacts, and harvest status. It is not a source handoff
 and does not carry `source_bit_per_component`.
+
+`DETECTOR_BAND_HANDOFF` is the Layer 1 mathematical continuation state for a
+plain static-annulus detector campaign. It binds the shared seam
+`geo_O(N-1) == geo_I(N)`, the TileOp/grid/oracle/support identities, and the
+compact carry-port component partition. Its per-component flags record detector
+reachability, not source reachability:
+
+```text
+D_i = (carry_ports, component_partition, reach_flags_per_component)
+```
+
+For a static annulus, the minimal flags are `INNER_REACHED` and
+`OUTER_REACHED`. If any component has both, the stitched campaign has observed
+an `ANY-SPAN`. If the final band completes without such a component, the row is
+static-annulus `ANY-SHELL-MOAT` evidence subject to the ordinary campaign gates.
+These flags are global-annulus flags. Only the first band may create
+`INNER_REACHED` from the global `geo_I`, and only the final band may create
+`OUTER_REACHED` from the global `geo_O`. Interior band cuts are seam geometry,
+not detector reach events. Incoming reach in an interior band comes from
+`D_{i-1}` only.
+
+`RESUMABLE_BAND_CHECKPOINT` may reference a `DETECTOR_BAND_HANDOFF` by path and
+hash, but it must not pretend to be the handoff. Restarting the process without
+the handoff resumes only operations, not mathematics.
+
+For production execution the detector handoff is a deterministic binary
+`DETECTOR_BAND_HANDOFF_V1` blob, not a text dump or host-layout struct. The
+checkpoint references the blob path, SHA-256, schema, and byte count. On
+resume, the checkpoint is the authority: the runner loads exactly the referenced
+blob and rejects if it is missing, stale, malformed, wrong-context, or hash
+mismatched. It must not scan for the newest handoff or continue from schedule
+position alone.
+
+The default hot path keeps at most one durable live detector handoff per run.
+Older handoffs are debug/proof-tier history only when explicitly requested.
+Temporary files and stale blobs are cleanup state, not mathematical state, and
+cleanup must never delete the blob referenced by the current checkpoint.
 
 `CERTIFIED_SEED` is an atom that may be marked source-connected before a band is
 processed. A seed is valid only when a prior proof, origin-prefix witness, or
@@ -196,6 +268,11 @@ needed to overlap the next independently tiled band. This preserves stable port
 identity across independently built bands without weakening coordinate-source
 terminal death.
 
+For the Layer 1 detector handoff, replace `source_bit_per_component` with
+detector reach flags. The sufficiency argument is the same: the prefix can
+influence the suffix only through the carry ports/atoms at the cut, and only the
+partition plus accumulated flags must survive compaction.
+
 ## Lemma 3: No-Rewire
 
 When the next band is processed, the incoming separator components may be wired
@@ -239,6 +316,28 @@ booleans. The fixtures must compare the carry partition and source bits, because
 those are the state that future bands consume. Tests may compare terminal
 inventory payloads as extra proof-tier evidence, but inventory equality is not
 part of live handoff equality.
+
+For Layer 1 detector stitching, the same equivalence gate compares:
+
+```text
+canonical(carry_ports, component_partition, reach_flags_per_component)
+```
+
+The restart test is not "checkpoint bytes match." The restart test is:
+
+```text
+stitched/resumed detector handoff and verdict
+==
+uninterrupted detector handoff and verdict
+```
+
+under the same band schedule and oracle identities.
+
+Equivalence fixtures must also control boundary seeding. A one-band comparison
+sees the global inner and outer boundaries at once. A stitched comparison must
+seed global inner only in the first band, global outer only in the last band,
+and no global reach flags at interior cuts. Otherwise a component spanning one
+interior sub-annulus can be mistaken for a global `ANY-SPAN`.
 
 ## Lemma 5: Terminal Guard And Death Logic
 
@@ -381,8 +480,13 @@ only after a certified source is in scope.
 ## Hot-Path Constraints
 
 - The carry width is `ceil(sqrt(K))`; for `K = 32`, this is `6`.
+- Carry width is the mathematical locality bound, not the production band-width
+  target. Real CUDA/TileOp band campaigns should use a policy-scale band width
+  such as `4096+` unless a test or diagnostic explicitly opts into toy widths.
 - Source reachability and geometric boundary flags remain separate.
 - Source-origin continuation state is `H_i`, not historical inventory.
+- Plain detector continuation state is `D_i`, not a checkpoint ledger and not a
+  full tile inventory.
 - Plain resumable CUDA band checkpoints, K>40 scouts, and prolonged
   static-annulus harvest ledgers are valid LB campaign artifacts without this
   source overlay, as long as they are reported with detector semantics only.
