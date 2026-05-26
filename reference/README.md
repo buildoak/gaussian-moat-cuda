@@ -15,7 +15,11 @@ Static-annulus first-read:
 
 1. `current-verification-spine.md` - static-annulus gate spine and proof-status
    vocabulary.
-2. `attached-static-annulus-moats.md` - attached lower-K static-annulus rows and
+2. `cuda-band-engine-playbook.md` - what the CUDA band engine does, how to use
+   it, and what it does not prove.
+3. `cuda-band-results-ledger.md` - compact ledger of harvested K26/K34/K36/K38/K40
+   static-annulus results and status labels.
+4. `attached-static-annulus-moats.md` - attached lower-K static-annulus rows and
    proof-status cautions.
 
 Lower-bound source-propagation first-read:
@@ -38,6 +42,8 @@ Lower-bound source-propagation first-read:
 | File | Role |
 |---|---|
 | `current-verification-spine.md` | Active static-annulus verification gates, demoted tools, and sample policy. |
+| `cuda-band-engine-playbook.md` | Operator playbook for battle-tested CUDA band rows, resumable campaign use, and non-claim boundaries. |
+| `cuda-band-results-ledger.md` | Compact results ledger for harvested CUDA/static-annulus rows, K40 launchpad status, and known gaps. |
 | `attached-static-annulus-moats.md` | Attached lower-K36 and local K34 static-annulus moat evidence, with proof-status cautions. |
 | `experiment-contract.md` | Operational contract for running/reporting campaign experiments. |
 | `optimization-safety-checklist.md` | Do-not-break checklist for math/TileOp/port/verdict changes. |

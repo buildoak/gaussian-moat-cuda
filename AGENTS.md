@@ -49,6 +49,47 @@ instructions unless the task is explicitly auditing that artifact.
 This includes `AGENTS.md` files under
 `tiles-maxxing/cuda-campaign-v2-sqrt-36/artifacts/`.
 
+## Current Strategic Streams
+
+This repo has three active streams:
+
+1. **Paper consolidation:** consolidate the battle-tested
+   CUDA/static-annulus evidence without upgrading detector evidence into
+   origin/global proof.
+2. **Resumable CUDA band campaigns:** use the battle-tested CUDA band engine
+   for lightweight, checkpointable, prolonged static-annulus and high-K hunts.
+   The first objective is reliable band-to-band continuation, restart, harvest,
+   and replay with low overhead.
+3. **Source/origin proof work:** use source propagation when the task explicitly
+   asks for source/origin survival, source death, last-live/first-dead
+   refinement, or certificates.
+
+Do not force source propagation into ordinary static-annulus, high-K, or
+prolonged detector campaigns. For those campaigns, source propagation is
+optional secondary instrumentation, not the hot-path requirement.
+
+## Campaign Mode Routing
+
+Every non-trivial task should declare its mode before changing code, docs, or
+campaign plans:
+
+- `paper`: consolidate already-mined evidence, methods, figures, and claim
+  language.
+- `static-annulus`: run or verify current `ANY-SPAN` / `ANY-SHELL-MOAT`
+  detector rows.
+- `resumable-band`: build or use lightweight checkpoint/restart,
+  band-to-band stitching, harvest, and replay machinery for prolonged CUDA
+  band campaigns.
+- `source-origin`: track source/origin survival, death, exact frontier
+  handoff, or source certificates.
+- `proof-refinement`: promote detector evidence toward stronger claims with
+  explicit proof obligations and independent checks.
+
+Source propagation is mandatory for `source-origin` work and for any
+claim-grade `proof-refinement` work that names source/origin survival or death.
+It is not mandatory for `static-annulus`, `resumable-band`, or high-K scout
+work unless the task explicitly asks for that stronger claim mode.
+
 ## LB First-Read Order
 
 For lower-bound source-propagation work, read in this order:
@@ -81,6 +122,14 @@ Current campaign verdicts are static-annulus detector results:
 Do not report current K38/K40 or sweep rows as origin-component moat proofs.
 Current `MOAT` rows are detector evidence plus audit evidence unless a future
 independent negative proof is built.
+
+Above-K40 work inherits these semantics until a stronger mode is explicitly
+implemented. Treat K40 as the calibrated launchpad for K>40 scout design, not
+as proof that an above-K40 evidence stream already exists. A K>40 row may be
+called scout, diagnostic, or static-annulus detector evidence only according to
+the gates it actually passed. It may not be called an above-K40 moat proof
+without the compact static-annulus spine plus whatever source/origin gates the
+claim requires.
 
 ## LB Source-Propagation Simplicity Law
 
