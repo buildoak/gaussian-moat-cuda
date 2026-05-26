@@ -6,9 +6,11 @@ usage() {
 Usage:
   remote_cuda_static_reach_equivalence_campaign.sh [--repo DIR]
       [--out-dir DIR] [--build-dir DIR] [--timeout-seconds N]
+      [--include-diagnostic-sub4096] [--include-full-static-production]
 
 Build and run CUDA static-reach stitching equivalence gates on a remote CUDA
-host. Outputs are diagnostic/non-claim.
+host. Default rows use production-width microbands only. Outputs are
+diagnostic/non-claim.
 USAGE
 }
 
@@ -16,6 +18,8 @@ repo_dir="$(pwd)"
 out_dir="/workspace/cuda-static-reach-equivalence"
 build_dir="/tmp/gm-cuda-static-reach-equivalence"
 timeout_seconds="5400"
+include_diagnostic_sub4096="0"
+include_full_static_production="0"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,6 +38,14 @@ while [[ $# -gt 0 ]]; do
     --timeout-seconds)
       timeout_seconds="$2"
       shift 2
+      ;;
+    --include-diagnostic-sub4096)
+      include_diagnostic_sub4096="1"
+      shift
+      ;;
+    --include-full-static-production)
+      include_full_static_production="1"
+      shift
       ;;
     -h|--help)
       usage
@@ -72,6 +84,8 @@ write_environment() {
     echo "branch=$(git -C "$repo_dir" branch --show-current 2>/dev/null || echo unknown)"
     echo "commit=$(git -C "$repo_dir" rev-parse HEAD 2>/dev/null || echo unknown)"
     echo "timeout_seconds=$timeout_seconds"
+    echo "include_diagnostic_sub4096=$include_diagnostic_sub4096"
+    echo "include_full_static_production=$include_full_static_production"
     echo "proof_status=DIAGNOSTIC_NON_CLAIM"
     echo "time_bin=$(command -v time || true)"
     echo "timeout_bin=$(command -v timeout || true)"
@@ -104,6 +118,7 @@ run_case() {
   local r_start="$2"
   local r_final="$3"
   local width="$4"
+  shift 4
   local stdout="$out_dir/cases/${label}.stdout.json"
   local stderr="$out_dir/cases/${label}.stderr.log"
   local time_file="$out_dir/cases/${label}.time.txt"
@@ -116,9 +131,10 @@ run_case() {
     "--microband-width=$width"
     --chunk-size=200000
     --max-atoms=1000000000
+    "$@"
   )
 
-  log "CASE ${label} r_start=${r_start} r_final=${r_final} microband_width=${width}"
+  log "CASE ${label} proof_status=DIAGNOSTIC_NON_CLAIM r_start=${r_start} r_final=${r_final} microband_width=${width} artifacts=cases/${label}.*"
   printf '%q ' "${cmd[@]}" > "$out_dir/cases/${label}.argv.txt"
   printf '\n' >> "$out_dir/cases/${label}.argv.txt"
   begin_epoch="$(date +%s)"
@@ -145,8 +161,9 @@ run_case() {
     echo "wall_seconds=$((end_epoch - begin_epoch))"
   } >> "$time_file"
   echo "$rc" > "$exit_file"
-  printf '{"label":"%s","r_start":%s,"r_final":%s,"microband_width":%s,"exit_code":%s,"stdout":"cases/%s.stdout.json","stderr":"cases/%s.stderr.log","time":"cases/%s.time.txt"}\n' \
+  printf '{"schema":"cuda_static_reach_equivalence_campaign_case_v2","proof_status":"DIAGNOSTIC_NON_CLAIM","label":"%s","r_start":%s,"r_final":%s,"microband_width":%s,"exit_code":%s,"stdout":"cases/%s.stdout.json","stderr":"cases/%s.stderr.log","time":"cases/%s.time.txt","argv":"cases/%s.argv.txt","exit_code_file":"cases/%s.exit_code.txt"}\n' \
     "$label" "$r_start" "$r_final" "$width" "$rc" "$label" "$label" "$label" \
+    "$label" "$label" \
     >> "$out_dir/cases.jsonl"
   log "END_CASE ${label} exit=${rc} wall_seconds=$((end_epoch - begin_epoch))"
 }
@@ -158,6 +175,63 @@ import pathlib
 import sys
 
 out = pathlib.Path(sys.argv[1])
+required_payload_scalars = {
+    "phase0_schema": "cuda_static_reach_equivalence_phase0_telemetry_v1",
+    "runner_id": "cuda_static_reach_equivalence_v1",
+    "proof_status": "DIAGNOSTIC_NON_CLAIM",
+}
+required_numeric_fields = [
+    "rss_bytes",
+    "peak_rss_bytes",
+    "max_resident_microband_tiles",
+    "max_resident_tileops",
+    "max_resident_port_atoms",
+    "max_resident_edges",
+    "max_live_frontier_atoms",
+    "max_components",
+    "wall_share_full_compositor",
+    "wall_share_full_static",
+    "wall_share_stitched",
+    "wall_share_materialization",
+    "wall_share_handoff_hash",
+]
+required_timing_fields = [
+    "full",
+    "full_static",
+    "stitched",
+    "materialization",
+    "handoff_hash",
+    "pre_handoff_total",
+    "total",
+]
+
+def telemetry_errors(payload):
+    errors = []
+    if not isinstance(payload, dict):
+        return ["payload_missing_or_not_object"]
+    for key, expected in required_payload_scalars.items():
+        if payload.get(key) != expected:
+            errors.append(f"{key}_mismatch")
+    for key in required_numeric_fields:
+        value = payload.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+            errors.append(f"{key}_missing_or_negative")
+    timings = payload.get("timings_ms")
+    if not isinstance(timings, dict):
+        errors.append("timings_ms_missing")
+    else:
+        for key in required_timing_fields:
+            value = timings.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+                errors.append(f"timings_ms.{key}_missing_or_negative")
+        if (
+            isinstance(timings.get("total"), (int, float))
+            and isinstance(timings.get("pre_handoff_total"), (int, float))
+            and timings["total"] < timings["pre_handoff_total"]
+        ):
+            errors.append("timings_ms.total_lt_pre_handoff_total")
+    return errors
+
 cases = []
 for line in (out / "cases.jsonl").read_text().splitlines():
     if not line.strip():
@@ -171,6 +245,7 @@ for line in (out / "cases.jsonl").read_text().splitlines():
         except Exception as exc:
             payload = {"parse_error": str(exc)}
     row["payload"] = payload
+    row["telemetry_errors"] = telemetry_errors(payload)
     cases.append(row)
 
 status = "CUDA_STATIC_REACH_EQUIVALENCE_CAMPAIGN_PASS"
@@ -179,6 +254,8 @@ if any(row["exit_code"] != 0 for row in cases):
 elif any((row.get("payload") or {}).get("status") != "CUDA_STATIC_REACH_EQUIVALENCE_PASS"
          for row in cases):
     status = "CUDA_STATIC_REACH_EQUIVALENCE_CAMPAIGN_MISMATCH"
+elif any(row["telemetry_errors"] for row in cases):
+    status = "CUDA_STATIC_REACH_EQUIVALENCE_CAMPAIGN_TELEMETRY_INVALID"
 
 summary = {
     "schema": "cuda_static_reach_equivalence_campaign_summary_v1",
@@ -215,9 +292,23 @@ run_logged cmake-configure cmake -S "$cuda_dir" -B "$build_dir" \
 run_logged cmake-build cmake --build "$build_dir" \
   --target cuda_static_reach_equivalence -j"$(nproc 2>/dev/null || echo 8)"
 
-run_case smoke_r5000_w1024 5000 10000 1024
-run_case r60000000_w32768_m1024 60000000 60032768 1024
-run_case r80000000_w32768_m1024 80000000 80032768 1024
+if [[ "$include_diagnostic_sub4096" == "1" ]]; then
+  run_case diagnostic_sub4096_smoke_r5000_w1024 5000 10000 1024 \
+    --allow-diagnostic-microband-width
+fi
+
+run_case phase0_r60000000_w8192_split4096_full_static 60000000 60008192 4096 \
+  --enable-full-static-handoff
+
+if [[ "$include_full_static_production" == "1" ]]; then
+  run_case phase0_r60000000_w32768_split8192_full_static 60000000 60032768 8192 \
+    --enable-full-static-handoff
+  run_case phase0_r80000000_w32768_split8192_full_static 80000000 80032768 8192 \
+    --enable-full-static-handoff
+else
+  run_case phase0_r60000000_w32768_split8192_telemetry 60000000 60032768 8192
+  run_case phase0_r80000000_w32768_split8192_telemetry 80000000 80032768 8192
+fi
 
 summary_status="$(summarize)"
 echo "$summary_status" > "$out_dir/status.txt"

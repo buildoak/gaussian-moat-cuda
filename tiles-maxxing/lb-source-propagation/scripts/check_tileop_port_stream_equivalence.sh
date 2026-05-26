@@ -141,6 +141,35 @@ def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def require_phase0_materialized(path, obj):
+    expected_string = {
+        "phase0_schema": "lb_diagnostic_phase0_v1",
+        "runner_id": "source_tileop_port_runner_v1",
+    }
+    for key, expected in expected_string.items():
+        if obj.get(key) != expected:
+            raise SystemExit(
+                f"{path}: {key} mismatch: {obj.get(key)!r} != {expected!r}"
+            )
+    integer_keys = [
+        "rss_bytes",
+        "peak_rss_bytes",
+        "max_resident_tiles",
+        "max_resident_tileops",
+        "max_resident_port_atoms",
+        "max_resident_edges",
+        "max_live_frontier_atoms",
+        "max_resident_components",
+        "graph_ms",
+        "process_ms",
+        "handoff_ms",
+        "total_ms",
+    ]
+    for key in integer_keys:
+        value = obj.get(key)
+        if not isinstance(value, int) or value < 0:
+            raise SystemExit(f"{path}: missing/nonnegative integer {key}")
+
 def parse_live(path):
     with open(path, "r", encoding="utf-8") as f:
         tokens = f.read().split()
@@ -190,6 +219,7 @@ def parse_live(path):
 
 mat_json = load_json(materialized_json)
 stream_json_obj = load_json(stream_json)
+require_phase0_materialized(materialized_json, mat_json)
 for label, obj in (("materialized", mat_json), ("stream", stream_json_obj)):
     if not obj.get("accepted"):
         raise SystemExit(f"{label} run was not accepted: {obj.get('reject_diagnostic')}")

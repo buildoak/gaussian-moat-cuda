@@ -1,3 +1,4 @@
+#include "lb_source/diagnostic_telemetry.h"
 #include "lb_source/source_propagation.h"
 #include "lb_source/tileop_live_bridge.h"
 #include "lb_source/tileop_port_graph.h"
@@ -32,6 +33,9 @@
 #include "../../cpp-campaign-v2/src/sha256.h"
 
 namespace {
+
+constexpr std::string_view kPhase0Schema = "lb_diagnostic_phase0_v1";
+constexpr std::string_view kRunnerId = "source_tileop_port_runner_v1";
 
 struct Config {
   std::uint64_t r_start = 248;
@@ -103,6 +107,26 @@ struct RunnerInventorySummary {
   lb_source::InventorySummary digest;
   std::uint64_t max_norm_sq = 0;
   std::vector<lb_source::AtomId> max_norm_atom_ids;
+};
+
+struct RunningMaxima {
+  std::uint64_t resident_tiles = 0;
+  std::uint64_t resident_tileops = 0;
+  std::uint64_t resident_port_atoms = 0;
+  std::uint64_t resident_edges = 0;
+  std::uint64_t live_frontier_atoms = 0;
+  std::uint64_t live_frontier_components = 0;
+};
+
+struct WallTimingTotals {
+  std::uint64_t grid_ms = 0;
+  std::uint64_t enumerate_ms = 0;
+  std::uint64_t tileop_ms = 0;
+  std::uint64_t graph_ms = 0;
+  std::uint64_t target_bridge_ms = 0;
+  std::uint64_t handoff_ms = 0;
+  std::uint64_t process_ms = 0;
+  std::uint64_t band_total_ms = 0;
 };
 
 struct RunnerDsu {
@@ -644,9 +668,7 @@ bool norm_in_radial_segment(std::uint64_t norm_sq,
 
 std::uint64_t elapsed_ms(std::chrono::steady_clock::time_point begin,
                          std::chrono::steady_clock::time_point end) {
-  return static_cast<std::uint64_t>(
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
-          .count());
+  return lb_source::elapsed_ms(begin, end);
 }
 
 bool has_source_carry(const lb_source::LiveSeparator& state) {
@@ -1481,6 +1503,7 @@ TargetBridgeResult bridge_target_coordinate_to_ports(
 }  // namespace
 
 int main(int argc, char** argv) {
+  const auto total_begin = lb_source::DiagnosticClock::now();
   Config config;
   if (!parse_args(argc, argv, config)) {
     return EXIT_FAILURE;
@@ -1497,6 +1520,8 @@ int main(int argc, char** argv) {
   }
 
   HandoffKind handoff_kind = HandoffKind::kNone;
+  RunningMaxima maxima;
+  WallTimingTotals timings;
   std::optional<PrefixWitness> prefix_witness;
   std::optional<Point> target;
   std::optional<lb_source::AtomId> target_id;
@@ -1566,6 +1591,8 @@ int main(int argc, char** argv) {
                         std::numeric_limits<std::uint64_t>::max(), 0, 0,
                         elapsed_ms(live_manifest_read_begin,
                                    std::chrono::steady_clock::now()));
+    timings.handoff_ms += elapsed_ms(live_manifest_read_begin,
+                                     std::chrono::steady_clock::now());
     first_source_artifact = previous_live_handoff;
     live_incoming = previous_live_handoff->separator;
     source_mode = previous_live_handoff->source_mode;
@@ -1585,6 +1612,8 @@ int main(int argc, char** argv) {
                           std::numeric_limits<std::uint64_t>::max(), 0, 0,
                           elapsed_ms(prefix_witness_read_begin,
                                      std::chrono::steady_clock::now()));
+      timings.handoff_ms += elapsed_ms(prefix_witness_read_begin,
+                                       std::chrono::steady_clock::now());
       if (prefix_witness->k_sq !=
           static_cast<std::uint64_t>(campaign::k_sq_value)) {
         std::cerr << "prefix witness k_sq does not match compiled K_SQ\n";
@@ -1694,9 +1723,10 @@ int main(int argc, char** argv) {
       return EXIT_FAILURE;
     }
     const auto grid_done = std::chrono::steady_clock::now();
+    const std::uint64_t grid_ms = elapsed_ms(grid_begin, grid_done);
+    timings.grid_ms += grid_ms;
     emit_phase_progress(progress, "grid_build", "end", segment,
-                        previous_outer, outer,
-                        elapsed_ms(grid_begin, grid_done));
+                        previous_outer, outer, grid_ms);
 
     emit_phase_progress(progress, "active_tile_enumerate", "begin", segment,
                         previous_outer, outer,
@@ -1705,9 +1735,10 @@ int main(int argc, char** argv) {
         grid.enumerate_active_tiles();
     campaign_tiles_processed += coords.size();
     const auto enumerate_done = std::chrono::steady_clock::now();
+    const std::uint64_t enumerate_ms = elapsed_ms(grid_done, enumerate_done);
+    timings.enumerate_ms += enumerate_ms;
     emit_phase_progress(progress, "active_tile_enumerate", "end", segment,
-                        previous_outer, outer,
-                        elapsed_ms(grid_done, enumerate_done));
+                        previous_outer, outer, enumerate_ms);
     const std::size_t tileop_threads =
         resolve_tileop_threads(config.tileop_threads, coords.size());
     max_tileop_worker_threads =
@@ -1718,9 +1749,10 @@ int main(int argc, char** argv) {
         build_tileops(coords, tileop_constants, grid, tileop_overflows,
                       tileop_threads);
     const auto tileop_done = std::chrono::steady_clock::now();
+    const std::uint64_t tileop_ms = elapsed_ms(enumerate_done, tileop_done);
+    timings.tileop_ms += tileop_ms;
     emit_phase_progress(progress, "tileop_build", "end", segment,
-                        previous_outer, outer,
-                        elapsed_ms(enumerate_done, tileop_done));
+                        previous_outer, outer, tileop_ms);
 
     emit_phase_progress(progress, "port_graph", "begin", segment,
                         previous_outer, outer,
@@ -1739,9 +1771,10 @@ int main(int argc, char** argv) {
       return EXIT_FAILURE;
     }
     const auto graph_done = std::chrono::steady_clock::now();
+    const std::uint64_t graph_ms = elapsed_ms(tileop_done, graph_done);
+    timings.graph_ms += graph_ms;
     emit_phase_progress(progress, "port_graph", "end", segment,
-                        previous_outer, outer,
-                        elapsed_ms(tileop_done, graph_done));
+                        previous_outer, outer, graph_ms);
     for (const lb_source::BandAtom& atom : graph.band.atoms) {
       norm_by_id.emplace(atom.id, atom.norm_sq);
     }
@@ -1772,9 +1805,11 @@ int main(int argc, char** argv) {
       }
     }
     const auto target_bridge_done = std::chrono::steady_clock::now();
+    const std::uint64_t target_bridge_ms =
+        elapsed_ms(graph_done, target_bridge_done);
+    timings.target_bridge_ms += target_bridge_ms;
     emit_phase_progress(progress, "target_bridge", "end", segment,
-                        previous_outer, outer,
-                        elapsed_ms(graph_done, target_bridge_done));
+                        previous_outer, outer, target_bridge_ms);
     auto bridge_done = target_bridge_done;
     TileOpLiveBridgeResult segment_bridge;
     lb_source::BandInput processed_band_for_summary = band;
@@ -1796,9 +1831,11 @@ int main(int argc, char** argv) {
               *previous_live_handoff, tileop_constants, coords, tileops,
               bridged_band, tileop_threads);
       bridge_done = std::chrono::steady_clock::now();
+      const std::uint64_t live_handoff_bridge_ms =
+          elapsed_ms(target_bridge_done, bridge_done);
+      timings.handoff_ms += live_handoff_bridge_ms;
       emit_phase_progress(progress, "live_handoff_bridge", "end", segment,
-                          previous_outer, outer,
-                          elapsed_ms(target_bridge_done, bridge_done));
+                          previous_outer, outer, live_handoff_bridge_ms);
       segment_bridge = bridge;
       if (config.require_full_bridge &&
           bridge.unbridged_coordinate_carry_atoms != 0) {
@@ -1875,9 +1912,11 @@ int main(int argc, char** argv) {
          .max_components = config.max_atoms,
          .max_inventory_atoms = config.max_atoms});
     const auto source_process_done = std::chrono::steady_clock::now();
+    const std::uint64_t source_process_ms =
+        elapsed_ms(bridge_done, source_process_done);
+    timings.process_ms += source_process_ms;
     emit_phase_progress(progress, "source_process", "end", segment,
-                        previous_outer, outer,
-                        elapsed_ms(bridge_done, source_process_done));
+                        previous_outer, outer, source_process_ms);
     active_band_summary.reset();
     if (live_last.accepted() && previous_live_handoff.has_value()) {
       active_band_summary = make_active_band_summary(
@@ -1900,9 +1939,29 @@ int main(int argc, char** argv) {
       }
     }
     const auto process_done = std::chrono::steady_clock::now();
+    const std::uint64_t band_total_ms = elapsed_ms(band_begin, process_done);
+    timings.band_total_ms += band_total_ms;
     port_atoms += graph.port_atoms;
     internal_edges += graph.internal_edges;
     seam_edges += graph.seam_edges;
+    maxima.resident_tiles =
+        std::max<std::uint64_t>(maxima.resident_tiles, coords.size());
+    maxima.resident_tileops =
+        std::max<std::uint64_t>(maxima.resident_tileops, tileops.size());
+    maxima.resident_port_atoms =
+        std::max<std::uint64_t>(maxima.resident_port_atoms, graph.port_atoms);
+    maxima.resident_edges =
+        std::max<std::uint64_t>(maxima.resident_edges,
+                                processed_band_for_summary.edges.size());
+    if (live_last.accepted()) {
+      maxima.live_frontier_atoms =
+          std::max<std::uint64_t>(maxima.live_frontier_atoms,
+                                  live_last.outgoing.carry_atoms.size());
+      maxima.live_frontier_components =
+          std::max<std::uint64_t>(
+              maxima.live_frontier_components,
+              live_last.outgoing.component_partition.size());
+    }
 
     ++bands_processed;
     processed_outer = outer;
@@ -1993,20 +2052,18 @@ int main(int argc, char** argv) {
                << segment_target_bridge_edges
                << ",\"grid_ms\":" << elapsed_ms(band_begin, grid_done)
                << ",\"enumerate_ms\":"
-               << elapsed_ms(grid_done, enumerate_done)
-               << ",\"tileop_ms\":"
-               << elapsed_ms(enumerate_done, tileop_done)
-               << ",\"graph_ms\":" << elapsed_ms(tileop_done, graph_done)
-               << ",\"target_bridge_ms\":"
-               << elapsed_ms(graph_done, target_bridge_done)
-               << ",\"process_ms\":"
-               << elapsed_ms(target_bridge_done, process_done)
-               << ",\"total_ms\":"
-               << elapsed_ms(band_begin, process_done) << "}\n";
+               << enumerate_ms
+               << ",\"tileop_ms\":" << tileop_ms
+               << ",\"graph_ms\":" << graph_ms
+               << ",\"target_bridge_ms\":" << target_bridge_ms
+               << ",\"handoff_ms\":"
+               << elapsed_ms(target_bridge_done, bridge_done)
+               << ",\"process_ms\":" << source_process_ms
+               << ",\"total_ms\":" << band_total_ms << "}\n";
       progress.flush();
     }
     emit_phase_progress(progress, "band", "end", segment, previous_outer,
-                        outer, elapsed_ms(band_begin, process_done));
+                        outer, band_total_ms);
     if (!live_last.accepted()) {
       break;
     }
@@ -2037,7 +2094,11 @@ int main(int argc, char** argv) {
                 << *config.live_manifest_out << "\n";
       return EXIT_FAILURE;
     }
+    const auto live_manifest_write_begin = lb_source::DiagnosticClock::now();
     lb_source::write_live_handoff(manifest, *current_live_handoff);
+    timings.handoff_ms +=
+        lb_source::elapsed_ms(live_manifest_write_begin,
+                              lb_source::DiagnosticClock::now());
     live_manifest_written = true;
   }
 
@@ -2053,7 +2114,11 @@ int main(int argc, char** argv) {
                 << *config.last_band_summary_out << "\n";
       return EXIT_FAILURE;
     }
+    const auto summary_write_begin = lb_source::DiagnosticClock::now();
     summary << last_band_summary_to_json(*active_band_summary);
+    timings.handoff_ms +=
+        lb_source::elapsed_ms(summary_write_begin,
+                              lb_source::DiagnosticClock::now());
     last_band_summary_written = true;
   }
 
@@ -2095,6 +2160,7 @@ int main(int argc, char** argv) {
                 << "\n";
       return EXIT_FAILURE;
     }
+    const auto death_write_begin = lb_source::DiagnosticClock::now();
     death << "{\"schema\":\"lb_source_tileop_port_death_diagnostic_v1\""
           << ",\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\""
           << ",\"terminal_source_dead\":true"
@@ -2116,6 +2182,9 @@ int main(int argc, char** argv) {
     death << ",\"non_claim\":\"diagnostic death artifact only; previous "
              "handoff and active summary are required; not a claim-grade "
              "source-dead certificate\"}\n";
+    timings.handoff_ms +=
+        lb_source::elapsed_ms(death_write_begin,
+                              lb_source::DiagnosticClock::now());
     death_written = true;
   }
 
@@ -2166,9 +2235,14 @@ int main(int argc, char** argv) {
   const CoordinatePortExpansionStatus target_expansion_status =
       summarize_coordinate_port_expansions(target_atom_path,
                                            coordinate_port_expansion_paths);
+  const lb_source::RssSnapshot rss = lb_source::rss_snapshot();
+  const std::uint64_t total_ms =
+      lb_source::elapsed_ms(total_begin, lb_source::DiagnosticClock::now());
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_port_runner_v1\","
+            << "\"phase0_schema\":\"" << kPhase0Schema << "\","
+            << "\"runner_id\":\"" << kRunnerId << "\","
             << "\"claim_label\":\"SOURCE_TILEOP_PORT_DIAGNOSTIC\","
             << "\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\","
             << "\"source_mode\":\"" << source_mode << "\","
@@ -2320,6 +2394,28 @@ int main(int argc, char** argv) {
   }
   std::cout
             << ",\"non_claim\":\"TileOp-port scheduler diagnostic; not SOURCE_ORIGIN_K26 or SOURCE_DEAD_CERT\""
+            << ",\"rss_bytes\":"
+            << lb_source::json_safe_uint64(rss.current_bytes)
+            << ",\"peak_rss_bytes\":"
+            << lb_source::json_safe_uint64(rss.peak_bytes)
+            << ",\"max_resident_tiles\":" << maxima.resident_tiles
+            << ",\"max_resident_tileops\":" << maxima.resident_tileops
+            << ",\"max_resident_port_atoms\":"
+            << maxima.resident_port_atoms
+            << ",\"max_resident_edges\":" << maxima.resident_edges
+            << ",\"max_live_frontier_atoms\":"
+            << maxima.live_frontier_atoms
+            << ",\"max_resident_components\":"
+            << maxima.live_frontier_components
+            << ",\"grid_ms\":" << timings.grid_ms
+            << ",\"enumerate_ms\":" << timings.enumerate_ms
+            << ",\"tileop_ms\":" << timings.tileop_ms
+            << ",\"graph_ms\":" << timings.graph_ms
+            << ",\"target_bridge_ms\":" << timings.target_bridge_ms
+            << ",\"process_ms\":" << timings.process_ms
+            << ",\"handoff_ms\":" << timings.handoff_ms
+            << ",\"band_total_ms\":" << timings.band_total_ms
+            << ",\"total_ms\":" << total_ms
             << "}\n";
 
   return accepted && tileop_overflows == 0 ? EXIT_SUCCESS : EXIT_FAILURE;

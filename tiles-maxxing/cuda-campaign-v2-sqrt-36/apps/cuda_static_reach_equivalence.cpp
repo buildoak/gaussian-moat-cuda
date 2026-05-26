@@ -1,5 +1,6 @@
 #include "cuda_campaign/host_driver.h"
 #include "lb_source/detector_band_handoff.h"
+#include "lb_source/diagnostic_telemetry.h"
 #include "lb_source/tileop_static_reach.h"
 
 #include <algorithm>
@@ -44,6 +45,49 @@ struct ColumnBatch {
   };
   std::vector<campaign::TileCoord> coords;
   std::vector<Column> columns;
+};
+
+struct Phase0Telemetry {
+  std::uint64_t max_resident_microband_tiles = 0;
+  std::uint64_t max_resident_tileops = 0;
+  std::uint64_t max_resident_port_atoms = 0;
+  std::uint64_t max_resident_edges = 0;
+  std::uint64_t max_live_frontier_atoms = 0;
+  std::uint64_t max_components = 0;
+  std::uint64_t materialization_ms = 0;
+  std::uint64_t handoff_hash_ms = 0;
+
+  void observe_tileops(std::size_t count) {
+    max_resident_tileops =
+        std::max<std::uint64_t>(max_resident_tileops,
+                                static_cast<std::uint64_t>(count));
+  }
+
+  void observe_microband_tiles(std::size_t count) {
+    max_resident_microband_tiles =
+        std::max<std::uint64_t>(max_resident_microband_tiles,
+                                static_cast<std::uint64_t>(count));
+    observe_tileops(count);
+  }
+
+  void observe_band(const lb_source::TileOpStaticReachMicrobandResult& band) {
+    max_resident_port_atoms =
+        std::max(max_resident_port_atoms, band.port_atoms);
+    max_resident_edges =
+        std::max<std::uint64_t>(max_resident_edges,
+                                band.internal_edges + band.seam_edges);
+  }
+
+  void observe_frontier(const lb_source::StaticReachSeparator& frontier) {
+    max_live_frontier_atoms =
+        std::max<std::uint64_t>(
+            max_live_frontier_atoms,
+            static_cast<std::uint64_t>(frontier.carry_atoms.size()));
+    max_components =
+        std::max<std::uint64_t>(
+            max_components,
+            static_cast<std::uint64_t>(frontier.component_partition.size()));
+  }
 };
 
 bool parse_uint64(std::string_view text, std::uint64_t& out) {
@@ -150,6 +194,14 @@ std::uint64_t elapsed_ms(Clock::time_point begin, Clock::time_point end) {
   return static_cast<std::uint64_t>(
       std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
           .count());
+}
+
+double wall_share(std::uint64_t part_ms, std::uint64_t total_ms) {
+  if (total_ms == 0) {
+    return 0.0;
+  }
+  return lb_source::json_safe_finite_double(
+      static_cast<double>(part_ms) / static_cast<double>(total_ms));
 }
 
 std::vector<std::uint64_t> build_schedule(std::uint64_t r_start,
@@ -284,7 +336,8 @@ bool full_compositor_spanning(
     const Config& config,
     std::uint64_t& tiles,
     std::uint64_t& columns,
-    cuda_campaign::DispatchStats& dispatch_stats) {
+    cuda_campaign::DispatchStats& dispatch_stats,
+    Phase0Telemetry& telemetry) {
   campaign::StreamingCompositor compositor;
   compositor.init(grid);
 
@@ -293,6 +346,7 @@ bool full_compositor_spanning(
     if (batch.coords.empty()) {
       return;
     }
+    telemetry.observe_tileops(batch.coords.size());
     cuda_campaign::DispatchStats local_stats;
     const std::vector<campaign::TileOp> tileops =
         dispatch_all_tileops(batch.coords, dispatcher, local_stats);
@@ -355,9 +409,11 @@ FullStaticReachComparator full_static_reach_handoff(
     const std::vector<std::uint64_t>& schedule,
     cuda_campaign::TileBatchDispatcher& dispatcher,
     const Config& config,
-    cuda_campaign::DispatchStats& dispatch_stats) {
+    cuda_campaign::DispatchStats& dispatch_stats,
+    Phase0Telemetry& telemetry) {
   FullStaticReachComparator result;
   const std::vector<campaign::TileCoord> coords = grid.enumerate_active_tiles();
+  telemetry.observe_tileops(coords.size());
   cuda_campaign::DispatchStats local_stats;
   const std::vector<campaign::TileOp> tileops =
       dispatch_all_tileops(coords, dispatcher, local_stats);
@@ -371,6 +427,7 @@ FullStaticReachComparator full_static_reach_handoff(
       local_stats.k4_group_overflow_count;
   dispatch_stats.k5_port_overflow_count += local_stats.k5_port_overflow_count;
 
+  const auto materialization_begin = Clock::now();
   const lb_source::TileOpStaticReachMicrobandResult band =
       lb_source::build_tileop_static_reach_microband({
           .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
@@ -379,6 +436,8 @@ FullStaticReachComparator full_static_reach_handoff(
           .tileops = tileops,
           .seed_policy = lb_source::StaticReachSeedPolicy::kOneBand,
       });
+  telemetry.materialization_ms += elapsed_ms(materialization_begin, Clock::now());
+  telemetry.observe_band(band);
   if (!band.accepted()) {
     result.rejected = true;
     result.diagnostic = band.diagnostic;
@@ -395,6 +454,7 @@ FullStaticReachComparator full_static_reach_handoff(
     result.diagnostic = reach.diagnostic;
     return result;
   }
+  telemetry.observe_frontier(reach.outgoing);
 
   result.tiles = coords.size();
   result.port_atoms = band.port_atoms;
@@ -417,6 +477,7 @@ int main(int argc, char** argv) {
   }
 
   const auto total_begin = Clock::now();
+  Phase0Telemetry telemetry;
   campaign::CampaignConstants constants;
   try {
     constants = campaign::CampaignConstants::from_radii(
@@ -454,7 +515,7 @@ int main(int argc, char** argv) {
     }
     full_spanning = full_compositor_spanning(full_grid, dispatcher, config,
                                              full_tiles, full_columns,
-                                             full_dispatch);
+                                             full_dispatch, telemetry);
     std::cerr << "phase=full_compositor end tiles=" << full_tiles
               << " columns=" << full_columns
               << " elapsed_ms=" << elapsed_ms(full_begin, Clock::now())
@@ -487,8 +548,9 @@ int main(int argc, char** argv) {
             .diagnostic =
                 "full static grid invariant failed: " + invariant_error};
       } else {
-        full_static = full_static_reach_handoff(
-            full_grid, schedule, dispatcher, config, full_static_dispatch);
+        full_static = full_static_reach_handoff(full_grid, schedule, dispatcher,
+                                                config, full_static_dispatch,
+                                                telemetry);
       }
     }
     std::cerr << "phase=full_static_handoff end rejected="
@@ -523,29 +585,39 @@ int main(int argc, char** argv) {
     const lb_source::StaticReachSeedPolicy seed_policy =
         stitched_seed_policy(segment, segment_count);
     const auto segment_begin = Clock::now();
-    if (segment == 0 || segment + 2 == schedule.size() ||
-        segment % 8 == 0) {
-      std::cerr << "phase=stitched_segment begin segment=" << segment
-                << " segments=" << (schedule.size() - 1)
-                << " r_inner=" << r_inner << " r_outer=" << r_outer
+    auto emit_segment_end = [&](std::string_view result,
+                                std::uint64_t tiles,
+                                std::uint64_t carry_atoms) {
+      std::cerr << "phase=stitched_segment end segment=" << segment
+                << " result=" << result << " tiles=" << tiles
+                << " carry_atoms=" << carry_atoms
+                << " spanning=" << (stitched_spanning ? "true" : "false")
+                << " elapsed_ms=" << elapsed_ms(segment_begin, Clock::now())
                 << "\n";
-    }
+    };
+    std::cerr << "phase=stitched_segment begin segment=" << segment
+              << " segments=" << (schedule.size() - 1)
+              << " r_inner=" << r_inner << " r_outer=" << r_outer
+              << "\n";
     campaign::Grid grid;
     try {
       grid = campaign::Grid::build(r_inner, r_outer, campaign::k_sq_value);
     } catch (const std::exception& ex) {
       stitched_rejected = true;
       stitched_diagnostic = std::string("segment grid failed: ") + ex.what();
+      emit_segment_end("rejected_grid", 0, 0);
       break;
     }
     const std::string invariant_error = grid.verify_invariants();
     if (!invariant_error.empty()) {
       stitched_rejected = true;
       stitched_diagnostic = "segment grid invariant failed: " + invariant_error;
+      emit_segment_end("rejected_grid_invariant", 0, 0);
       break;
     }
     const std::vector<campaign::TileCoord> coords =
         grid.enumerate_active_tiles();
+    telemetry.observe_microband_tiles(coords.size());
     cuda_campaign::DispatchStats local_stats;
     const std::vector<campaign::TileOp> tileops =
         dispatch_all_tileops(coords, dispatcher, local_stats);
@@ -561,6 +633,7 @@ int main(int argc, char** argv) {
     stitched_dispatch.k5_port_overflow_count +=
         local_stats.k5_port_overflow_count;
 
+    const auto materialization_begin = Clock::now();
     const lb_source::TileOpStaticReachMicrobandResult band =
         lb_source::build_tileop_static_reach_microband({
             .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
@@ -569,9 +642,13 @@ int main(int argc, char** argv) {
             .tileops = tileops,
             .seed_policy = seed_policy,
         });
+    telemetry.materialization_ms +=
+        elapsed_ms(materialization_begin, Clock::now());
+    telemetry.observe_band(band);
     if (!band.accepted()) {
       stitched_rejected = true;
       stitched_diagnostic = band.diagnostic;
+      emit_segment_end("rejected_materialization", coords.size(), 0);
       break;
     }
     lb_source::StaticReachProcessResult step =
@@ -583,6 +660,7 @@ int main(int argc, char** argv) {
     if (!step.accepted()) {
       stitched_rejected = true;
       stitched_diagnostic = step.diagnostic;
+      emit_segment_end("rejected_process", coords.size(), 0);
       break;
     }
     stitched_tiles += coords.size();
@@ -597,20 +675,13 @@ int main(int argc, char** argv) {
     }
     const std::uint64_t segment_carry_atoms =
         static_cast<std::uint64_t>(step.outgoing.carry_atoms.size());
+    telemetry.observe_frontier(step.outgoing);
     max_carry_atoms = std::max<std::uint64_t>(max_carry_atoms,
                                               segment_carry_atoms);
     final_carry_width = step.carry_width;
     stitched_spanning = stitched_spanning || step.spanning;
     state = std::move(step.outgoing);
-    if (segment == 0 || segment + 2 == schedule.size() ||
-        segment % 8 == 0 || stitched_spanning) {
-      std::cerr << "phase=stitched_segment end segment=" << segment
-                << " tiles=" << coords.size()
-                << " carry_atoms=" << segment_carry_atoms
-                << " spanning=" << (stitched_spanning ? "true" : "false")
-                << " elapsed_ms=" << elapsed_ms(segment_begin, Clock::now())
-                << "\n";
-    }
+    emit_segment_end("accepted", coords.size(), segment_carry_atoms);
   }
   const auto stitched_done = Clock::now();
 
@@ -618,6 +689,7 @@ int main(int argc, char** argv) {
   std::string full_static_handoff_sha256;
   std::optional<bool> handoff_equal;
   if (!stitched_rejected && state.has_value()) {
+    const auto handoff_hash_begin = Clock::now();
     const lb_source::StaticReachProcessResult stitched_final{
         .reject = lb_source::RejectReason::kNone,
         .carry_width = final_carry_width,
@@ -636,6 +708,7 @@ int main(int argc, char** argv) {
                       final_handoff_sha256 == full_static_handoff_sha256 &&
                       stitched_handoff == *full_static->handoff;
     }
+    telemetry.handoff_hash_ms += elapsed_ms(handoff_hash_begin, Clock::now());
   }
 
   const bool interior_seed_clean =
@@ -670,8 +743,19 @@ int main(int argc, char** argv) {
                  : (pass ? "CUDA_STATIC_REACH_EQUIVALENCE_PASS"
                          : "CUDA_STATIC_REACH_EQUIVALENCE_FAIL"));
 
+  const lb_source::RssSnapshot rss = lb_source::rss_snapshot();
+  const std::uint64_t full_ms = elapsed_ms(full_begin, full_done);
+  const std::uint64_t full_static_ms =
+      elapsed_ms(full_static_begin, full_static_done);
+  const std::uint64_t stitched_ms = elapsed_ms(stitched_begin, stitched_done);
+  const std::uint64_t pre_handoff_total_ms =
+      elapsed_ms(total_begin, stitched_done);
+  const std::uint64_t total_ms = elapsed_ms(total_begin, Clock::now());
+
   std::cout << "{"
             << "\"schema\":\"cuda_static_reach_equivalence_v1\""
+            << ",\"phase0_schema\":\"cuda_static_reach_equivalence_phase0_telemetry_v1\""
+            << ",\"runner_id\":\"cuda_static_reach_equivalence_v1\""
             << ",\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\""
             << ",\"status\":\"" << status << "\""
             << ",\"k_sq\":" << campaign::k_sq_value
@@ -722,6 +806,26 @@ int main(int argc, char** argv) {
             << ",\"interior_outer_seed_ports\":" << interior_outer_seed_ports
             << ",\"max_carry_atoms\":" << max_carry_atoms
             << ",\"max_live_frontier_ports\":" << max_carry_atoms
+            << ",\"rss_bytes\":" << rss.current_bytes
+            << ",\"peak_rss_bytes\":" << rss.peak_bytes
+            << ",\"max_resident_microband_tiles\":"
+            << telemetry.max_resident_microband_tiles
+            << ",\"max_resident_tileops\":" << telemetry.max_resident_tileops
+            << ",\"max_resident_port_atoms\":"
+            << telemetry.max_resident_port_atoms
+            << ",\"max_resident_edges\":" << telemetry.max_resident_edges
+            << ",\"max_live_frontier_atoms\":"
+            << telemetry.max_live_frontier_atoms
+            << ",\"max_components\":" << telemetry.max_components
+            << ",\"wall_share_full_compositor\":"
+            << wall_share(full_ms, total_ms)
+            << ",\"wall_share_full_static\":"
+            << wall_share(full_static_ms, total_ms)
+            << ",\"wall_share_stitched\":" << wall_share(stitched_ms, total_ms)
+            << ",\"wall_share_materialization\":"
+            << wall_share(telemetry.materialization_ms, total_ms)
+            << ",\"wall_share_handoff_hash\":"
+            << wall_share(telemetry.handoff_hash_ms, total_ms)
             << ",\"stitched_rejected\":";
   emit_json_bool(std::cout, stitched_rejected);
   std::cout << ",\"stitched_diagnostic\":";
@@ -794,11 +898,13 @@ int main(int argc, char** argv) {
             << full_static_dispatch.k5_port_overflow_count
             << "}"
             << ",\"timings_ms\":{"
-            << "\"full\":" << elapsed_ms(full_begin, full_done)
-            << ",\"full_static\":"
-            << elapsed_ms(full_static_begin, full_static_done)
-            << ",\"stitched\":" << elapsed_ms(stitched_begin, stitched_done)
-            << ",\"total\":" << elapsed_ms(total_begin, stitched_done)
+            << "\"full\":" << full_ms
+            << ",\"full_static\":" << full_static_ms
+            << ",\"stitched\":" << stitched_ms
+            << ",\"materialization\":" << telemetry.materialization_ms
+            << ",\"handoff_hash\":" << telemetry.handoff_hash_ms
+            << ",\"pre_handoff_total\":" << pre_handoff_total_ms
+            << ",\"total\":" << total_ms
             << "}}\n";
 
   return pass ? EXIT_SUCCESS : EXIT_FAILURE;

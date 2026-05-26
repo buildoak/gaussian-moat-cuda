@@ -1,9 +1,9 @@
 #include "lb_source/detector_band_handoff.h"
+#include "lb_source/diagnostic_telemetry.h"
 #include "lb_source/tileop_static_reach.h"
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -24,7 +24,10 @@
 
 namespace {
 
-using Clock = std::chrono::steady_clock;
+using Clock = lb_source::DiagnosticClock;
+
+constexpr std::string_view kPhase0Schema = "lb_diagnostic_phase0_v1";
+constexpr std::string_view kRunnerId = "tileop_static_reach_equivalence_v1";
 
 struct Config {
   std::uint64_t r_start = 248;
@@ -32,6 +35,42 @@ struct Config {
   std::uint64_t microband_width = 128;
   std::size_t max_atoms = 1000000;
   std::size_t tileop_threads = 0;
+};
+
+struct SurfaceResidentCounts {
+  std::uint64_t tiles = 0;
+  std::uint64_t tileops = 0;
+  std::uint64_t port_atoms = 0;
+  std::uint64_t edges = 0;
+  std::uint64_t frontier_atoms = 0;
+  std::uint64_t components = 0;
+};
+
+struct RunningMaxima {
+  std::uint64_t resident_tiles = 0;
+  std::uint64_t resident_tileops = 0;
+  std::uint64_t resident_port_atoms = 0;
+  std::uint64_t resident_edges = 0;
+  std::uint64_t live_frontier_atoms = 0;
+  std::uint64_t components = 0;
+
+  void observe(const SurfaceResidentCounts& counts) {
+    resident_tiles = std::max(resident_tiles, counts.tiles);
+    resident_tileops = std::max(resident_tileops, counts.tileops);
+    resident_port_atoms = std::max(resident_port_atoms, counts.port_atoms);
+    resident_edges = std::max(resident_edges, counts.edges);
+    live_frontier_atoms =
+        std::max(live_frontier_atoms, counts.frontier_atoms);
+    components = std::max(components, counts.components);
+  }
+};
+
+struct WallTimingTotals {
+  std::uint64_t stitched_grid_ms = 0;
+  std::uint64_t stitched_enumerate_ms = 0;
+  std::uint64_t stitched_tileop_ms = 0;
+  std::uint64_t stitched_graph_ms = 0;
+  std::uint64_t stitched_static_reach_ms = 0;
 };
 
 bool parse_uint64(std::string_view text, std::uint64_t& out) {
@@ -134,9 +173,7 @@ bool parse_args(int argc, char** argv, Config& config) {
 }
 
 std::uint64_t elapsed_ms(Clock::time_point begin, Clock::time_point end) {
-  return static_cast<std::uint64_t>(
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
-          .count());
+  return lb_source::elapsed_ms(begin, end);
 }
 
 std::size_t resolve_tileop_threads(std::size_t requested,
@@ -360,6 +397,7 @@ int main(int argc, char** argv) {
                                            full_coords.size()));
   const auto full_tileop_done = Clock::now();
 
+  const auto full_graph_begin = Clock::now();
   const lb_source::TileOpStaticReachMicrobandResult full_reach_band =
       lb_source::build_tileop_static_reach_microband({
           .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
@@ -368,6 +406,7 @@ int main(int argc, char** argv) {
           .tileops = full_tileops,
           .seed_policy = lb_source::StaticReachSeedPolicy::kOneBand,
       });
+  const auto full_graph_done = Clock::now();
   if (!full_reach_band.accepted()) {
     std::cerr << "full static reach band rejected: "
               << full_reach_band.diagnostic << "\n";
@@ -379,13 +418,28 @@ int main(int argc, char** argv) {
           {.max_atoms = config.max_atoms,
            .max_carry_atoms = config.max_atoms,
            .max_components = config.max_atoms});
+  const auto full_static_reach_done = Clock::now();
   if (!full_reach.accepted()) {
     std::cerr << "full static reach process rejected: "
               << full_reach.diagnostic << "\n";
     return EXIT_FAILURE;
   }
+  const auto full_compositor_begin = Clock::now();
   const bool full_compositor = compositor_spanning(full_grid, full_tileops);
+  const auto full_compositor_done = Clock::now();
   const auto full_done = Clock::now();
+  const SurfaceResidentCounts full_compositor_resident{
+      .tiles = full_coords.size(),
+      .tileops = full_tileops.size(),
+  };
+  const SurfaceResidentCounts full_static_handoff_resident{
+      .tiles = full_coords.size(),
+      .tileops = full_tileops.size(),
+      .port_atoms = full_reach_band.band.atoms.size(),
+      .edges = full_reach_band.band.edges.size(),
+      .frontier_atoms = full_reach.outgoing.carry_atoms.size(),
+      .components = full_reach.outgoing.component_partition.size(),
+  };
 
   const std::vector<std::uint64_t> schedule =
       build_schedule(config.r_start, config.r_final,
@@ -401,6 +455,11 @@ int main(int argc, char** argv) {
   std::uint64_t interior_inner_seed_ports = 0;
   std::uint64_t interior_outer_seed_ports = 0;
   std::uint64_t max_stitched_carry_atoms = 0;
+  RunningMaxima stitched_maxima;
+  RunningMaxima all_maxima;
+  WallTimingTotals timings;
+  all_maxima.observe(full_compositor_resident);
+  all_maxima.observe(full_static_handoff_resident);
   const auto stitched_begin = Clock::now();
 
   const std::size_t segment_count =
@@ -411,6 +470,7 @@ int main(int argc, char** argv) {
     const lb_source::StaticReachSeedPolicy seed_policy =
         stitched_seed_policy(segment, segment_count);
     campaign::Grid grid;
+    const auto segment_grid_begin = Clock::now();
     try {
       grid = campaign::Grid::build(r_inner, r_outer, campaign::k_sq_value);
     } catch (const std::exception& ex) {
@@ -423,13 +483,17 @@ int main(int argc, char** argv) {
                 << "\n";
       return EXIT_FAILURE;
     }
+    const auto segment_grid_done = Clock::now();
 
     const std::vector<campaign::TileCoord> coords =
         grid.enumerate_active_tiles();
+    const auto segment_enumerate_done = Clock::now();
     const std::vector<campaign::TileOp> tileops =
         build_tileops(coords, constants, grid,
                       resolve_tileop_threads(config.tileop_threads,
                                              coords.size()));
+    const auto segment_tileop_done = Clock::now();
+    const auto segment_graph_begin = Clock::now();
     const lb_source::TileOpStaticReachMicrobandResult band =
         lb_source::build_tileop_static_reach_microband({
             .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
@@ -438,6 +502,7 @@ int main(int argc, char** argv) {
             .tileops = tileops,
             .seed_policy = seed_policy,
         });
+    const auto segment_graph_done = Clock::now();
     if (!band.accepted()) {
       std::cerr << "stitched static reach band rejected: "
                 << band.diagnostic << "\n";
@@ -449,6 +514,7 @@ int main(int argc, char** argv) {
             {.max_atoms = config.max_atoms,
              .max_carry_atoms = config.max_atoms,
              .max_components = config.max_atoms});
+    const auto segment_static_reach_done = Clock::now();
     if (!step.accepted()) {
       std::cerr << "stitched static reach process rejected: "
                 << step.diagnostic << "\n";
@@ -468,6 +534,26 @@ int main(int argc, char** argv) {
     max_stitched_carry_atoms =
         std::max<std::uint64_t>(max_stitched_carry_atoms,
                                 step.outgoing.carry_atoms.size());
+    const SurfaceResidentCounts segment_resident{
+        .tiles = coords.size(),
+        .tileops = tileops.size(),
+        .port_atoms = band.band.atoms.size(),
+        .edges = band.band.edges.size(),
+        .frontier_atoms = step.outgoing.carry_atoms.size(),
+        .components = step.outgoing.component_partition.size(),
+    };
+    stitched_maxima.observe(segment_resident);
+    all_maxima.observe(segment_resident);
+    timings.stitched_grid_ms +=
+        elapsed_ms(segment_grid_begin, segment_grid_done);
+    timings.stitched_enumerate_ms +=
+        elapsed_ms(segment_grid_done, segment_enumerate_done);
+    timings.stitched_tileop_ms +=
+        elapsed_ms(segment_enumerate_done, segment_tileop_done);
+    timings.stitched_graph_ms +=
+        elapsed_ms(segment_graph_begin, segment_graph_done);
+    timings.stitched_static_reach_ms +=
+        elapsed_ms(segment_graph_done, segment_static_reach_done);
     stitched_spanning = stitched_spanning || step.spanning;
     stitched_state = step.outgoing;
   }
@@ -478,6 +564,7 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
+  const auto handoff_begin = Clock::now();
   const lb_source::DetectorBandHandoffV1 full_handoff =
       make_final_handoff(full_reach, schedule, config);
   const lb_source::StaticReachProcessResult stitched_final{
@@ -496,14 +583,29 @@ int main(int argc, char** argv) {
       !full_handoff_sha256.empty() &&
       full_handoff_sha256 == stitched_handoff_sha256 &&
       full_handoff == stitched_handoff;
+  const auto handoff_done = Clock::now();
   const bool verdict_equal = full_reach.spanning == stitched_spanning;
   const bool pass =
       full_compositor == full_reach.spanning &&
       verdict_equal &&
       handoff_equal;
+  const lb_source::RssSnapshot rss = lb_source::rss_snapshot();
+  const std::uint64_t full_graph_ms =
+      elapsed_ms(full_graph_begin, full_graph_done);
+  const std::uint64_t full_static_reach_ms =
+      elapsed_ms(full_graph_done, full_static_reach_done);
+  const std::uint64_t full_compositor_ms =
+      elapsed_ms(full_compositor_begin, full_compositor_done);
+  const std::uint64_t handoff_ms = elapsed_ms(handoff_begin, handoff_done);
+  const auto total_done = Clock::now();
+  const std::uint64_t graph_ms = full_graph_ms + timings.stitched_graph_ms;
+  const std::uint64_t static_reach_ms =
+      full_static_reach_ms + timings.stitched_static_reach_ms;
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_static_reach_equivalence_v1\""
+            << ",\"phase0_schema\":\"" << kPhase0Schema << "\""
+            << ",\"runner_id\":\"" << kRunnerId << "\""
             << ",\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\""
             << ",\"status\":\""
             << (pass ? "STATIC_REACH_EQUIVALENCE_PASS"
@@ -555,12 +657,80 @@ int main(int argc, char** argv) {
             << (full_reach.spanning ? "true" : "false")
             << ",\"stitched_static_reach_spanning\":"
             << (stitched_spanning ? "true" : "false")
+            << ",\"rss_bytes\":"
+            << lb_source::json_safe_uint64(rss.current_bytes)
+            << ",\"peak_rss_bytes\":"
+            << lb_source::json_safe_uint64(rss.peak_bytes)
+            << ",\"full_compositor_resident_tiles\":"
+            << full_compositor_resident.tiles
+            << ",\"full_compositor_resident_tileops\":"
+            << full_compositor_resident.tileops
+            << ",\"full_compositor_resident_port_atoms\":"
+            << full_compositor_resident.port_atoms
+            << ",\"full_compositor_resident_edges\":"
+            << full_compositor_resident.edges
+            << ",\"full_compositor_resident_frontier_atoms\":"
+            << full_compositor_resident.frontier_atoms
+            << ",\"full_compositor_resident_components\":"
+            << full_compositor_resident.components
+            << ",\"full_static_handoff_resident_tiles\":"
+            << full_static_handoff_resident.tiles
+            << ",\"full_static_handoff_resident_tileops\":"
+            << full_static_handoff_resident.tileops
+            << ",\"full_static_handoff_resident_port_atoms\":"
+            << full_static_handoff_resident.port_atoms
+            << ",\"full_static_handoff_resident_edges\":"
+            << full_static_handoff_resident.edges
+            << ",\"full_static_handoff_resident_frontier_atoms\":"
+            << full_static_handoff_resident.frontier_atoms
+            << ",\"full_static_handoff_resident_components\":"
+            << full_static_handoff_resident.components
+            << ",\"max_stitched_resident_tiles\":"
+            << stitched_maxima.resident_tiles
+            << ",\"max_stitched_resident_tileops\":"
+            << stitched_maxima.resident_tileops
+            << ",\"max_stitched_resident_port_atoms\":"
+            << stitched_maxima.resident_port_atoms
+            << ",\"max_stitched_resident_edges\":"
+            << stitched_maxima.resident_edges
+            << ",\"max_stitched_live_frontier_atoms\":"
+            << stitched_maxima.live_frontier_atoms
+            << ",\"max_stitched_resident_components\":"
+            << stitched_maxima.components
+            << ",\"max_resident_tiles\":"
+            << all_maxima.resident_tiles
+            << ",\"max_resident_tileops\":"
+            << all_maxima.resident_tileops
+            << ",\"max_resident_port_atoms\":"
+            << all_maxima.resident_port_atoms
+            << ",\"max_resident_edges\":"
+            << all_maxima.resident_edges
+            << ",\"max_live_frontier_atoms\":"
+            << all_maxima.live_frontier_atoms
+            << ",\"max_resident_components\":"
+            << all_maxima.components
             << ",\"full_tileop_ms\":"
             << elapsed_ms(full_tileop_begin, full_tileop_done)
+            << ",\"full_graph_ms\":" << full_graph_ms
+            << ",\"full_static_reach_ms\":" << full_static_reach_ms
+            << ",\"full_compositor_ms\":" << full_compositor_ms
+            << ",\"stitched_grid_ms\":" << timings.stitched_grid_ms
+            << ",\"stitched_enumerate_ms\":"
+            << timings.stitched_enumerate_ms
+            << ",\"stitched_tileop_ms\":" << timings.stitched_tileop_ms
+            << ",\"stitched_graph_ms\":" << timings.stitched_graph_ms
+            << ",\"stitched_static_reach_ms\":"
+            << timings.stitched_static_reach_ms
+            << ",\"graph_ms\":" << graph_ms
+            << ",\"static_reach_ms\":" << static_reach_ms
+            << ",\"process_ms\":" << static_reach_ms
+            << ",\"handoff_ms\":" << handoff_ms
             << ",\"full_total_ms\":" << elapsed_ms(full_tileop_begin, full_done)
             << ",\"stitched_total_ms\":"
             << elapsed_ms(stitched_begin, stitched_done)
-            << ",\"total_ms\":" << elapsed_ms(total_begin, stitched_done)
+            << ",\"pre_handoff_total_ms\":"
+            << elapsed_ms(total_begin, stitched_done)
+            << ",\"total_ms\":" << elapsed_ms(total_begin, total_done)
             << "}\n";
 
   return pass ? EXIT_SUCCESS : EXIT_FAILURE;
