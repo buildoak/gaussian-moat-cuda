@@ -1,4 +1,5 @@
 #include "lb_source/source_propagation.h"
+#include "lb_source/resumable_band_checkpoint.h"
 #include "lb_source/stream_checkpoint.h"
 #include "lb_source/tileop_port_stream.h"
 
@@ -37,6 +38,13 @@ constexpr std::string_view kFirstBandSourceMode = "GEO_I_PORT_DIAGNOSTIC";
 constexpr std::string_view kGeometryId = "gaussian_octant_tileop_port_v1";
 constexpr std::string_view kBuildId = "local_campaign_build";
 constexpr std::string_view kOverflowSummary = "none";
+constexpr std::string_view kProofStatus = "DIAGNOSTIC_NON_CLAIM";
+constexpr std::string_view kResumableMode = "resumable-band";
+constexpr std::string_view kOracleId = "tileop_port_stream_v1";
+constexpr std::string_view kCommandId =
+    "source_tileop_port_stream_runner_fixed_width_v1";
+constexpr std::string_view kHarvestStatus = "BAND_HARVEST_PROGRESS_V1";
+constexpr std::string_view kReplayStatus = "REPLAYABLE_CONTEXT_V1";
 
 struct Config {
   std::uint64_t r_start = 248;
@@ -48,6 +56,8 @@ struct Config {
   bool seed_inner_flags = false;
   std::optional<std::string> checkpoint_in;
   std::optional<std::string> checkpoint_out;
+  std::optional<std::string> resumable_checkpoint_in;
+  std::optional<std::string> resumable_checkpoint_out;
   std::optional<std::string> live_manifest_out;
   std::optional<std::string> progress_out;
   std::optional<std::string> death_out;
@@ -96,6 +106,10 @@ void usage(const char* prog) {
       << "  --seed-inner-flags          seed first microband from TileOp inner flags\n"
       << "  --checkpoint-in PATH        read LB_SOURCE_STREAM_CHECKPOINT_V1\n"
       << "  --checkpoint-out PATH       write LB_SOURCE_STREAM_CHECKPOINT_V1\n"
+      << "  --resumable-checkpoint-in PATH\n"
+      << "                              read source-neutral resumable checkpoint\n"
+      << "  --resumable-checkpoint-out PATH\n"
+      << "                              write source-neutral resumable checkpoint\n"
       << "  --live-manifest-out PATH    write final LB_SOURCE_LIVE_HANDOFF_V1\n"
       << "  --progress-out PATH         write per-microband JSONL progress\n"
       << "  --stop-after-microbands N   stop after N microbands in this process\n"
@@ -159,6 +173,18 @@ bool parse_args(int argc, char** argv, Config& config) {
         return false;
       }
       config.checkpoint_out = value;
+    } else if (take_value("--resumable-checkpoint-in", value)) {
+      if (value.empty()) {
+        std::cerr << "--resumable-checkpoint-in must not be empty\n";
+        return false;
+      }
+      config.resumable_checkpoint_in = value;
+    } else if (take_value("--resumable-checkpoint-out", value)) {
+      if (value.empty()) {
+        std::cerr << "--resumable-checkpoint-out must not be empty\n";
+        return false;
+      }
+      config.resumable_checkpoint_out = value;
     } else if (take_value("--live-manifest-out", value)) {
       if (value.empty()) {
         std::cerr << "--live-manifest-out must not be empty\n";
@@ -221,6 +247,17 @@ bool parse_args(int argc, char** argv, Config& config) {
   if (config.seed_inner_flags && config.checkpoint_in.has_value()) {
     std::cerr << "--seed-inner-flags cannot be combined with "
                  "--checkpoint-in\n";
+    return false;
+  }
+  if (config.seed_inner_flags && config.resumable_checkpoint_in.has_value()) {
+    std::cerr << "--seed-inner-flags cannot be combined with "
+                 "--resumable-checkpoint-in\n";
+    return false;
+  }
+  if (config.checkpoint_in.has_value() &&
+      config.resumable_checkpoint_in.has_value()) {
+    std::cerr << "--checkpoint-in cannot be combined with "
+                 "--resumable-checkpoint-in\n";
     return false;
   }
   if (config.death_out.has_value()) {
@@ -434,9 +471,46 @@ lb_source::StreamCheckpointV1 make_checkpoint(
   return lb_source::canonicalize_stream_checkpoint(checkpoint);
 }
 
+lb_source::ResumableBandCheckpointV1 make_resumable_checkpoint(
+    std::uint64_t next_r_start,
+    std::uint64_t schedule_index,
+    std::uint64_t campaign_tiles_processed,
+    std::uint64_t tileop_overflows,
+    const ScheduleInfo& schedule) {
+  lb_source::ResumableBandCheckpointV1 checkpoint;
+  checkpoint.runner_id = std::string(kRunnerId);
+  checkpoint.mode = std::string(kResumableMode);
+  checkpoint.k_sq = static_cast<std::uint64_t>(campaign::k_sq_value);
+  checkpoint.original_r_start = schedule.original_r_start;
+  checkpoint.next_r_start = next_r_start;
+  checkpoint.requested_r_final = schedule.requested_r_final;
+  checkpoint.microband_width = schedule.microband_width;
+  checkpoint.carry_width = lb_source::ceil_sqrt(checkpoint.k_sq);
+  checkpoint.schedule_index = schedule_index;
+  checkpoint.schedule_digest_algorithm = std::string(kScheduleDigestAlgorithm);
+  checkpoint.schedule_digest_hex = schedule.digest_hex;
+  checkpoint.geometry_id = std::string(kGeometryId);
+  checkpoint.build_id = std::string(kBuildId);
+  checkpoint.oracle_id = std::string(kOracleId);
+  checkpoint.command_id = std::string(kCommandId);
+  checkpoint.overflow_summary = std::string(kOverflowSummary);
+  checkpoint.proof_status = std::string(kProofStatus);
+  checkpoint.harvest_status = std::string(kHarvestStatus);
+  checkpoint.replay_status = std::string(kReplayStatus);
+  checkpoint.campaign_tiles_processed = campaign_tiles_processed;
+  checkpoint.tileop_overflows = tileop_overflows;
+  return checkpoint;
+}
+
 std::uint64_t checkpoint_size_bytes(const lb_source::StreamCheckpointV1& cp) {
   return static_cast<std::uint64_t>(
       lb_source::stream_checkpoint_to_string(cp).size());
+}
+
+std::uint64_t checkpoint_size_bytes(
+    const lb_source::ResumableBandCheckpointV1& cp) {
+  return static_cast<std::uint64_t>(
+      lb_source::resumable_band_checkpoint_to_string(cp).size());
 }
 
 lb_source::StreamCheckpointV1 read_checkpoint_or_die(
@@ -450,6 +524,24 @@ lb_source::StreamCheckpointV1 read_checkpoint_or_die(
       lb_source::read_stream_checkpoint(in);
   if (!result.accepted()) {
     std::cerr << "invalid --checkpoint-in: " << result.diagnostic << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return result.checkpoint;
+}
+
+lb_source::ResumableBandCheckpointV1 read_resumable_checkpoint_or_die(
+    const std::string& path) {
+  std::ifstream in(path);
+  if (!in) {
+    std::cerr << "cannot open --resumable-checkpoint-in path: " << path
+              << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  const lb_source::ResumableBandCheckpointReadResult result =
+      lb_source::read_resumable_band_checkpoint(in);
+  if (!result.accepted()) {
+    std::cerr << "invalid --resumable-checkpoint-in: "
+              << result.diagnostic << "\n";
     std::exit(EXIT_FAILURE);
   }
   return result.checkpoint;
@@ -506,9 +598,49 @@ void validate_checkpoint_binding_or_die(
   }
 }
 
+void validate_resumable_checkpoint_binding_or_die(
+    const lb_source::ResumableBandCheckpointV1& checkpoint,
+    const Config& config,
+    const ScheduleInfo& schedule) {
+  lb_source::ResumableBandCheckpointExpectedContext expected;
+  expected.runner_id = std::string(kRunnerId);
+  expected.mode = std::string(kResumableMode);
+  expected.k_sq = static_cast<std::uint64_t>(campaign::k_sq_value);
+  expected.original_r_start = schedule.original_r_start;
+  expected.next_r_start = config.r_start;
+  expected.requested_r_final = config.r_final;
+  expected.microband_width = config.microband_width;
+  expected.carry_width =
+      lb_source::ceil_sqrt(static_cast<std::uint64_t>(campaign::k_sq_value));
+  expected.schedule_index = checkpoint.schedule_index;
+  expected.schedule_digest_algorithm = std::string(kScheduleDigestAlgorithm);
+  expected.schedule_digest_hex = schedule.digest_hex;
+  expected.geometry_id = std::string(kGeometryId);
+  expected.build_id = std::string(kBuildId);
+  expected.oracle_id = std::string(kOracleId);
+  expected.command_id = std::string(kCommandId);
+  expected.overflow_summary = std::string(kOverflowSummary);
+  expected.proof_status = std::string(kProofStatus);
+  expected.harvest_status = std::string(kHarvestStatus);
+  expected.replay_status = std::string(kReplayStatus);
+  const std::string validation =
+      lb_source::validate_resumable_band_checkpoint(checkpoint, expected);
+  if (!validation.empty()) {
+    std::cerr << "invalid --resumable-checkpoint-in: " << validation << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  if (checkpoint.schedule_index >= schedule.radii.size() ||
+      schedule.radii[checkpoint.schedule_index] != config.r_start) {
+    std::cerr << "invalid --resumable-checkpoint-in: wrong schedule_index\n";
+    std::exit(EXIT_FAILURE);
+  }
+}
+
 ScheduleInfo build_schedule_info(
     const Config& config,
-    const std::optional<lb_source::StreamCheckpointV1>& checkpoint) {
+    const std::optional<lb_source::StreamCheckpointV1>& checkpoint,
+    const std::optional<lb_source::ResumableBandCheckpointV1>&
+        resumable_checkpoint) {
   ScheduleInfo schedule;
   schedule.requested_r_final = config.r_final;
   schedule.microband_width = config.microband_width;
@@ -522,6 +654,8 @@ ScheduleInfo build_schedule_info(
     }
     schedule.original_r_start =
         config.r_start - static_cast<std::uint64_t>(offset);
+  } else if (resumable_checkpoint.has_value()) {
+    schedule.original_r_start = resumable_checkpoint->original_r_start;
   } else {
     schedule.original_r_start = config.r_start;
   }
@@ -553,10 +687,12 @@ int main(int argc, char** argv) {
   }
 
   std::optional<lb_source::StreamCheckpointV1> checkpoint;
+  std::optional<lb_source::ResumableBandCheckpointV1> resumable_checkpoint;
   std::optional<lb_source::LiveSeparator> live_incoming;
   std::optional<lb_source::LiveHandoffV1> current_live_handoff;
-  std::string source_mode = config.seed_inner_flags ? std::string(kFirstBandSourceMode)
-                                                    : "NONE";
+  std::string source_mode = config.seed_inner_flags
+                                ? std::string(kFirstBandSourceMode)
+                                : "NONE";
   std::uint64_t schedule_index = 0;
 
   if (config.checkpoint_in.has_value()) {
@@ -572,9 +708,20 @@ int main(int argc, char** argv) {
     schedule_index = checkpoint->schedule_index;
   }
 
-  const ScheduleInfo schedule = build_schedule_info(config, checkpoint);
+  if (config.resumable_checkpoint_in.has_value()) {
+    resumable_checkpoint =
+        read_resumable_checkpoint_or_die(*config.resumable_checkpoint_in);
+    schedule_index = resumable_checkpoint->schedule_index;
+  }
+
+  const ScheduleInfo schedule =
+      build_schedule_info(config, checkpoint, resumable_checkpoint);
   if (checkpoint.has_value()) {
     validate_checkpoint_binding_or_die(*checkpoint, config, schedule);
+  }
+  if (resumable_checkpoint.has_value()) {
+    validate_resumable_checkpoint_binding_or_die(*resumable_checkpoint,
+                                                 config, schedule);
   }
   if (schedule.radii.empty() || schedule_index >= schedule.radii.size() ||
       schedule.radii[schedule_index] != config.r_start) {
@@ -602,8 +749,13 @@ int main(int argc, char** argv) {
   lb_source::LiveProcessResult live_last;
   std::uint64_t processed_outer = config.r_start;
   std::uint64_t microbands_processed_this_run = 0;
-  std::uint64_t campaign_tiles_processed = 0;
-  std::uint64_t tileop_overflows = 0;
+  std::uint64_t campaign_tiles_processed =
+      resumable_checkpoint.has_value()
+          ? resumable_checkpoint->campaign_tiles_processed
+          : 0;
+  std::uint64_t tileop_overflows = resumable_checkpoint.has_value()
+                                       ? resumable_checkpoint->tileop_overflows
+                                       : 0;
   std::uint64_t port_atoms = 0;
   std::uint64_t internal_edges = 0;
   std::uint64_t seam_edges = 0;
@@ -692,9 +844,10 @@ int main(int argc, char** argv) {
       maxima.live_frontier_atoms =
           std::max<std::uint64_t>(maxima.live_frontier_atoms,
                                   live_last.outgoing.carry_atoms.size());
-      const lb_source::StreamCheckpointV1 progress_checkpoint =
-          make_checkpoint(r_outer, schedule_index, source_mode,
-                          *current_live_handoff, schedule);
+      const lb_source::ResumableBandCheckpointV1 progress_checkpoint =
+          make_resumable_checkpoint(r_outer, schedule_index,
+                                    campaign_tiles_processed, tileop_overflows,
+                                    schedule);
       maxima.checkpoint_bytes =
           std::max(maxima.checkpoint_bytes,
                    checkpoint_size_bytes(progress_checkpoint));
@@ -807,6 +960,28 @@ int main(int argc, char** argv) {
     checkpoint_written = true;
   }
 
+  bool resumable_checkpoint_written = false;
+  std::uint64_t resumable_checkpoint_bytes = 0;
+  if (config.resumable_checkpoint_out.has_value()) {
+    if (!accepted) {
+      std::cerr << "--resumable-checkpoint-out requires an accepted band run\n";
+      return EXIT_FAILURE;
+    }
+    const lb_source::ResumableBandCheckpointV1 out_checkpoint =
+        make_resumable_checkpoint(processed_outer, schedule_index,
+                                  campaign_tiles_processed, tileop_overflows,
+                                  schedule);
+    resumable_checkpoint_bytes = checkpoint_size_bytes(out_checkpoint);
+    std::ofstream out(*config.resumable_checkpoint_out);
+    if (!out) {
+      std::cerr << "cannot open --resumable-checkpoint-out path: "
+                << *config.resumable_checkpoint_out << "\n";
+      return EXIT_FAILURE;
+    }
+    lb_source::write_resumable_band_checkpoint(out, out_checkpoint);
+    resumable_checkpoint_written = true;
+  }
+
   const char* death_summary_status =
       accepted && live_last.terminal_source_dead
           ? "UNSUPPORTED_DIAGNOSTIC_MVP"
@@ -817,6 +992,7 @@ int main(int argc, char** argv) {
             << "\"runner_id\":\"" << kRunnerId << "\","
             << "\"claim_label\":\"SOURCE_TILEOP_PORT_STREAM_DIAGNOSTIC\","
             << "\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\","
+            << "\"resumable_mode\":\"" << kResumableMode << "\","
             << "\"source_mode\":\"" << source_mode << "\","
             << "\"k_sq\":" << campaign::k_sq_value
             << ",\"original_r_start\":" << schedule.original_r_start
@@ -837,7 +1013,8 @@ int main(int argc, char** argv) {
             << ",\"internal_edges\":" << internal_edges
             << ",\"seam_edges\":" << seam_edges
             << ",\"accepted\":" << (accepted ? "true" : "false")
-            << ",\"reject\":\"" << lb_source::reject_reason_name(live_last.reject)
+            << ",\"reject\":\""
+            << lb_source::reject_reason_name(live_last.reject)
             << "\",\"reject_diagnostic\":";
   append_json_string(std::cout, live_last.diagnostic);
   std::cout << ",\"terminal_source_dead\":"
@@ -855,6 +1032,10 @@ int main(int argc, char** argv) {
             << ",\"checkpoint_written\":"
             << (checkpoint_written ? "true" : "false")
             << ",\"checkpoint_bytes\":" << checkpoint_bytes
+            << ",\"resumable_checkpoint_written\":"
+            << (resumable_checkpoint_written ? "true" : "false")
+            << ",\"resumable_checkpoint_bytes\":"
+            << resumable_checkpoint_bytes
             << ",\"death_summary_status\":\"" << death_summary_status << "\""
             << ",\"death_written\":false"
             << ",\"max_resident_microband_tiles\":"

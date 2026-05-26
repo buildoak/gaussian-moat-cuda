@@ -51,7 +51,9 @@ reduces active complexity, clarifies ownership, or creates a useful test seam.
 Keep these boundaries visible:
 
 - `source_propagation`: certified source/origin live handoff semantics.
-- `stream_checkpoint`: restart/replay envelopes and checkpoint validation.
+- `stream_checkpoint`: source-carry restart envelopes around `LiveHandoffV1`.
+- `resumable_band_checkpoint`: source-neutral band progress/replay
+  checkpoints for lightweight prolonged runs.
 - `tileop_port_stream`: bounded streaming TileOp/port ingestion primitives.
 - `tileop_port_graph`: materialized diagnostic port graph conversion.
 - `tileop_live_bridge`: coordinate-to-port handoff bridge evidence.

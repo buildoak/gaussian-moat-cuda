@@ -39,6 +39,9 @@ These are the expected code-alignment surfaces:
 - `include/lb_source/stream_checkpoint.h`
 - `src/stream_checkpoint.cpp`
 - `tests/test_stream_checkpoint.cpp`
+- `include/lb_source/resumable_band_checkpoint.h`
+- `src/resumable_band_checkpoint.cpp`
+- `tests/test_resumable_band_checkpoint.cpp`
 - `apps/source_tileop_port_stream_runner.cpp`
 - `tests/test_tileop_port_stream_runner.sh`
 - `include/lb_source/tileop_port_stream.h`

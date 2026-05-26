@@ -156,6 +156,7 @@ ctest --test-dir "$verify_build_dir" --output-on-failure \
   --seed-inner-flags \
   --live-manifest-out "$out_dir/source_tileop_port_stream_live_handoff.txt" \
   --checkpoint-out "$out_dir/source_tileop_port_stream_checkpoint.txt" \
+  --resumable-checkpoint-out "$out_dir/source_tileop_port_stream_resumable_checkpoint.txt" \
   --progress-out "$out_dir/source_tileop_port_stream_progress.jsonl" \
   | tee "$out_dir/source_tileop_port_stream_runner_smoke.json"
 

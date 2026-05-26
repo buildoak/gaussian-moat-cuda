@@ -144,6 +144,7 @@ for artifact in \
   source_tileop_port_stream_runner_smoke.json \
   source_tileop_port_stream_live_handoff.txt \
   source_tileop_port_stream_checkpoint.txt \
+  source_tileop_port_stream_resumable_checkpoint.txt \
   source_tileop_port_stream_progress.jsonl \
   source_tileop_port_stream_equivalence.log \
   k26_tsuchimura_preflight.json \
@@ -181,6 +182,12 @@ require_grep '"has_source_carry":true' \
 require_grep '"checkpoint_written":true' \
   "$out_dir/source_tileop_port_stream_runner_smoke.json" \
   "TileOp-port stream runner checkpoint"
+require_grep '"resumable_mode":"resumable-band"' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner resumable mode"
+require_grep '"resumable_checkpoint_written":true' \
+  "$out_dir/source_tileop_port_stream_runner_smoke.json" \
+  "TileOp-port stream runner resumable checkpoint"
 require_grep '"max_resident_microband_tiles":[1-9][0-9]*' \
   "$out_dir/source_tileop_port_stream_runner_smoke.json" \
   "TileOp-port stream telemetry resident tiles"
@@ -193,6 +200,20 @@ require_grep '^LB_SOURCE_LIVE_HANDOFF_V1$' \
 require_grep '^LB_SOURCE_STREAM_CHECKPOINT_V1$' \
   "$out_dir/source_tileop_port_stream_checkpoint.txt" \
   "TileOp-port stream checkpoint"
+require_grep '^LB_RESUMABLE_BAND_CHECKPOINT_V1$' \
+  "$out_dir/source_tileop_port_stream_resumable_checkpoint.txt" \
+  "TileOp-port stream resumable checkpoint"
+require_grep '^mode resumable-band$' \
+  "$out_dir/source_tileop_port_stream_resumable_checkpoint.txt" \
+  "TileOp-port stream resumable checkpoint mode"
+require_grep '^proof_status DIAGNOSTIC_NON_CLAIM$' \
+  "$out_dir/source_tileop_port_stream_resumable_checkpoint.txt" \
+  "TileOp-port stream resumable checkpoint non-claim status"
+if grep -Eq 'source_mode|source_id|LB_SOURCE_LIVE_HANDOFF_V1' \
+  "$out_dir/source_tileop_port_stream_resumable_checkpoint.txt"; then
+  echo "artifact check failed: resumable checkpoint is not source-neutral" >&2
+  exit 1
+fi
 require_grep '"schema":"lb_source_tileop_port_stream_progress_v1"' \
   "$out_dir/source_tileop_port_stream_progress.jsonl" \
   "TileOp-port stream progress schema"

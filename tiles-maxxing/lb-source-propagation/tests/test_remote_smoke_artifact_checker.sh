@@ -66,7 +66,7 @@ cat > "$tmp/source_tileop_cpu_runner_manifest_smoke.json" <<'JSON'
 JSON
 
 cat > "$tmp/source_tileop_port_stream_runner_smoke.json" <<'JSON'
-{"schema":"lb_source_tileop_port_stream_runner_v1","runner_id":"source_tileop_port_stream_runner_v1","claim_label":"SOURCE_TILEOP_PORT_STREAM_DIAGNOSTIC","proof_status":"DIAGNOSTIC_NON_CLAIM","source_mode":"GEO_I_PORT_DIAGNOSTIC","k_sq":26,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"checkpoint_written":true,"max_resident_microband_tiles":4,"max_checkpoint_bytes":1693}
+{"schema":"lb_source_tileop_port_stream_runner_v1","runner_id":"source_tileop_port_stream_runner_v1","claim_label":"SOURCE_TILEOP_PORT_STREAM_DIAGNOSTIC","proof_status":"DIAGNOSTIC_NON_CLAIM","resumable_mode":"resumable-band","source_mode":"GEO_I_PORT_DIAGNOSTIC","k_sq":26,"accepted":true,"terminal_source_dead":false,"has_source_carry":true,"checkpoint_written":true,"resumable_checkpoint_written":true,"max_resident_microband_tiles":4,"max_checkpoint_bytes":1693}
 JSON
 
 cat > "$tmp/source_tileop_port_stream_live_handoff.txt" <<'TXT'
@@ -75,6 +75,12 @@ TXT
 
 cat > "$tmp/source_tileop_port_stream_checkpoint.txt" <<'TXT'
 LB_SOURCE_STREAM_CHECKPOINT_V1
+TXT
+
+cat > "$tmp/source_tileop_port_stream_resumable_checkpoint.txt" <<'TXT'
+LB_RESUMABLE_BAND_CHECKPOINT_V1
+mode resumable-band
+proof_status DIAGNOSTIC_NON_CLAIM
 TXT
 
 cat > "$tmp/source_tileop_port_stream_progress.jsonl" <<'JSONL'
