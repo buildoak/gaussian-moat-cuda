@@ -1,3 +1,4 @@
+#include "lb_source/diagnostic_telemetry.h"
 #include "lb_source/detector_band_handoff.h"
 #include "lb_source/source_propagation.h"
 #include "lb_source/resumable_band_checkpoint.h"
@@ -7,7 +8,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -35,6 +35,7 @@
 namespace {
 
 constexpr std::string_view kRunnerId = "source_tileop_port_stream_runner_v1";
+constexpr std::string_view kPhase0Schema = "lb_diagnostic_phase0_v1";
 constexpr std::string_view kScheduleDigestAlgorithm =
     "sha256:source_tileop_port_stream_runner_schedule_v1";
 constexpr std::string_view kSourceId =
@@ -76,6 +77,13 @@ struct DetectorHandoffWriteResult {
   std::string path;
   std::string sha256_hex;
   std::uint64_t bytes = 0;
+  std::uint64_t encode_ms = 0;
+  std::uint64_t hash_ms = 0;
+  std::uint64_t write_ms = 0;
+  std::uint64_t readback_ms = 0;
+  std::uint64_t validate_ms = 0;
+  std::uint64_t rename_ms = 0;
+  std::uint64_t total_ms = 0;
 };
 
 struct ScheduleInfo {
@@ -92,6 +100,7 @@ struct RunningMaxima {
   std::uint64_t resident_port_atoms = 0;
   std::uint64_t resident_edges = 0;
   std::uint64_t live_frontier_atoms = 0;
+  std::uint64_t components = 0;
   std::uint64_t checkpoint_bytes = 0;
 };
 
@@ -355,13 +364,6 @@ std::size_t resolve_tileop_threads(std::size_t requested,
   return std::min(threads, work_items);
 }
 
-std::uint64_t elapsed_ms(std::chrono::steady_clock::time_point begin,
-                         std::chrono::steady_clock::time_point end) {
-  return static_cast<std::uint64_t>(
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
-          .count());
-}
-
 std::uint64_t source_carry_atoms(const lb_source::LiveSeparator& separator) {
   std::uint64_t count = 0;
   for (std::size_t c = 0; c < separator.component_partition.size(); ++c) {
@@ -608,16 +610,22 @@ std::vector<std::uint8_t> read_binary_file_or_die(
 DetectorHandoffWriteResult write_detector_handoff_atomically_or_die(
     const lb_source::DetectorBandHandoffV1& handoff,
     const std::string& live_path) {
+  const auto total_begin = lb_source::DiagnosticClock::now();
+  const auto encode_begin = total_begin;
   const lb_source::DetectorBandHandoffBytesResult encoded =
       lb_source::detector_band_handoff_to_bytes(handoff);
+  const auto encode_done = lb_source::DiagnosticClock::now();
   if (!encoded.accepted()) {
     std::cerr << "detector handoff encode rejected: "
               << encoded.diagnostic << "\n";
     std::exit(EXIT_FAILURE);
   }
+  const auto hash_begin = lb_source::DiagnosticClock::now();
   const std::string sha256_hex =
       campaign::detail::sha256_hex(encoded.bytes.data(), encoded.bytes.size());
+  const auto hash_done = lb_source::DiagnosticClock::now();
   const std::string tmp_path = live_path + ".tmp";
+  const auto write_begin = lb_source::DiagnosticClock::now();
   {
     std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
     if (!out) {
@@ -633,9 +641,13 @@ DetectorHandoffWriteResult write_detector_handoff_atomically_or_die(
       std::exit(EXIT_FAILURE);
     }
   }
+  const auto write_done = lb_source::DiagnosticClock::now();
 
+  const auto readback_begin = lb_source::DiagnosticClock::now();
   const std::vector<std::uint8_t> readback =
       read_binary_file_or_die(tmp_path, "detector handoff temp");
+  const auto readback_done = lb_source::DiagnosticClock::now();
+  const auto validate_begin = lb_source::DiagnosticClock::now();
   if (readback.size() != encoded.bytes.size() ||
       campaign::detail::sha256_hex(readback.data(), readback.size()) !=
           sha256_hex) {
@@ -656,14 +668,41 @@ DetectorHandoffWriteResult write_detector_handoff_atomically_or_die(
               << decoded.diagnostic << "\n";
     std::exit(EXIT_FAILURE);
   }
+  const auto validate_done = lb_source::DiagnosticClock::now();
+  const auto rename_begin = validate_done;
   if (std::rename(tmp_path.c_str(), live_path.c_str()) != 0) {
     std::cerr << "cannot atomically replace detector handoff path: "
               << live_path << "\n";
     std::exit(EXIT_FAILURE);
   }
+  const auto rename_done = lb_source::DiagnosticClock::now();
   return {.path = live_path,
           .sha256_hex = sha256_hex,
-          .bytes = static_cast<std::uint64_t>(encoded.bytes.size())};
+          .bytes = static_cast<std::uint64_t>(encoded.bytes.size()),
+          .encode_ms = lb_source::elapsed_ms(encode_begin, encode_done),
+          .hash_ms = lb_source::elapsed_ms(hash_begin, hash_done),
+          .write_ms = lb_source::elapsed_ms(write_begin, write_done),
+          .readback_ms = lb_source::elapsed_ms(readback_begin, readback_done),
+          .validate_ms = lb_source::elapsed_ms(validate_begin, validate_done),
+          .rename_ms = lb_source::elapsed_ms(rename_begin, rename_done),
+          .total_ms = lb_source::elapsed_ms(total_begin, rename_done)};
+}
+
+std::uint64_t wall_share_basis_points(std::uint64_t part_ms,
+                                      std::uint64_t total_ms) {
+  if (total_ms == 0) {
+    return 0;
+  }
+  const long double share =
+      static_cast<long double>(part_ms) * 10000.0L /
+      static_cast<long double>(total_ms);
+  if (share <= 0.0L) {
+    return 0;
+  }
+  if (share >= 10000.0L) {
+    return 10000;
+  }
+  return static_cast<std::uint64_t>(share);
 }
 
 std::uint64_t checkpoint_size_bytes(const lb_source::StreamCheckpointV1& cp) {
@@ -869,6 +908,7 @@ ScheduleInfo build_schedule_info(
 }  // namespace
 
 int main(int argc, char** argv) {
+  const lb_source::ElapsedTimer run_timer;
   Config config;
   if (!parse_args(argc, argv, config)) {
     return EXIT_FAILURE;
@@ -891,10 +931,14 @@ int main(int argc, char** argv) {
   std::optional<lb_source::LiveHandoffV1> current_live_handoff;
   std::optional<lb_source::DetectorBandHandoffV1> current_detector_handoff;
   std::optional<DetectorHandoffWriteResult> current_detector_handoff_ref;
+  std::string checkpoint_handoff_source = "none";
   std::string source_mode = config.seed_inner_flags
                                 ? std::string(kFirstBandSourceMode)
                                 : "NONE";
   std::uint64_t schedule_index = 0;
+  std::uint64_t detector_handoff_wall_ms = 0;
+  std::uint64_t checkpoint_write_ms = 0;
+  std::uint64_t materialization_ms = 0;
 
   if (config.checkpoint_in.has_value()) {
     checkpoint = read_checkpoint_or_die(*config.checkpoint_in);
@@ -932,6 +976,7 @@ int main(int argc, char** argv) {
           .path = resumable_checkpoint->detector_handoff_path,
           .sha256_hex = resumable_checkpoint->detector_handoff_sha256,
           .bytes = resumable_checkpoint->detector_handoff_bytes};
+      checkpoint_handoff_source = "checkpoint_in";
     }
   }
   if (schedule.radii.empty() || schedule_index >= schedule.radii.size() ||
@@ -983,12 +1028,12 @@ int main(int argc, char** argv) {
 
   for (std::size_t segment = schedule_index; segment + 1 < schedule.radii.size();
        ++segment) {
-    const auto band_begin = std::chrono::steady_clock::now();
+    const auto band_begin = lb_source::DiagnosticClock::now();
     const std::uint64_t r_start = schedule.radii[segment];
     const std::uint64_t r_outer = schedule.radii[segment + 1];
 
     campaign::Grid grid;
-    const auto grid_begin = std::chrono::steady_clock::now();
+    const auto grid_begin = lb_source::DiagnosticClock::now();
     try {
       grid = campaign::Grid::build(r_start, r_outer, campaign::k_sq_value);
     } catch (const std::exception& ex) {
@@ -1001,11 +1046,13 @@ int main(int argc, char** argv) {
       std::cerr << "grid invariant failed: " << invariant_error << "\n";
       return EXIT_FAILURE;
     }
-    const auto grid_done = std::chrono::steady_clock::now();
+    const auto grid_done = lb_source::DiagnosticClock::now();
 
     const std::vector<campaign::TileCoord> coords =
         grid.enumerate_active_tiles();
-    const auto enumerate_done = std::chrono::steady_clock::now();
+    const auto enumerate_done = lb_source::DiagnosticClock::now();
+    const lb_source::RssSnapshot rss_after_enumerate =
+        lb_source::rss_snapshot();
     campaign_tiles_processed += coords.size();
     const std::size_t tileop_threads =
         resolve_tileop_threads(config.tileop_threads, coords.size());
@@ -1015,7 +1062,8 @@ int main(int argc, char** argv) {
     std::vector<campaign::TileOp> tileops =
         build_tileops(coords, tileop_constants, grid, tileop_overflows,
                       tileop_threads);
-    const auto tileop_done = std::chrono::steady_clock::now();
+    const auto tileop_done = lb_source::DiagnosticClock::now();
+    const lb_source::RssSnapshot rss_after_tileop = lb_source::rss_snapshot();
 
     const lb_source::TileOpPortStreamResult stream =
         lb_source::build_tileop_port_microband({
@@ -1030,7 +1078,8 @@ int main(int argc, char** argv) {
                 << "\n";
       return EXIT_FAILURE;
     }
-    const auto stream_done = std::chrono::steady_clock::now();
+    const auto stream_done = lb_source::DiagnosticClock::now();
+    const lb_source::RssSnapshot rss_after_stream = lb_source::rss_snapshot();
 
     const lb_source::TileOpStaticReachMicrobandResult detector_band =
         lb_source::build_tileop_static_reach_microband({
@@ -1062,7 +1111,10 @@ int main(int argc, char** argv) {
          .max_carry_atoms = config.max_atoms,
          .max_components = config.max_atoms,
          .max_inventory_atoms = config.max_atoms});
-    const auto process_done = std::chrono::steady_clock::now();
+    const auto process_done = lb_source::DiagnosticClock::now();
+    const lb_source::RssSnapshot rss_after_process = lb_source::rss_snapshot();
+    materialization_ms += lb_source::elapsed_ms(band_begin, process_done);
+    lb_source::RssSnapshot rss_after_handoff_write;
 
     port_atoms += stream.port_atoms;
     internal_edges += stream.internal_edges;
@@ -1087,6 +1139,14 @@ int main(int argc, char** argv) {
       maxima.live_frontier_atoms =
           std::max<std::uint64_t>(maxima.live_frontier_atoms,
                                   live_last.outgoing.carry_atoms.size());
+      maxima.components =
+          std::max<std::uint64_t>(
+              maxima.components,
+              live_last.outgoing.component_partition.size());
+      maxima.components =
+          std::max<std::uint64_t>(
+              maxima.components,
+              detector_last.outgoing.component_partition.size());
       current_detector_handoff =
           make_detector_handoff(r_outer, schedule_index,
                                 detector_last.outgoing, schedule);
@@ -1094,6 +1154,9 @@ int main(int argc, char** argv) {
         current_detector_handoff_ref =
             write_detector_handoff_atomically_or_die(
                 *current_detector_handoff, *detector_handoff_live_path);
+        detector_handoff_wall_ms += current_detector_handoff_ref->total_ms;
+        checkpoint_handoff_source = "written";
+        rss_after_handoff_write = lb_source::rss_snapshot();
       }
       const lb_source::ResumableBandCheckpointV1 progress_checkpoint =
           make_resumable_checkpoint(
@@ -1126,16 +1189,38 @@ int main(int argc, char** argv) {
                             : 0)
                << ",\"source_carry_atoms\":"
                << (source_carry ? source_carry_atoms(live_last.outgoing) : 0)
-               << ",\"grid_ms\":" << elapsed_ms(grid_begin, grid_done)
+               << ",\"grid_ms\":"
+               << lb_source::elapsed_ms(grid_begin, grid_done)
                << ",\"enumerate_ms\":"
-               << elapsed_ms(grid_done, enumerate_done)
+               << lb_source::elapsed_ms(grid_done, enumerate_done)
                << ",\"tileop_ms\":"
-               << elapsed_ms(enumerate_done, tileop_done)
+               << lb_source::elapsed_ms(enumerate_done, tileop_done)
                << ",\"microband_build_ms\":"
-               << elapsed_ms(tileop_done, stream_done)
+               << lb_source::elapsed_ms(tileop_done, stream_done)
                << ",\"process_ms\":"
-               << elapsed_ms(stream_done, process_done)
-               << ",\"total_ms\":" << elapsed_ms(band_begin, process_done)
+               << lb_source::elapsed_ms(stream_done, process_done)
+               << ",\"total_ms\":"
+               << lb_source::elapsed_ms(band_begin, process_done)
+               << ",\"rss_after_enumerate_bytes\":"
+               << rss_after_enumerate.current_bytes
+               << ",\"peak_rss_after_enumerate_bytes\":"
+               << rss_after_enumerate.peak_bytes
+               << ",\"rss_after_tileop_bytes\":"
+               << rss_after_tileop.current_bytes
+               << ",\"peak_rss_after_tileop_bytes\":"
+               << rss_after_tileop.peak_bytes
+               << ",\"rss_after_stream_bytes\":"
+               << rss_after_stream.current_bytes
+               << ",\"peak_rss_after_stream_bytes\":"
+               << rss_after_stream.peak_bytes
+               << ",\"rss_after_process_bytes\":"
+               << rss_after_process.current_bytes
+               << ",\"peak_rss_after_process_bytes\":"
+               << rss_after_process.peak_bytes
+               << ",\"rss_after_handoff_write_bytes\":"
+               << rss_after_handoff_write.current_bytes
+               << ",\"peak_rss_after_handoff_write_bytes\":"
+               << rss_after_handoff_write.peak_bytes
                << ",\"accepted\":" << (accepted ? "true" : "false")
                << ",\"reject\":\""
                << lb_source::reject_reason_name(live_last.reject) << "\""
@@ -1154,6 +1239,7 @@ int main(int argc, char** argv) {
                << ",\"max_resident_edges\":" << maxima.resident_edges
                << ",\"max_live_frontier_atoms\":"
                << maxima.live_frontier_atoms
+               << ",\"max_components\":" << maxima.components
                << ",\"max_checkpoint_bytes\":"
                << maxima.checkpoint_bytes << "}\n";
       progress.flush();
@@ -1202,6 +1288,7 @@ int main(int argc, char** argv) {
         make_checkpoint(processed_outer, schedule_index, source_mode,
                         *current_live_handoff, schedule);
     checkpoint_bytes = checkpoint_size_bytes(out_checkpoint);
+    const auto checkpoint_write_begin = lb_source::DiagnosticClock::now();
     std::ofstream out(*config.checkpoint_out);
     if (!out) {
       std::cerr << "cannot open --checkpoint-out path: "
@@ -1209,6 +1296,9 @@ int main(int argc, char** argv) {
       return EXIT_FAILURE;
     }
     lb_source::write_stream_checkpoint(out, out_checkpoint);
+    const auto checkpoint_write_done = lb_source::DiagnosticClock::now();
+    checkpoint_write_ms +=
+        lb_source::elapsed_ms(checkpoint_write_begin, checkpoint_write_done);
     checkpoint_written = true;
   }
 
@@ -1224,6 +1314,7 @@ int main(int argc, char** argv) {
                                   campaign_tiles_processed, tileop_overflows,
                                   current_detector_handoff_ref, schedule);
     resumable_checkpoint_bytes = checkpoint_size_bytes(out_checkpoint);
+    const auto checkpoint_write_begin = lb_source::DiagnosticClock::now();
     std::ofstream out(*config.resumable_checkpoint_out);
     if (!out) {
       std::cerr << "cannot open --resumable-checkpoint-out path: "
@@ -1231,6 +1322,9 @@ int main(int argc, char** argv) {
       return EXIT_FAILURE;
     }
     lb_source::write_resumable_band_checkpoint(out, out_checkpoint);
+    const auto checkpoint_write_done = lb_source::DiagnosticClock::now();
+    checkpoint_write_ms +=
+        lb_source::elapsed_ms(checkpoint_write_begin, checkpoint_write_done);
     resumable_checkpoint_written = true;
   }
 
@@ -1238,9 +1332,40 @@ int main(int argc, char** argv) {
       accepted && live_last.terminal_source_dead
           ? "UNSUPPORTED_DIAGNOSTIC_MVP"
           : "NOT_TERMINAL";
+  const lb_source::RssSnapshot final_rss = lb_source::rss_snapshot();
+  const std::uint64_t wall_ms = run_timer.elapsed_ms();
+  const std::uint64_t detector_handoff_encode_ms =
+      current_detector_handoff_ref.has_value()
+          ? current_detector_handoff_ref->encode_ms
+          : 0;
+  const std::uint64_t detector_handoff_hash_ms =
+      current_detector_handoff_ref.has_value()
+          ? current_detector_handoff_ref->hash_ms
+          : 0;
+  const std::uint64_t detector_handoff_write_ms =
+      current_detector_handoff_ref.has_value()
+          ? current_detector_handoff_ref->write_ms
+          : 0;
+  const std::uint64_t detector_handoff_readback_ms =
+      current_detector_handoff_ref.has_value()
+          ? current_detector_handoff_ref->readback_ms
+          : 0;
+  const std::uint64_t detector_handoff_validate_ms =
+      current_detector_handoff_ref.has_value()
+          ? current_detector_handoff_ref->validate_ms
+          : 0;
+  const std::uint64_t detector_handoff_rename_ms =
+      current_detector_handoff_ref.has_value()
+          ? current_detector_handoff_ref->rename_ms
+          : 0;
+  const std::uint64_t detector_handoff_total_ms =
+      current_detector_handoff_ref.has_value()
+          ? current_detector_handoff_ref->total_ms
+          : 0;
 
   std::cout << "{"
             << "\"schema\":\"lb_source_tileop_port_stream_runner_v1\","
+            << "\"phase0_schema\":\"" << kPhase0Schema << "\","
             << "\"runner_id\":\"" << kRunnerId << "\","
             << "\"claim_label\":\"SOURCE_TILEOP_PORT_STREAM_DIAGNOSTIC\","
             << "\"proof_status\":\"DIAGNOSTIC_NON_CLAIM\","
@@ -1288,10 +1413,25 @@ int main(int argc, char** argv) {
             << (resumable_checkpoint_written ? "true" : "false")
             << ",\"resumable_checkpoint_bytes\":"
             << resumable_checkpoint_bytes
+            << ",\"checkpoint_write_ms\":" << checkpoint_write_ms
             << ",\"detector_spanning\":"
             << (detector_last.spanning ? "true" : "false")
             << ",\"detector_handoff_written\":"
             << (current_detector_handoff_ref.has_value() ? "true" : "false")
+            << ",\"checkpoint_handoff_source\":";
+  append_json_string(std::cout, checkpoint_handoff_source);
+  std::cout << ",\"detector_handoff_encode_ms\":"
+            << detector_handoff_encode_ms
+            << ",\"detector_handoff_hash_ms\":" << detector_handoff_hash_ms
+            << ",\"detector_handoff_write_ms\":" << detector_handoff_write_ms
+            << ",\"detector_handoff_readback_ms\":"
+            << detector_handoff_readback_ms
+            << ",\"detector_handoff_validate_ms\":"
+            << detector_handoff_validate_ms
+            << ",\"detector_handoff_rename_ms\":"
+            << detector_handoff_rename_ms
+            << ",\"detector_handoff_total_ms\":"
+            << detector_handoff_total_ms
             << ",\"detector_handoff_sha256\":";
   append_json_string(std::cout,
                      current_detector_handoff_ref.has_value()
@@ -1309,7 +1449,20 @@ int main(int argc, char** argv) {
             << ",\"max_resident_port_atoms\":" << maxima.resident_port_atoms
             << ",\"max_resident_edges\":" << maxima.resident_edges
             << ",\"max_live_frontier_atoms\":" << maxima.live_frontier_atoms
+            << ",\"max_components\":" << maxima.components
             << ",\"max_checkpoint_bytes\":" << maxima.checkpoint_bytes
+            << ",\"rss_bytes\":" << final_rss.current_bytes
+            << ",\"peak_rss_bytes\":" << final_rss.peak_bytes
+            << ",\"wall_ms\":" << wall_ms
+            << ",\"materialization_ms\":" << materialization_ms
+            << ",\"detector_handoff_wall_ms\":"
+            << detector_handoff_wall_ms
+            << ",\"handoff_wall_share_bp\":"
+            << wall_share_basis_points(detector_handoff_wall_ms, wall_ms)
+            << ",\"checkpoint_wall_share_bp\":"
+            << wall_share_basis_points(checkpoint_write_ms, wall_ms)
+            << ",\"materialization_wall_share_bp\":"
+            << wall_share_basis_points(materialization_ms, wall_ms)
             << "}\n";
 
   return accepted ? EXIT_SUCCESS : EXIT_FAILURE;

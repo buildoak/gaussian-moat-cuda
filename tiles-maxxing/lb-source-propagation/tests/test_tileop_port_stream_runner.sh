@@ -28,6 +28,7 @@ seed_checkpoint_err="$tmp/seed-checkpoint.err"
 death_out_err="$tmp/death-out.err"
 neutral_full_json="$tmp/neutral-full.json"
 neutral_full_checkpoint="$tmp/neutral-full.checkpoint.txt"
+neutral_progress="$tmp/neutral-progress.jsonl"
 neutral_chunk_json="$tmp/neutral-chunk.json"
 neutral_chunk_checkpoint="$tmp/neutral-chunk.checkpoint.txt"
 neutral_resumed_json="$tmp/neutral-resumed.json"
@@ -39,6 +40,59 @@ missing_handoff_err="$tmp/missing-handoff.err"
 bad_hash_err="$tmp/bad-hash.err"
 bad_bytes_err="$tmp/bad-bytes.err"
 wrong_cut_err="$tmp/wrong-cut.err"
+
+assert_json_nonnegative_field() {
+  local file="$1"
+  local field="$2"
+  if ! grep -Eq '"'"$field"'":[0-9]+' "$file"; then
+    echo "missing nonnegative JSON field $field in $file" >&2
+    exit 1
+  fi
+}
+
+assert_json_string_field() {
+  local file="$1"
+  local field="$2"
+  if ! grep -Eq '"'"$field"'":"[^"]*"' "$file"; then
+    echo "missing string JSON field $field in $file" >&2
+    exit 1
+  fi
+}
+
+assert_resumable_telemetry_fields() {
+  local file="$1"
+  assert_json_string_field "$file" "phase0_schema"
+  assert_json_string_field "$file" "runner_id"
+  assert_json_nonnegative_field "$file" "detector_handoff_encode_ms"
+  assert_json_nonnegative_field "$file" "detector_handoff_hash_ms"
+  assert_json_nonnegative_field "$file" "detector_handoff_write_ms"
+  assert_json_nonnegative_field "$file" "detector_handoff_readback_ms"
+  assert_json_nonnegative_field "$file" "detector_handoff_validate_ms"
+  assert_json_nonnegative_field "$file" "detector_handoff_rename_ms"
+  assert_json_nonnegative_field "$file" "detector_handoff_total_ms"
+  assert_json_string_field "$file" "checkpoint_handoff_source"
+  assert_json_nonnegative_field "$file" "rss_bytes"
+  assert_json_nonnegative_field "$file" "peak_rss_bytes"
+  assert_json_nonnegative_field "$file" "max_components"
+  assert_json_nonnegative_field "$file" "handoff_wall_share_bp"
+  assert_json_nonnegative_field "$file" "checkpoint_wall_share_bp"
+  assert_json_nonnegative_field "$file" "materialization_wall_share_bp"
+}
+
+assert_progress_telemetry_fields() {
+  local file="$1"
+  assert_json_nonnegative_field "$file" "rss_after_enumerate_bytes"
+  assert_json_nonnegative_field "$file" "peak_rss_after_enumerate_bytes"
+  assert_json_nonnegative_field "$file" "rss_after_tileop_bytes"
+  assert_json_nonnegative_field "$file" "peak_rss_after_tileop_bytes"
+  assert_json_nonnegative_field "$file" "rss_after_stream_bytes"
+  assert_json_nonnegative_field "$file" "peak_rss_after_stream_bytes"
+  assert_json_nonnegative_field "$file" "rss_after_process_bytes"
+  assert_json_nonnegative_field "$file" "peak_rss_after_process_bytes"
+  assert_json_nonnegative_field "$file" "rss_after_handoff_write_bytes"
+  assert_json_nonnegative_field "$file" "peak_rss_after_handoff_write_bytes"
+  assert_json_nonnegative_field "$file" "max_components"
+}
 
 "$runner" \
   --r-start 248 \
@@ -104,6 +158,7 @@ cmp "$full_checkpoint" "$resumed_checkpoint"
   --r-final 512 \
   --microband-width 128 \
   --resumable-checkpoint-out "$neutral_full_checkpoint" \
+  --progress-out "$neutral_progress" \
   > "$neutral_full_json"
 
 grep -q '"source_mode":"NONE"' "$neutral_full_json"
@@ -113,7 +168,10 @@ grep -q '"has_source_carry":false' "$neutral_full_json"
 grep -q '"checkpoint_written":false' "$neutral_full_json"
 grep -q '"resumable_checkpoint_written":true' "$neutral_full_json"
 grep -q '"detector_handoff_written":true' "$neutral_full_json"
+grep -q '"checkpoint_handoff_source":"written"' "$neutral_full_json"
 grep -q '"detector_handoff_sha256":"[0-9a-f]\{64\}"' "$neutral_full_json"
+assert_resumable_telemetry_fields "$neutral_full_json"
+assert_progress_telemetry_fields "$neutral_progress"
 grep -q '^LB_RESUMABLE_BAND_CHECKPOINT_V1$' "$neutral_full_checkpoint"
 grep -q '^mode resumable-band$' "$neutral_full_checkpoint"
 grep -q '^proof_status DIAGNOSTIC_NON_CLAIM$' "$neutral_full_checkpoint"
@@ -145,6 +203,8 @@ neutral_full_handoff_hash="$(
 grep -q '"r_final":376' "$neutral_chunk_json"
 grep -q '"schedule_index":1' "$neutral_chunk_json"
 grep -q '"resumable_checkpoint_written":true' "$neutral_chunk_json"
+grep -q '"checkpoint_handoff_source":"written"' "$neutral_chunk_json"
+assert_resumable_telemetry_fields "$neutral_chunk_json"
 grep -q '^detector_handoff_schema DETECTOR_BAND_HANDOFF_V1$' \
   "$neutral_chunk_checkpoint"
 neutral_chunk_handoff="$tmp/neutral-chunk.handoff.bin"
@@ -166,6 +226,8 @@ grep -q '"r_final":512' "$neutral_resumed_json"
 grep -q '"schedule_index":3' "$neutral_resumed_json"
 grep -q '"resumable_checkpoint_written":true' "$neutral_resumed_json"
 grep -q '"detector_handoff_written":true' "$neutral_resumed_json"
+grep -q '"checkpoint_handoff_source":"written"' "$neutral_resumed_json"
+assert_resumable_telemetry_fields "$neutral_resumed_json"
 cmp "$neutral_full_checkpoint" "$neutral_resumed_checkpoint"
 neutral_resumed_handoff_hash="$(
   awk '$1 == "detector_handoff_sha256" {print $2}' "$neutral_resumed_checkpoint"
