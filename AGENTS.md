@@ -30,7 +30,7 @@ independent verification.
 | `tiles-maxxing/lb-source-propagation/` | Active lower-bound source-propagation sidecar, live handoffs, diagnostics, and LB gates. |
 | `verification/` | Independent BZ, boundary, sample, span-cert, postflight, and stats checks. |
 | `methodology/source-propagation-band-stitching.md` | LB source/frontier stitching semantics and first-principles handoff model. |
-| `agents-directives/experiment-contract.md` | Operational contract for running/reporting experiments. |
+| `reference/experiment-contract.md` | Operational contract for running/reporting experiments. |
 | `reference/current-verification-spine.md` | Static-annulus gate spine and status vocabulary. |
 | `reference/archive/` | Historical evidence and implemented plans; not current authority. |
 

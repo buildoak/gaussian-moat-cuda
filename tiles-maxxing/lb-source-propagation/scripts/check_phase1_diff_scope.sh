@@ -8,7 +8,7 @@ Usage:
 
 Validate that the Phase 1 LB source-propagation branch diff is confined to the
 new sidecar plus the explicit source verifier/schema exceptions named in
-reference/lb-source-propagation-goal-plan-20260522.md.
+reference/archive/implemented-plans/lb-source-propagation-goal-plan-20260522.md.
 
 Defaults:
   --base  2720059
@@ -67,7 +67,7 @@ while IFS= read -r path; do
   case "$path" in
     tiles-maxxing/lb-source-propagation/* | \
     methodology/source-propagation-band-stitching.md | \
-    reference/lb-source-propagation-goal-plan-20260522.md | \
+    reference/archive/implemented-plans/lb-source-propagation-goal-plan-20260522.md | \
     verification/CMakeLists.txt | \
     verification/README.md | \
     verification/test_source_prop_schema_contract.py | \
