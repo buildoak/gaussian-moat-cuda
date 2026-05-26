@@ -9,6 +9,9 @@ namespace {
 
 int g_failures = 0;
 
+constexpr const char kDetectorBandHandoffSchema[] =
+    "DETECTOR_BAND_HANDOFF_V1";
+
 #define CHECK_TRUE(expr)                                                    \
   do {                                                                      \
     if (!(expr)) {                                                          \
@@ -59,6 +62,16 @@ lb_source::ResumableBandCheckpointV1 checkpoint_fixture() {
   return checkpoint;
 }
 
+lb_source::ResumableBandCheckpointV1 checkpoint_with_handoff_ref_fixture() {
+  lb_source::ResumableBandCheckpointV1 checkpoint = checkpoint_fixture();
+  checkpoint.detector_handoff_path = "detector_handoff.current.bin";
+  checkpoint.detector_handoff_sha256 =
+      "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+  checkpoint.detector_handoff_schema = kDetectorBandHandoffSchema;
+  checkpoint.detector_handoff_bytes = 4096;
+  return checkpoint;
+}
+
 lb_source::ResumableBandCheckpointExpectedContext expected_context() {
   lb_source::ResumableBandCheckpointExpectedContext expected;
   const lb_source::ResumableBandCheckpointV1 checkpoint = checkpoint_fixture();
@@ -81,6 +94,20 @@ lb_source::ResumableBandCheckpointExpectedContext expected_context() {
   expected.proof_status = checkpoint.proof_status;
   expected.harvest_status = checkpoint.harvest_status;
   expected.replay_status = checkpoint.replay_status;
+  return expected;
+}
+
+lb_source::ResumableBandCheckpointExpectedContext
+expected_context_with_handoff_ref() {
+  lb_source::ResumableBandCheckpointExpectedContext expected =
+      expected_context();
+  const lb_source::ResumableBandCheckpointV1 checkpoint =
+      checkpoint_with_handoff_ref_fixture();
+  expected.require_detector_handoff_reference = true;
+  expected.detector_handoff_path = checkpoint.detector_handoff_path;
+  expected.detector_handoff_sha256 = checkpoint.detector_handoff_sha256;
+  expected.detector_handoff_schema = checkpoint.detector_handoff_schema;
+  expected.detector_handoff_bytes = checkpoint.detector_handoff_bytes;
   return expected;
 }
 
@@ -132,6 +159,7 @@ void test_round_trip_is_source_neutral() {
   CHECK_TRUE(encoded.find("source_mode") == std::string::npos);
   CHECK_TRUE(encoded.find("source_id") == std::string::npos);
   CHECK_TRUE(encoded.find("LB_SOURCE_LIVE_HANDOFF_V1") == std::string::npos);
+  CHECK_TRUE(encoded.find("detector_handoff_path") == std::string::npos);
 
   const lb_source::ResumableBandCheckpointReadResult decoded =
       lb_source::resumable_band_checkpoint_from_string(encoded,
@@ -144,6 +172,57 @@ void test_round_trip_is_source_neutral() {
   CHECK_TRUE(!source_decode.accepted());
   CHECK_EQ(source_decode.diagnostic,
            std::string("missing stream checkpoint header"));
+}
+
+void test_round_trip_detector_handoff_reference() {
+  const lb_source::ResumableBandCheckpointV1 checkpoint =
+      checkpoint_with_handoff_ref_fixture();
+  const std::string encoded =
+      lb_source::resumable_band_checkpoint_to_string(checkpoint);
+  CHECK_EQ(encoded,
+           std::string(
+               "LB_RESUMABLE_BAND_CHECKPOINT_V1\n"
+               "runner_id source_tileop_port_stream_runner_v1\n"
+               "mode resumable-band\n"
+               "k_sq 26\n"
+               "original_r_start 248\n"
+               "next_r_start 512\n"
+               "requested_r_final 512\n"
+               "microband_width 128\n"
+               "carry_width 6\n"
+               "schedule_index 3\n"
+               "schedule_digest_algorithm "
+               "sha256:source_tileop_port_stream_runner_schedule_v1\n"
+               "schedule_digest_hex "
+               "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n"
+               "geometry_id gaussian_octant_tileop_port_v1\n"
+               "build_id local_campaign_build\n"
+               "oracle_id tileop_port_stream_v1\n"
+               "command_id source_tileop_port_stream_runner_fixed_width_v1\n"
+               "overflow_summary none\n"
+               "proof_status DIAGNOSTIC_NON_CLAIM\n"
+               "harvest_status BAND_HARVEST_PROGRESS_V1\n"
+               "replay_status REPLAYABLE_CONTEXT_V1\n"
+               "detector_handoff_path detector_handoff.current.bin\n"
+               "detector_handoff_sha256 "
+               "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789\n"
+               "detector_handoff_schema DETECTOR_BAND_HANDOFF_V1\n"
+               "detector_handoff_bytes 4096\n"
+               "campaign_tiles_processed 12345\n"
+               "tileop_overflows 0\n"
+               "END_RESUMABLE_BAND_CHECKPOINT\n"));
+
+  CHECK_TRUE(encoded.find("separator") == std::string::npos);
+  CHECK_TRUE(encoded.find("carry_atoms") == std::string::npos);
+  CHECK_TRUE(encoded.find("component_partition") == std::string::npos);
+  CHECK_TRUE(encoded.find("source_bit") == std::string::npos);
+  CHECK_TRUE(encoded.find("LB_SOURCE_LIVE_HANDOFF_V1") == std::string::npos);
+
+  const lb_source::ResumableBandCheckpointReadResult decoded =
+      lb_source::resumable_band_checkpoint_from_string(
+          encoded, expected_context_with_handoff_ref());
+  CHECK_TRUE(decoded.accepted());
+  CHECK_EQ(decoded.checkpoint, checkpoint);
 }
 
 void test_rejects_expected_context_mismatch() {
@@ -220,6 +299,29 @@ void test_rejects_expected_context_mismatch() {
   expected.proof_status = "SUMMARY_ONLY_NON_CLAIM";
   expect_rejects_before_exposing_checkpoint(checkpoint, expected,
                                             "wrong proof_status");
+
+  expected = expected_context_with_handoff_ref();
+  expect_rejects_before_exposing_checkpoint(
+      checkpoint, expected, "missing detector handoff reference");
+
+  const lb_source::ResumableBandCheckpointV1 with_handoff =
+      checkpoint_with_handoff_ref_fixture();
+
+  expected = expected_context_with_handoff_ref();
+  expected.detector_handoff_path = "stale_handoff.bin";
+  expect_rejects_before_exposing_checkpoint(with_handoff, expected,
+                                            "wrong detector_handoff_path");
+
+  expected = expected_context_with_handoff_ref();
+  expected.detector_handoff_sha256 =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  expect_rejects_before_exposing_checkpoint(with_handoff, expected,
+                                            "wrong detector_handoff_sha256");
+
+  expected = expected_context_with_handoff_ref();
+  expected.detector_handoff_bytes = 8192;
+  expect_rejects_before_exposing_checkpoint(with_handoff, expected,
+                                            "wrong detector_handoff_bytes");
 }
 
 void test_rejects_structural_invariants() {
@@ -252,6 +354,40 @@ void test_rejects_structural_invariants() {
   checkpoint.proof_status = "SOURCE_DEAD_CERT_PASS";
   CHECK_EQ(lb_source::validate_resumable_band_checkpoint(checkpoint),
            std::string("missing or invalid proof_status"));
+}
+
+void test_rejects_malformed_detector_handoff_reference() {
+  lb_source::ResumableBandCheckpointV1 checkpoint =
+      checkpoint_with_handoff_ref_fixture();
+  checkpoint.detector_handoff_path.clear();
+  CHECK_EQ(lb_source::validate_resumable_band_checkpoint(checkpoint),
+           std::string("missing or invalid detector_handoff_path"));
+
+  checkpoint = checkpoint_with_handoff_ref_fixture();
+  checkpoint.detector_handoff_schema.clear();
+  CHECK_EQ(lb_source::validate_resumable_band_checkpoint(checkpoint),
+           std::string("wrong detector_handoff_schema"));
+
+  checkpoint = checkpoint_with_handoff_ref_fixture();
+  checkpoint.detector_handoff_schema = "LB_SOURCE_LIVE_HANDOFF_V1";
+  CHECK_EQ(lb_source::validate_resumable_band_checkpoint(checkpoint),
+           std::string("wrong detector_handoff_schema"));
+
+  checkpoint = checkpoint_with_handoff_ref_fixture();
+  checkpoint.detector_handoff_sha256 =
+      "ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+  CHECK_EQ(lb_source::validate_resumable_band_checkpoint(checkpoint),
+           std::string("missing or invalid detector_handoff_sha256"));
+
+  checkpoint = checkpoint_with_handoff_ref_fixture();
+  checkpoint.detector_handoff_sha256 = "abc";
+  CHECK_EQ(lb_source::validate_resumable_band_checkpoint(checkpoint),
+           std::string("missing or invalid detector_handoff_sha256"));
+
+  checkpoint = checkpoint_with_handoff_ref_fixture();
+  checkpoint.detector_handoff_bytes = 0;
+  CHECK_EQ(lb_source::validate_resumable_band_checkpoint(checkpoint),
+           std::string("missing or invalid detector_handoff_bytes"));
 }
 
 void test_rejects_hostile_parse_inputs() {
@@ -301,8 +437,10 @@ void test_rejects_hostile_parse_inputs() {
 
 int main() {
   test_round_trip_is_source_neutral();
+  test_round_trip_detector_handoff_reference();
   test_rejects_expected_context_mismatch();
   test_rejects_structural_invariants();
+  test_rejects_malformed_detector_handoff_reference();
   test_rejects_hostile_parse_inputs();
 
   if (g_failures != 0) {

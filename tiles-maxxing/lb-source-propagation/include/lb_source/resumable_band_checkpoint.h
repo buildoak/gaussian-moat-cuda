@@ -28,6 +28,10 @@ struct ResumableBandCheckpointV1 {
   std::string proof_status;
   std::string harvest_status;
   std::string replay_status;
+  std::string detector_handoff_path;
+  std::string detector_handoff_sha256;
+  std::string detector_handoff_schema;
+  std::uint64_t detector_handoff_bytes = 0;
   std::uint64_t campaign_tiles_processed = 0;
   std::uint64_t tileop_overflows = 0;
 
@@ -55,6 +59,11 @@ struct ResumableBandCheckpointExpectedContext {
   std::optional<std::string> proof_status;
   std::optional<std::string> harvest_status;
   std::optional<std::string> replay_status;
+  bool require_detector_handoff_reference = false;
+  std::optional<std::string> detector_handoff_path;
+  std::optional<std::string> detector_handoff_sha256;
+  std::optional<std::string> detector_handoff_schema;
+  std::optional<std::uint64_t> detector_handoff_bytes;
 };
 
 struct ResumableBandCheckpointReadResult {

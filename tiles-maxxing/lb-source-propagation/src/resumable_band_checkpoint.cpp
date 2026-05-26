@@ -12,6 +12,9 @@
 namespace lb_source {
 namespace {
 
+constexpr std::string_view kDetectorBandHandoffSchema =
+    "DETECTOR_BAND_HANDOFF_V1";
+
 bool parse_uint64_token(const std::string& token, std::uint64_t& value) {
   if (token.empty() || token[0] == '-') {
     return false;
@@ -46,6 +49,18 @@ bool valid_hex_token(std::string_view value) {
   return true;
 }
 
+bool valid_sha256_lower_hex(std::string_view value) {
+  if (value.size() != 64) {
+    return false;
+  }
+  for (const unsigned char ch : value) {
+    if ((ch < '0' || ch > '9') && (ch < 'a' || ch > 'f')) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::uint64_t ceil_sqrt_u64(std::uint64_t n) {
   std::uint64_t lo = 1;
   std::uint64_t hi =
@@ -64,6 +79,23 @@ std::uint64_t ceil_sqrt_u64(std::uint64_t n) {
 bool is_claim_pass_token(std::string_view value) {
   return value == "SOURCE_DEAD_CERT_PASS" || value == "MOAT_PROOF_PASS" ||
          value == "SPAN_PROOF_PASS";
+}
+
+bool has_detector_handoff_reference(
+    const ResumableBandCheckpointV1& checkpoint) {
+  return !checkpoint.detector_handoff_path.empty() ||
+         !checkpoint.detector_handoff_sha256.empty() ||
+         !checkpoint.detector_handoff_schema.empty() ||
+         checkpoint.detector_handoff_bytes != 0;
+}
+
+bool expects_detector_handoff_reference(
+    const ResumableBandCheckpointExpectedContext& expected) {
+  return expected.require_detector_handoff_reference ||
+         expected.detector_handoff_path.has_value() ||
+         expected.detector_handoff_sha256.has_value() ||
+         expected.detector_handoff_schema.has_value() ||
+         expected.detector_handoff_bytes.has_value();
 }
 
 template <class T>
@@ -157,6 +189,26 @@ std::string validate_resumable_band_checkpoint(
   }
   if (!valid_manifest_token(checkpoint.replay_status)) {
     return "missing or invalid replay_status";
+  }
+  const bool has_handoff_ref = has_detector_handoff_reference(checkpoint);
+  const bool requires_handoff_ref =
+      expects_detector_handoff_reference(expected);
+  if (requires_handoff_ref && !has_handoff_ref) {
+    return "missing detector handoff reference";
+  }
+  if (has_handoff_ref || requires_handoff_ref) {
+    if (!valid_manifest_token(checkpoint.detector_handoff_path)) {
+      return "missing or invalid detector_handoff_path";
+    }
+    if (!valid_sha256_lower_hex(checkpoint.detector_handoff_sha256)) {
+      return "missing or invalid detector_handoff_sha256";
+    }
+    if (checkpoint.detector_handoff_schema != kDetectorBandHandoffSchema) {
+      return "wrong detector_handoff_schema";
+    }
+    if (checkpoint.detector_handoff_bytes == 0) {
+      return "missing or invalid detector_handoff_bytes";
+    }
   }
 
   if (const std::string diagnostic =
@@ -277,6 +329,34 @@ std::string validate_resumable_band_checkpoint(
       !diagnostic.empty()) {
     return diagnostic;
   }
+  if (const std::string diagnostic =
+          check_expected(expected.detector_handoff_path,
+                         checkpoint.detector_handoff_path,
+                         "wrong detector_handoff_path");
+      !diagnostic.empty()) {
+    return diagnostic;
+  }
+  if (const std::string diagnostic =
+          check_expected(expected.detector_handoff_sha256,
+                         checkpoint.detector_handoff_sha256,
+                         "wrong detector_handoff_sha256");
+      !diagnostic.empty()) {
+    return diagnostic;
+  }
+  if (const std::string diagnostic =
+          check_expected(expected.detector_handoff_schema,
+                         checkpoint.detector_handoff_schema,
+                         "wrong detector_handoff_schema");
+      !diagnostic.empty()) {
+    return diagnostic;
+  }
+  if (const std::string diagnostic =
+          check_expected(expected.detector_handoff_bytes,
+                         checkpoint.detector_handoff_bytes,
+                         "wrong detector_handoff_bytes");
+      !diagnostic.empty()) {
+    return diagnostic;
+  }
   return "";
 }
 
@@ -303,6 +383,16 @@ std::ostream& write_resumable_band_checkpoint(
   out << "proof_status " << checkpoint.proof_status << "\n";
   out << "harvest_status " << checkpoint.harvest_status << "\n";
   out << "replay_status " << checkpoint.replay_status << "\n";
+  if (has_detector_handoff_reference(checkpoint)) {
+    out << "detector_handoff_path " << checkpoint.detector_handoff_path
+        << "\n";
+    out << "detector_handoff_sha256 " << checkpoint.detector_handoff_sha256
+        << "\n";
+    out << "detector_handoff_schema " << checkpoint.detector_handoff_schema
+        << "\n";
+    out << "detector_handoff_bytes " << checkpoint.detector_handoff_bytes
+        << "\n";
+  }
   out << "campaign_tiles_processed "
       << checkpoint.campaign_tiles_processed << "\n";
   out << "tileop_overflows " << checkpoint.tileop_overflows << "\n";
@@ -405,7 +495,30 @@ ResumableBandCheckpointReadResult read_resumable_band_checkpoint(
       !read_string(result.checkpoint.replay_status)) {
     return fail("missing or invalid replay_status");
   }
-  if (!expect("campaign_tiles_processed") ||
+  if (!(in >> token)) {
+    return fail("missing or invalid campaign_tiles_processed");
+  }
+  if (token == "detector_handoff_path") {
+    if (!read_string(result.checkpoint.detector_handoff_path)) {
+      return fail("missing or invalid detector_handoff_path");
+    }
+    if (!expect("detector_handoff_sha256") ||
+        !read_string(result.checkpoint.detector_handoff_sha256)) {
+      return fail("missing or invalid detector_handoff_sha256");
+    }
+    if (!expect("detector_handoff_schema") ||
+        !read_string(result.checkpoint.detector_handoff_schema)) {
+      return fail("missing or invalid detector_handoff_schema");
+    }
+    if (!expect("detector_handoff_bytes") ||
+        !read_uint64(result.checkpoint.detector_handoff_bytes)) {
+      return fail("missing or invalid detector_handoff_bytes");
+    }
+    if (!(in >> token)) {
+      return fail("missing or invalid campaign_tiles_processed");
+    }
+  }
+  if (token != "campaign_tiles_processed" ||
       !read_uint64(result.checkpoint.campaign_tiles_processed)) {
     return fail("missing or invalid campaign_tiles_processed");
   }
