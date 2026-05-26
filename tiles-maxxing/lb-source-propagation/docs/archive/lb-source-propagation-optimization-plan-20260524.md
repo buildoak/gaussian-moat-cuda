@@ -3,6 +3,8 @@
 Status: historical/conditional execution runbook, non-claim.
 Date: 2026-05-24.
 Branch context: `ttc/lb-source-propagation`.
+Current path:
+`tiles-maxxing/lb-source-propagation/docs/archive/lb-source-propagation-optimization-plan-20260524.md`.
 
 This file records the overnight 4090 optimization plan and acceptance shape. It
 does not certify a lower-bound result and does not grant standing permission to
@@ -63,7 +65,7 @@ Use repo-root-relative paths. Do not create root-level `docs/`, `artifacts/`,
 
 Active paths for this plan:
 
-- `tiles-maxxing/lb-source-propagation/PLAN.md`
+- `tiles-maxxing/lb-source-propagation/docs/archive/lb-source-propagation-implementation-plan-20260524.md`
 - `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`
 - `tiles-maxxing/lb-source-propagation/apps/source_tileop_port_runner.cpp`
 - `tiles-maxxing/lb-source-propagation/include/lb_source/`
@@ -906,7 +908,7 @@ Residual risk:
 
 ```text
 Execute the overnight 4090 full-scale benchmarking/profiling campaign in
-tiles-maxxing/lb-source-propagation/OPTIMIZATION_PLAN.md. Rent one Vast RTX
+tiles-maxxing/lb-source-propagation/docs/archive/lb-source-propagation-optimization-plan-20260524.md. Rent one Vast RTX
 4090 instance only if the offer is <= $0.75/h, run for up to 12h wall time,
 and use it for remote K26 LB correctness gates, baseline profiling, K26
 runtime-budget probes, R~60M and R~400M thin high-radius probes, CUDA

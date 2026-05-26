@@ -3,6 +3,8 @@
 Status: historical implementation plan plus execution record.
 Date: 2026-05-24.
 Branch context: `ttc/lb-source-propagation`.
+Current path:
+`tiles-maxxing/lb-source-propagation/docs/archive/lb-source-propagation-implementation-plan-20260524.md`.
 
 This file is no longer the first-read LB plan. Phases 0-5 were implemented and
 recorded below; later stream/static-reach work landed in follow-up commits.
@@ -507,7 +509,7 @@ Initial stop gate:
 
 ```text
 Phase 0 through Phase 5 pass locally, work is committed in scoped commits, and
-PLAN.md is updated with any deviations.
+this archived plan is updated with any deviations.
 ```
 
 ## Execution Record

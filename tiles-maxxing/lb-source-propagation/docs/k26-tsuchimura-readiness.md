@@ -2,9 +2,8 @@
 
 This note is the execution guard for the first source/origin comparison target.
 It is not a result claim and it is not a first-read LB architecture document.
-Read it only when touching K26. Remote budget values and Vast commands below
-are historical/conditional runbook material, not standing authorization for
-paid compute.
+Read it only when touching K26. Remote budget values are conditional execution
+guardrails, not standing authorization for paid compute.
 
 ## Target
 
@@ -276,412 +275,41 @@ the harness writes
 
 ## Executable Contract
 
-The local executable contract is:
+The executable contract is intentionally narrow:
 
 ```bash
 k26_source_run_contract
-```
-
-It emits `lb_source_k26_run_contract_v1`, including the target endpoint,
-`R_final >= 1015645` conservative guard, a suggested 8192-radius band schedule,
-required evidence, and current blocking gaps. It must keep
-`"executable_now": false` until these pieces exist:
-
-- accepted full-run K26 bundle artifacts. The bundle harness now wires the
-  row-0 coordinate prefix into rows `1..123` of TileOp-port continuation using
-  stable coordinate/canonical-port identity, but no budgeted K26 execution has
-  completed the repaired schedule and produced accepted artifacts yet;
-- execution evidence for the repaired variable-boundary schedule. The
-  TileOp-port runner supports explicit boundaries and the harness passes the
-  repaired schedule, but the full schedule has not completed under budget yet;
-- promotion of the TileOp port-graph primitive into the full band scheduler;
-  transient TileOp group labels must remain internal only. The current
-  `source_tileop_port_runner` can consume an origin-prefix manifest/witness and
-  bridge coordinate carry into canonical TileOp port atoms. The handoff is
-  hybrid: the original coordinate separator remains incoming and bridge edges
-  connect it to first-band TileOp ports. It is still diagnostic because the
-  full repaired schedule has not completed and the endpoint has not been bound
-  to a coordinate Gaussian-prime source path.
-- an accepted seam-bridge rule for moving from coordinate carry atoms into the
-  TileOp-port graph. The runner reports `bridged_coordinate_carry_atoms`,
-  `unbridged_coordinate_carry_atoms`, next-band candidate counters,
-  source-only versions of those counters, `bridged_port_carry_atoms`, and
-  `bridge_edges`; K26 remains blocked until those fields are justified by an
-  accepted lemma and verifier gate. The old `--require-full-bridge` guard is a
-  conservative hard stop, but the current certificate logic is sharper:
-  `source_unbridged_unsafe_candidate_atoms` must be zero. A K26 first
-  continuation diagnostic on 2026-05-23 reported
-  `source_unbridged_with_next_band_candidates=57`, all classified as
-  `source_unbridged_dead_end_candidate_atoms=57`, with
-  `source_unbridged_unsafe_candidate_atoms=0`. This closes the bridge-safety
-  blocker for row 0 -> row 1, but not the terminal inventory or coordinate
-  endpoint-path blockers.
-- accepted terminal inventory handling for count/digest/max norm/tie set at
-  14.5B-member scale;
-- accepted K26 non-square BZ evidence bound to the repaired schedule digest;
-- an accepted full-scale `SOURCE_DEAD_CERT` artifact. The current independent
-  draft checker has two deliberately separate modes: a listed-inventory mode
-  that recomputes the count/digest/max-norm/tie-set from the explicit terminal
-  inventory, and a `summary_only_non_claim` mode that still validates the
-  positive Gaussian-prime source path and negative guard but treats the
-  terminal inventory as a Tsuchimura-scale accumulator shape plus extrema
-  witnesses. It emits `SOURCE_DEAD_CERT_SUMMARY_ONLY_NON_CLAIM_PASS` only for
-  that narrower non-claim case. The latter is the scalable K26 contract shape,
-  not a certificate acceptance; the real K26 chain, accumulator provenance,
-  and full-run BZ digest binding are still missing.
-
-The exact command contract is:
-
-```bash
+k26_execution_plan
+k26_bz_schedule_check
+k26_source_run_profile
 k26_source_run_commands
 ```
 
-It emits the row-0 coordinate prefix command and the repaired TileOp-port
-continuation schedule. Its bundle-harness block also names
-`k26-continuation-chunks.jsonl` as required acceptance evidence for checked
-chunked runs, matching the full bundle checker's ledger validation. The row-0
-prefix command targets the canonical-octant
-representative `376039 + 943460i`; the comparison back to Tsuchimura's
-`943460 + 376039i` is by Gaussian-unit and conjugation symmetry. The
-continuation command includes `--target-a 376039 --target-b 943460` and the
-bundle checker requires `source_unbridged_unsafe_candidate_atoms=0`. Unbridged
-source carry is acceptable only when there is no legal next-band candidate or
-only dead-end candidates with no encoded face ports. The canonical endpoint
-must still be bridged into a TileOp-port component and reported as
-source-reached in the continuation artifact. The target field currently reports
-`path_provenance=mixed_coordinate_port_atom_chain_non_claim` plus a stable atom
-id chain when target reachability is proved. This is still not a coordinate
-Gaussian-prime source-path witness suitable for a `SOURCE_DEAD_CERT`. This
-command is not part of the local smoke gate. A Mac Mini probe of the row-0
-prefix now completes after the prefix-witness BFS-tree fix: on 2026-05-22,
-`source_origin_cpu_runner --k-sq 26 --r-final 8192 --band-width 8192
---endpoint-a 376039 --endpoint-b 943460 --max-atoms 50000000
---manifest-out ... --prefix-witness-out ... --progress-out ...` completed
-locally in about `40s`. It generated `1,979,012` atoms, `6,328,416` edges,
-`2,580` source carry witness targets, and wrote the prefix manifest plus
-witness. This is operational readiness evidence for row 0 only; it is still
-not a source/origin comparison, not terminal source death, and not a
-`SOURCE_DEAD_CERT`.
+These programs emit machine-checkable non-claim contracts for the Tsuchimura
+comparison target. They must keep `executable_now=false` and must not emit
+`SOURCE_DEAD_CERT_PASS`, `MOAT_PROOF_PASS`, or `SPAN_PROOF_PASS` until a future
+claim-grade verifier accepts the full source/death certificate.
 
-A follow-up local first-continuation diagnostic over `8192 -> 16384` with the
-same prefix artifacts now completes in about `31s` and keeps source carry live
-after the TileOp overhanging-support carry fix. Its row-0 seam bridge counters
-remain:
-`coordinate_carry_atoms_with_next_band_candidates=1504`,
-`bridged_coordinate_carry_atoms=1441`,
-`unbridged_coordinate_carry_atoms=1249`,
-`unbridged_without_next_band_candidates=1186`,
-`unbridged_with_next_band_candidates=63`,
-`source_coordinate_carry_atoms_with_next_band_candidates=1426`,
-`source_bridged_coordinate_carry_atoms=1369`,
-`source_unbridged_coordinate_carry_atoms=1211`,
-`source_unbridged_without_next_band_candidates=1154`,
-`source_unbridged_with_next_band_candidates=57`,
-`source_unbridged_dead_end_candidate_atoms=57`,
-`source_unbridged_unsafe_candidate_atoms=0`, and
-`source_bridge_rejected_candidate_atoms=72`. The only rejection reason was
-`visible coordinate component has no encoded face ports`. A two-band probe
-through `24576` then reports `terminal_source_dead=false`,
-`has_source_carry=true`, and `source_carry_atoms=2337`. This is useful
-bridge-safety and continuation evidence, but it is still not a certificate
-because the full repaired schedule, coordinate endpoint path, and claim-grade
-terminal inventory are missing.
+The K26 path is blocked until all of the following are true:
 
-A bounded local bundle harness run with `--timeout-seconds 120` now stops with
-`K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_TIMEOUT` while building band
-`40960 -> 49152`; by then bands through `32768 -> 40960` have completed with
-live source carry. Paid attempts should additionally pass
-`--max-runtime-seconds 14000`, which stops the whole bundle with a
-`K26_FULL_RUN_BUNDLE_BLOCKED_*_RUNTIME_LIMIT` status before the `$1.50` budget
-can be exhausted. The current runner and bundle harness can checkpoint and
-resume TileOp-port separator state, but no full repaired K26 chunked run has
-completed under the active runtime/budget gate yet. The current local blocker
-is therefore runtime/budget, not the earlier target-not-reached terminal
-diagnostic.
+- the repaired variable-boundary schedule completes under an explicitly
+  authorized run budget;
+- coordinate-to-port bridge safety is accepted by verifier evidence;
+- terminal inventory is represented by a claim-grade accumulator, not a flat
+  historical list;
+- a coordinate Gaussian-prime path binds the canonical endpoint to the certified
+  source;
+- BZ/schedule evidence, commit/build identity, artifact hashes, path evidence,
+  and terminal inventory are bound into one accepted `SOURCE_DEAD_CERT`.
 
-A longer 2026-05-23 local resume probe with `--continuation-chunk-bands 8`,
-`--timeout-seconds 1800`, and `--max-runtime-seconds 14000` reused the prefix
-and completed two continuation chunks: `8192 -> 73728` and
-`73728 -> 139264`. The chunk ledger recorded both handoffs, source carry was
-still live, the target was not yet seen, and all completed rows had
-`tileop_overflows_total=0`. The combined progress through 16 continuation
-bands emitted `K26_RUNTIME_BUDGET_PASS` with projected total `7684s`, but the
-next chunk's first completed band `139264 -> 147456` took `152.237s` and the
-chunk-local runtime checker emitted `K26_RUNTIME_BUDGET_REJECT` with projected
-total `18726s`. The local run was stopped on that budget signal. This does not
-invalidate the source-propagation protocol or checkpoint chain, but it means a
-full local K26 continuation is not accepted under the current runtime gate; a
-paid or larger-machine attempt must keep the same runtime checker active and
-stop if the later-radius projection remains over budget.
+Remote smoke, timing probes, runtime-budget checks, and historical Vast offer
+ledgers are operational diagnostics. They are not readiness canon and should be
+read from git history or pulled artifacts only when investigating a specific
+run.
 
-A bounded 2026-05-23 Vast RTX 4090 timing probe at commit `3483137` ran under
-the price gate on instance `37436093` at about `$0.355/hr`, pulled artifacts to
-`tiles-maxxing/lb-source-propagation/artifacts/vast-k26-timing-pull`, and
-destroyed the instance after exit. The probe built the K26 sidecar but timed
-out inside `K26_CONTINUATION_CHUNK_000` with
-`K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_000_TIMEOUT`. It completed
-six continuation bands through `R=57344`, all with
-`tileop_overflows_total=0`, live source carry, and target not seen. The
-tail-conservative runtime checker rejected the run:
-`completed_band_count=6`, cumulative projection `20575s`, latest-band tail
-projection `28229s`, effective projection `28229s`, and budget margin
-`-14229s` against the `14000s` cap. This confirms the current cheap 4090 Vast
-shape is not a viable full K26 CPU TileOp continuation path; it is timing
-evidence only, not a `SOURCE_DEAD_CERT`, not a sqrt(26) reproduction, and not a
-moat result.
-
-A follow-up bounded Vast RTX 4090 timing probe at deployed local head
-`984d2f1` pinned `--tileop-threads 6` to test whether the previous run was hurt
-by using all 32 visible hardware threads on a fractional-CPU host. The probe
-ran on instance `37439137`, pulled artifacts to
-`tiles-maxxing/lb-source-propagation/artifacts/vast-k26-timing-pull-t6`, and
-destroyed the instance after exit. It completed chunk `000`
-(`8192 -> 73728`) with live source carry (`source_carry_atoms=8362`),
-`tileop_overflows_total=0`, and target not seen, then was stopped in chunk
-`001` after the budget rejection was already clear. Pinning helped the later
-chunk-0 bands compared with the 32-thread auto run, for example
-`40960 -> 49152` improved from `195.776s` to `118.120s`, but it still did not
-meet the full-run budget gate. The manual runtime checker over the completed
-chunk emitted `K26_RUNTIME_BUDGET_REJECT` with `completed_band_count=8`,
-cumulative projection `14891s`, latest-band tail projection `23084s`,
-effective projection `23084s`, and budget margin `-9084s`. This means thread
-pinning is useful execution control, but this cheap 4090/fractional-CPU host
-class still cannot justify a full K26 continuation under the active cap.
-
-A final one-band remote timing probe at deployed local head `9d4010f` validated
-the safer timing-probe default. It ran with `--chunk-bands 1` and
-`--tileop-threads 6` on instance `37442799`, pulled artifacts to
-`tiles-maxxing/lb-source-propagation/artifacts/vast-k26-timing-pull-t6-c1`,
-and destroyed the instance after exit. The harness stopped immediately after
-chunk `000` (`8192 -> 16384`) with
-`K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_000_RUNTIME_BUDGET_REJECT`.
-The single completed band had `tileop_overflows_total=0`, live source carry
-(`source_carry_atoms=1437`), and target not seen. The runtime checker reported
-`completed_band_count=1`, effective/cumulative/tail projection `15151s`, and
-budget margin `-1151s`. This confirms that one-band remote timing probes can
-reject this host shape in about one continuation band instead of burning a
-whole eight-band chunk.
-
-After that rejection, the first sidecar-only runtime fixes target the measured
-`manifest_bridge` and `source_process` hotspots without changing TileOp bytes,
-CUDA kernels, certificate semantics, or final sorted bridge output. The
-coordinate carry lookup inside `source_tileop_port_runner` now uses a reserved
-hash table keyed by stable `(a,b)` coordinates and precomputes the finite
-K-neighborhood offsets once per bridge. The source-propagation inventory merge
-now sorts only new per-band atoms and linearly merges already-canonical
-incoming component inventories, instead of re-sorting the full accumulated
-source inventory on every continuation band. Direct API inputs with unsorted
-incoming inventory remain accepted and canonicalized. Local verification after
-the changes: full sidecar CTest passed `28/28`, the Phase 1 diff-scope guard
-passed, a matching-K36 progress smoke emitted `manifest_bridge` and
-`source_process` phase rows, and a local K26-compiled first-continuation probe
-over `8192 -> 16384` with `--tileop-threads 6` completed with live source
-carry in `6.719s` total: `tileop_ms=3516`, `manifest_bridge=2085ms`, and
-`source_process=1104ms`. It preserved the row-0 bridge-safety counters,
-including `source_unbridged_unsafe_candidate_atoms=0`. This is runtime
-evidence only; it does not yet prove that the full K26 continuation fits the
-paid budget gate, so another paid timing probe still requires the same one-band
-default, price cap, and runtime checker.
-
-A bounded local continuation probe at optimized head `6a20e1a` then measured
-the first 12 K26 continuation bands. The first chunk `8192 -> 73728` completed
-8 bands in `92.927s`, kept source carry live with `source_carry_atoms=8362`,
-had `tileop_overflows_total=0`, did not see the target, and emitted
-`K26_RUNTIME_BUDGET_PASS`: cumulative projection `1429s`, latest-band tail
-projection `2547s`, effective projection `2547s`, and budget margin `+11453s`.
-A second bounded continuation from the emitted port manifest covered
-`73728 -> 106496` in 4 more bands. Across all 12 completed bands, the default
-tail-conservative runtime checker still emitted `K26_RUNTIME_BUDGET_PASS`:
-observed continuation time `203.590s`, cumulative projection `2087s`,
-latest-band tail projection `3960s`, effective projection `3960s`, and budget
-margin `+10040s`. A four-band tail window over the same combined progress
-projected `3403s`. This is local non-claim timing evidence only, but it
-reopens a capped one-band Vast timing probe as meaningful once an RTX 4090
-offer satisfies the `$0.37/hr` gate.
-
-The same audit also exposed the remaining terminal-inventory scale blocker.
-The current Phase 1 separator keeps explicit `component_inventory` vectors so
-small stitched-vs-big proofs and terminal-death checks can compare exact atom
-sets. That is not a claim-grade representation for Tsuchimura scale: the
-expected terminal source component has `14,542,615,005` members. The sidecar
-therefore now treats `--max-atoms` as a cap on accumulated component inventory
-as well as current band atoms, carry atoms, and components. If the explicit
-inventory exceeds the cap, `process_band` rejects with
-`reject=overflow` and `reject_diagnostic="component inventory exceeds source cap"`.
-A K26 first-continuation probe with an intentionally low `--max-atoms 2000000`
-confirmed the deterministic blocker on `8192 -> 16384`. This prevents a long
-run from exhausting memory silently, but it also means a full Tsuchimura-grade
-`SOURCE_DEAD_CERT` still needs a streaming or accumulator-based terminal
-inventory witness before the 14.5B-member comparison can be accepted.
-
-A guarded paid retry was attempted after this optimization at local head
-`6f94b31`, but no RTX 4090 offer satisfied the active `$0.37/hr` cap. The
-guard refused to rent; the nearest observed qualifying-market offer was about
-`$0.4000/hr`, `0.0300/hr` over cap. No Vast instance was created.
-
-After the source-inventory merge optimization at local head `3bb5fa5`, the
-same guarded one-band timing retry was attempted with a 120-second offer wait.
-No RTX 4090 offer satisfied the active `$0.37/hr` cap; the nearest observed
-qualifying-market offer was again about `$0.4000/hr`, `0.0300/hr` over cap.
-No Vast instance was created.
-
-After recording the 12-band local timing pass at local head `7996d30`, the
-guarded one-band Vast retry was attempted again with a 120-second offer wait.
-No RTX 4090 offer satisfied the active `$0.37/hr` cap; the nearest observed
-qualifying-market offer was about `$0.4000/hr`, `0.0300/hr` over cap. No Vast
-instance was created.
-
-After binding the explicit non-claim terminal accumulator contract at local
-head `7d1098a`, a dry-run Vast offer probe was attempted with the same
-`$0.37/hr` and `$1.50` caps. No RTX 4090 offer satisfied the cap; the nearest
-observed qualifying-market offer was `$0.6685/hr`, `0.2985/hr` over cap. No
-Vast instance was created.
-
-After requiring the K26 harness to copy the terminal accumulator from the
-continuation artifact at local head `157a9df`, a 120-second dry-run Vast offer
-probe was attempted with the same `$0.37/hr` and `$1.50` caps. No RTX 4090
-offer satisfied the cap; the nearest observed qualifying-market offer was
-`$0.6685/hr`, `0.2985/hr` over cap. No Vast instance was created.
-
-After binding the mixed target atom-chain start to the prefix witness at local
-head `8a6363c`, another 120-second dry-run Vast offer probe used the same
-`$0.37/hr` and `$1.50` caps. No RTX 4090 offer satisfied the cap; the nearest
-observed qualifying-market offer was `$0.4010/hr`, `0.0310/hr` over cap. No
-Vast instance was created.
-
-After binding the K26 gap to explicit target-bridge evidence at local head
-`4c6e867`, another 120-second dry-run Vast offer probe used the same
-`$0.37/hr` and `$1.50` caps. No RTX 4090 offer satisfied the cap; the nearest
-observed qualifying-market offer was `$0.4000/hr`, `0.0300/hr` over cap. No
-Vast instance was created.
-
-After binding the K26 gap to explicit BZ schedule obligations at local head
-`b50375c`, a capped Vast RTX 4090 offer appeared at `$0.3481/hr`, inside the
-`$0.37/hr` cap. Instance `37454361` ran the guarded one-shot remote smoke on
-2026-05-23, then `--destroy-on-exit` destroyed it. Pulled artifacts under
-`tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull/` record
-`REMOTE_SIDECAR_SMOKE_PASS`, sidecar CTest `28/28`, independent verification
-CTest `84/84`, and `REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS`. This remains a
-build/smoke and small/medium verification gate only, not a sqrt(26) source run
-and not a moat result.
-
-After binding the K26 gap to origin-prefix path provenance at local head
-`da765d6`, a dry-run saw an RTX 4090 offer at `$0.3587/hr`, but the guarded
-execute path rechecked the market before creating and found no qualifying offer.
-The nearest observed qualifying-market offer was `$0.5081/hr`, `0.1381/hr`
-over cap. No Vast instance was created.
-
-After binding the K26 mixed coordinate/TileOp-port atom chain to local
-per-port expansion evidence at local head `e3fd90f`, a capped dry-run Vast
-offer probe used the same `$0.37/hr` and `$1.50` caps. No RTX 4090 offer
-satisfied the cap; the nearest observed qualifying-market offer was
-`$0.6681/hr`, `0.2981/hr` over cap. No Vast instance was created.
-
-After binding full coordinate-port expansion paths and summary-only
-non-claim cert generation at local head `6f423ff`, a capped dry-run saw an
-RTX 4090 offer at `$0.2947/hr`, inside the `$0.37/hr` cap. The guarded execute
-path rechecked the market before creating an instance and found no qualifying
-offer. The nearest observed qualifying-market offer was `$0.4014/hr`,
-`0.0314/hr` over cap. No Vast instance was created; `vastai show instances
---raw` returned `[]` after the attempt.
-
-After exposing the auto summary/non-claim certificate contract at local head
-`a5dd815`, a guarded Vast smoke attempt found RTX 4090 offer `31475019` on
-host `53663` at `$0.2801/hr`, inside the cap, and created instance
-`37460590`. SSH metadata never became available within the 600-second readiness
-window, so no deploy or remote smoke ran. Because the attempt used
-`--destroy-on-exit`, the guard destroyed the unready instance. A final
-`vastai show instances --raw` returned `[]`.
-
-After recording the SSH-timeout attempt at local head `73c6417`, a guarded
-retry excluded host `53663` and enabled
-`tiles-maxxing/lb-source-propagation/artifacts/vast-k26-failures.ledger`.
-It selected RTX 4090 offer `28429701` on host `1647` at `$0.3347/hr`, inside
-the cap, created instance `37461974`, waited for SSH readiness, deployed the
-current tree, and ran the one-shot remote smoke. The smoke passed and
-`--destroy-on-exit` destroyed the instance. Pulled artifacts under
-`tiles-maxxing/lb-source-propagation/artifacts/vast-smoke-pull/` record
-`deployed_local_head=73c6417`, `REMOTE_SIDECAR_SMOKE_PASS`, sidecar CTest
-`28/28`, independent verification CTest `86/86`, and
-`REMOTE_SIDECAR_SMOKE_ARTIFACTS_PASS`. A final `vastai show instances --raw`
-returned `[]`. This satisfies the Phase 1 remote build/smoke gate for the
-auto-summary certificate contract, but remains non-claim: it is not a
-sqrt(26) source/origin run and not a moat result.
-
-After recording the successful remote smoke at local head `bbc20d7`, a guarded
-one-band K26 timing-probe attempt used the same cap and excluded host `53663`.
-No RTX 4090 offer satisfied `$0.37/hr`; the nearest observed
-qualifying-market offer was `$0.4000/hr`, `0.0300/hr` over cap. No Vast
-instance was created, the failure ledger recorded the capped stop, and
-`vastai show instances --raw` returned `[]`.
-
-After binding the remote K26 timing probe to independently built source-death
-checkers at local head `a66d021`, another guarded one-band timing-probe
-attempt used the same `$0.37/hr` and `$1.50` caps and excluded host `53663`.
-No RTX 4090 offer satisfied the cap; the nearest observed qualifying-market
-offer was `$0.5214/hr`, `0.1514/hr` over cap. No Vast instance was created,
-the failure ledger recorded the capped stop, and `vastai show instances --raw`
-returned `[]`.
-
-After adding the dedicated remote K26 timing artifact checker at local head
-`0704e06`, a 120-second guarded one-band timing-probe offer poll used the
-same `$0.37/hr` and `$1.50` caps and excluded host `53663`. No RTX 4090 offer
-satisfied the cap; the nearest observed qualifying-market offer was
-`$0.5085/hr`, `0.1385/hr` over cap. No Vast instance was created, the failure
-ledger recorded the capped stop, and `vastai show instances --raw` returned
-`[]`.
-
-After any partial continuation, run:
-
-```bash
-check_k26_runtime_budget.py \
-  --progress OUT_DIR/k26-continuation-progress.jsonl \
-  --chunk-ledger OUT_DIR/k26-continuation-chunks.jsonl \
-  --schedule-segment-count 123 \
-  --max-runtime-seconds 14000
-```
-
-This emits `K26_RUNTIME_BUDGET_PASS`, `K26_RUNTIME_BUDGET_REJECT`, or
-`K26_RUNTIME_BUDGET_INSUFFICIENT_PROGRESS` as diagnostic non-claim evidence.
-By default it computes both a cumulative-average projection and a conservative
-tail projection from the latest completed band; the effective
-`projected_total_seconds` is the larger of those values. This prevents early
-cheap bands from masking later-radius runtime growth. It is a stop/continue
-guard for budgeted execution, not source/origin proof.
-For chunked continuation, the checker treats radial intervals as the stable
-identity of completed rows; local `band_index` values may restart inside each
-resumed `source_tileop_port_runner` process.
-The full bundle harness also invokes this checker automatically after a
-continuation timeout, whole-bundle runtime-limit stop, failed continuation with
-progress, or completed continuation. The harness stores the raw checker output
-as `k26-runtime-budget-check.log` plus stderr/meta sidecars, and copies the
-checker status, effective projection, cumulative projection, tail projection,
-tail window, margin, last completed radius, progress artifact, and exit code
-into `status.txt` when those fields exist. A paid attempt should therefore
-leave enough runtime evidence to decide whether to resume, reduce chunk size,
-or stop under the `$1.50` cap without weakening the `SOURCE_DEAD_CERT` gate.
-For chunked continuation, the harness now enforces the same checker after each
-completed chunk against the cumulative appended progress. If the projection is
-already over budget, it stops with
-`K26_FULL_RUN_BUNDLE_BLOCKED_K26_CONTINUATION_CHUNK_<id>_RUNTIME_BUDGET_REJECT`
-before launching the next chunk.
-Remote timing probes therefore default to `--chunk-bands 1`, while the full
-bundle command contract can still use larger chunks such as `8` for resumable
-execution when the runtime profile is already known to be acceptable.
-The remote timing probe also builds the independent `source_dead_gap_check`
-and `source_dead_cert_check` verifier binaries in its own verification build
-directory, then passes both paths into the bundle harness. That means a paid
-one-band, resumed, terminal, or target-reaching probe exercises the same
-auto-generated `SUMMARY_ONLY_NON_CLAIM` source-death summary contract as the
-local checked bundle path, instead of stopping at the older unchecked
-missing-certificate blocker. This still remains diagnostic unless a future
-artifact satisfies the full `SOURCE_DEAD_CERT` checker.
-Pulled timing-probe artifacts must pass
-`check_remote_k26_timing_artifacts.sh`, which verifies deployed-source
-provenance, checker wiring, runtime-budget diagnostics for any progress rows,
-and non-claim status. The Vast guard invokes this checker automatically for
-`--run-k26-timing-probe`, so future paid timing pulls are accepted by an
-artifact contract rather than by status-file presence alone.
+After any partial continuation, `check_k26_runtime_budget.py` may be used as a
+stop/continue budget guard over `k26-continuation-progress.jsonl` and
+`k26-continuation-chunks.jsonl`. Its statuses are diagnostic non-claim evidence.
 
 ## Stop Conditions
 

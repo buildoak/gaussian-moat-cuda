@@ -35,16 +35,17 @@ membership in `geo_I` is not a certified seed by itself.
 `SOURCE_CARRY` is the separator state emitted after processing a band:
 
 ```text
-H_i = (carry_atoms, component_partition, source_bit_per_component,
-       component_inventory)
+H_i = (carry_atoms, component_partition, source_bit_per_component)
 ```
 
 `carry_atoms` are the atoms in the final radial guard window of width
 `ceil(sqrt(K))`. `component_partition` records which carry atoms are already
 connected through the processed prefix. `source_bit_per_component` marks which
-carry components are connected to the certified source. `component_inventory`
-preserves the atoms that belong to each component before non-carry atoms are
-compacted away.
+carry components are connected to the certified source.
+
+`component_inventory` is not part of `H_i`. It is optional terminal/proof-tier
+payload used to report or certify retired source components after non-carry
+atoms are compacted away.
 
 `SOURCE_TERMINAL` is the diagnostic state reached when a processed band had a
 source-connected component but no source-connected carry component remains at
@@ -91,8 +92,9 @@ Carrying only source atoms can lose later merges through non-source carry.
 Carrying all carry atoms as source can invent reachability. Carrying the full
 partition plus source bits preserves exactly what the prefix proved.
 
-The implementation also carries `component_inventory` so terminal death can
-report the retired source component after non-carry atoms have been compacted.
+Diagnostic or certificate implementations may also carry `component_inventory`
+outside the live handoff so terminal death can report the retired source
+component after non-carry atoms have been compacted.
 
 For coordinate atoms the carry predicate is the literal final guard
 `[R - ceil(sqrt(K)), R]`. TileOp port atoms are abstract tile-support atoms,
@@ -131,13 +133,14 @@ separator state as processing the same atoms and edges as one big band.
 The acceptance comparison is separator equality:
 
 ```text
-canonical(carry_atoms, component_partition, source_bit_per_component,
-          component_inventory)
+canonical(carry_atoms, component_partition, source_bit_per_component)
 ```
 
 It is not enough to compare only final `SPANNING`, `MOAT`, or "has source"
 booleans. The fixtures must compare the carry partition and source bits, because
-those are the state that future bands consume.
+those are the state that future bands consume. Tests may compare terminal
+inventory payloads as extra proof-tier evidence, but inventory equality is not
+part of live handoff equality.
 
 ## Lemma 5: Terminal Guard And Death Logic
 
