@@ -18,6 +18,13 @@ constexpr std::uint8_t kStaticReachOuter = 0x2;
 constexpr std::uint8_t kStaticReachBoth =
     kStaticReachInner | kStaticReachOuter;
 
+enum class StaticReachSeedPolicy : std::uint8_t {
+  kOneBand,
+  kFirstBand,
+  kInteriorBand,
+  kFinalBand,
+};
+
 struct StaticReachBandAtom {
   AtomId id = 0;
   std::uint64_t norm_sq = 0;
@@ -31,6 +38,7 @@ struct StaticReachBandInput {
   std::vector<StaticReachBandAtom> atoms;
   std::vector<std::pair<AtomId, AtomId>> edges;
   bool force_overflow = false;
+  StaticReachSeedPolicy seed_policy = StaticReachSeedPolicy::kOneBand;
 };
 
 struct StaticReachSeparator {
@@ -63,6 +71,7 @@ struct TileOpStaticReachInput {
   std::uint64_t outer_radius = 0;
   std::vector<campaign::TileCoord> coords;
   std::vector<campaign::TileOp> tileops;
+  StaticReachSeedPolicy seed_policy = StaticReachSeedPolicy::kOneBand;
 };
 
 struct TileOpStaticReachMicrobandResult {

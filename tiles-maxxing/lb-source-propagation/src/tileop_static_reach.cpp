@@ -124,6 +124,45 @@ bool stable_atom_id(AtomId id) {
          decode_port_atom_id(id).has_value();
 }
 
+bool policy_seeds_inner(StaticReachSeedPolicy policy) {
+  return policy == StaticReachSeedPolicy::kOneBand ||
+         policy == StaticReachSeedPolicy::kFirstBand;
+}
+
+bool policy_seeds_outer(StaticReachSeedPolicy policy) {
+  return policy == StaticReachSeedPolicy::kOneBand ||
+         policy == StaticReachSeedPolicy::kFinalBand;
+}
+
+std::uint8_t apply_seed_policy(std::uint8_t reach,
+                               StaticReachSeedPolicy policy) {
+  std::uint8_t allowed = 0;
+  if (policy_seeds_inner(policy)) {
+    allowed |= kStaticReachInner;
+  }
+  if (policy_seeds_outer(policy)) {
+    allowed |= kStaticReachOuter;
+  }
+  return reach & allowed;
+}
+
+StaticReachSeedPolicy stitched_seed_policy(std::size_t index,
+                                           std::size_t count,
+                                           bool has_incoming) {
+  const bool first_global_band = index == 0 && !has_incoming;
+  const bool final_global_band = index + 1 == count;
+  if (first_global_band && final_global_band) {
+    return StaticReachSeedPolicy::kOneBand;
+  }
+  if (first_global_band) {
+    return StaticReachSeedPolicy::kFirstBand;
+  }
+  if (final_global_band) {
+    return StaticReachSeedPolicy::kFinalBand;
+  }
+  return StaticReachSeedPolicy::kInteriorBand;
+}
+
 void add_edge(std::vector<std::pair<AtomId, AtomId>>& edges, AtomId lhs,
               AtomId rhs) {
   if (lhs == rhs) {
@@ -242,6 +281,7 @@ TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
   TileOpStaticReachMicrobandResult result;
   result.band.k_sq = input.k_sq;
   result.band.outer_radius = input.outer_radius;
+  result.band.seed_policy = input.seed_policy;
 
   if (input.k_sq == 0 || input.outer_radius == 0) {
     result.diagnostic = "k_sq and outer_radius must be positive";
@@ -269,7 +309,7 @@ TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
     }
 
     const TileOpPortDecodedTile decoded =
-        decode_tileop_ports(coord, op, true);
+        decode_tileop_ports(coord, op, policy_seeds_inner(input.seed_policy));
     if (!decoded.accepted()) {
       result.diagnostic = decoded.diagnostic;
       return result;
@@ -290,7 +330,7 @@ TileOpStaticReachMicrobandResult build_tileop_static_reach_microband(
       if (port.certified_source) {
         reach |= kStaticReachInner;
       }
-      if (port.certified_sink) {
+      if (policy_seeds_outer(input.seed_policy) && port.certified_sink) {
         reach |= kStaticReachOuter;
       }
       reach_by_label[port.local_label] |= reach;
@@ -407,6 +447,8 @@ StaticReachProcessResult process_static_reach_band(
       return reject(RejectReason::kMalformed, "invalid band atom reach bits",
                     carry_width);
     }
+    all_atoms[i].reach = apply_seed_policy(all_atoms[i].reach,
+                                           band.seed_policy);
     if (!stable_atom_id(all_atoms[i].id)) {
       return reject(RejectReason::kMalformed, "band atom has unstable id",
                     carry_width);
@@ -548,7 +590,10 @@ StaticReachProcessResult process_static_reach_bands(
   std::optional<StaticReachSeparator> state = incoming;
   StaticReachProcessResult last;
   bool spanning = false;
-  for (const StaticReachBandInput& band : bands) {
+  for (std::size_t i = 0; i < bands.size(); ++i) {
+    StaticReachBandInput band = bands[i];
+    band.seed_policy = stitched_seed_policy(i, bands.size(),
+                                            incoming.has_value());
     last = process_static_reach_band(band, state, options);
     if (!last.accepted()) {
       return last;

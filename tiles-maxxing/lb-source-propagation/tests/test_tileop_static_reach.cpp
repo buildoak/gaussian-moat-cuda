@@ -154,6 +154,29 @@ void test_neutral_carry_does_not_invent_span() {
                                  lb_source::kStaticReachOuter));
 }
 
+void test_three_band_interior_local_span_is_not_global_span() {
+  const lb_source::AtomId first = coordinate_id(6, 8);
+  const lb_source::AtomId middle = coordinate_id(9, 12);
+  const lb_source::AtomId final = coordinate_id(12, 16);
+  const std::vector<lb_source::StaticReachBandInput> bands = {
+      {.k_sq = 36,
+       .outer_radius = 10,
+       .atoms = {{first, 100, 0, false}}},
+      {.k_sq = 36,
+       .outer_radius = 15,
+       .atoms = {{middle, 225, lb_source::kStaticReachBoth, false}}},
+      {.k_sq = 36,
+       .outer_radius = 20,
+       .atoms = {{final, 400, 0, false}}},
+  };
+
+  const lb_source::StaticReachProcessResult stitched =
+      lb_source::process_static_reach_bands(bands);
+  CHECK_TRUE(stitched.accepted());
+  CHECK_TRUE(!stitched.spanning);
+  CHECK_TRUE(separator_has_reach(stitched.outgoing, {final}, 0));
+}
+
 void test_tileop_flags_drive_two_bit_reach() {
   campaign::TileOp lower{};
   add_port(lower, campaign::Face::I, 1);
@@ -185,6 +208,45 @@ void test_tileop_flags_drive_two_bit_reach() {
   CHECK_TRUE(result.spanning);
 }
 
+void test_tileop_seed_policy_counts_follow_global_boundary_role() {
+  campaign::TileOp op{};
+  add_port(op, campaign::Face::I, 1);
+  add_port(op, campaign::Face::O, 1);
+  campaign::bit_set(op.inner_flags, 1);
+  campaign::bit_set(op.outer_flags, 1);
+
+  struct Case {
+    lb_source::StaticReachSeedPolicy policy;
+    std::uint64_t inner_seed_ports;
+    std::uint64_t outer_seed_ports;
+    bool spanning;
+  };
+  const std::vector<Case> cases = {
+      {lb_source::StaticReachSeedPolicy::kOneBand, 2, 2, true},
+      {lb_source::StaticReachSeedPolicy::kFirstBand, 2, 0, false},
+      {lb_source::StaticReachSeedPolicy::kInteriorBand, 0, 0, false},
+      {lb_source::StaticReachSeedPolicy::kFinalBand, 0, 2, false},
+  };
+  for (const Case test_case : cases) {
+    const lb_source::TileOpStaticReachMicrobandResult microband =
+        lb_source::build_tileop_static_reach_microband({
+            .k_sq = campaign::k_sq_value,
+            .outer_radius = 362,
+            .coords = {coord(0, 0)},
+            .tileops = {op},
+            .seed_policy = test_case.policy,
+        });
+    CHECK_TRUE(microband.accepted());
+    CHECK_EQ(microband.inner_seed_ports, test_case.inner_seed_ports);
+    CHECK_EQ(microband.outer_seed_ports, test_case.outer_seed_ports);
+
+    const lb_source::StaticReachProcessResult result =
+        lb_source::process_static_reach_band(microband.band);
+    CHECK_TRUE(result.accepted());
+    CHECK_EQ(result.spanning, test_case.spanning);
+  }
+}
+
 void test_duplicate_boundary_tile_carries_reach_across_microbands() {
   campaign::TileOp first{};
   add_port(first, campaign::Face::I, 1);
@@ -200,6 +262,7 @@ void test_duplicate_boundary_tile_carries_reach_across_microbands() {
           .outer_radius = 362,
           .coords = {coord(0, 0)},
           .tileops = {first},
+          .seed_policy = lb_source::StaticReachSeedPolicy::kFirstBand,
       });
   CHECK_TRUE(a.accepted());
   const lb_source::StaticReachProcessResult first_result =
@@ -213,6 +276,7 @@ void test_duplicate_boundary_tile_carries_reach_across_microbands() {
           .outer_radius = 368,
           .coords = {coord(0, 0)},
           .tileops = {second},
+          .seed_policy = lb_source::StaticReachSeedPolicy::kFinalBand,
       });
   CHECK_TRUE(b.accepted());
   const lb_source::StaticReachProcessResult stitched =
@@ -236,8 +300,12 @@ int main() {
       test_stitched_static_reach_equals_one_big_band);
   run("neutral_carry_does_not_invent_span",
       test_neutral_carry_does_not_invent_span);
+  run("three_band_interior_local_span_is_not_global_span",
+      test_three_band_interior_local_span_is_not_global_span);
   run("tileop_flags_drive_two_bit_reach",
       test_tileop_flags_drive_two_bit_reach);
+  run("tileop_seed_policy_counts_follow_global_boundary_role",
+      test_tileop_seed_policy_counts_follow_global_boundary_role);
   run("duplicate_boundary_tile_carries_reach_across_microbands",
       test_duplicate_boundary_tile_carries_reach_across_microbands);
 
