@@ -34,6 +34,11 @@ neutral_resumed_json="$tmp/neutral-resumed.json"
 neutral_resumed_checkpoint="$tmp/neutral-resumed.checkpoint.txt"
 neutral_stale_err="$tmp/neutral-stale.err"
 neutral_seed_err="$tmp/neutral-seed.err"
+neutral_handoff="$(dirname "$neutral_full_checkpoint")/detector_handoff.current.bin"
+missing_handoff_err="$tmp/missing-handoff.err"
+bad_hash_err="$tmp/bad-hash.err"
+bad_bytes_err="$tmp/bad-bytes.err"
+wrong_cut_err="$tmp/wrong-cut.err"
 
 "$runner" \
   --r-start 248 \
@@ -107,14 +112,27 @@ grep -q '"accepted":true' "$neutral_full_json"
 grep -q '"has_source_carry":false' "$neutral_full_json"
 grep -q '"checkpoint_written":false' "$neutral_full_json"
 grep -q '"resumable_checkpoint_written":true' "$neutral_full_json"
+grep -q '"detector_handoff_written":true' "$neutral_full_json"
+grep -q '"detector_handoff_sha256":"[0-9a-f]\{64\}"' "$neutral_full_json"
 grep -q '^LB_RESUMABLE_BAND_CHECKPOINT_V1$' "$neutral_full_checkpoint"
 grep -q '^mode resumable-band$' "$neutral_full_checkpoint"
 grep -q '^proof_status DIAGNOSTIC_NON_CLAIM$' "$neutral_full_checkpoint"
+grep -q '^detector_handoff_path '"$neutral_handoff"'$' \
+  "$neutral_full_checkpoint"
+grep -q '^detector_handoff_schema DETECTOR_BAND_HANDOFF_V1$' \
+  "$neutral_full_checkpoint"
+grep -q '^detector_handoff_bytes [1-9][0-9]*$' \
+  "$neutral_full_checkpoint"
+[[ -s "$neutral_handoff" ]]
+[[ "$(find "$tmp" -maxdepth 1 -name 'detector_handoff*.bin' -type f | wc -l | tr -d ' ')" == "1" ]]
 if grep -Eq 'source_mode|source_id|LB_SOURCE_LIVE_HANDOFF_V1' \
   "$neutral_full_checkpoint"; then
   echo "resumable checkpoint is not source-neutral" >&2
   exit 1
 fi
+neutral_full_handoff_hash="$(
+  awk '$1 == "detector_handoff_sha256" {print $2}' "$neutral_full_checkpoint"
+)"
 
 "$runner" \
   --r-start 248 \
@@ -127,6 +145,13 @@ fi
 grep -q '"r_final":376' "$neutral_chunk_json"
 grep -q '"schedule_index":1' "$neutral_chunk_json"
 grep -q '"resumable_checkpoint_written":true' "$neutral_chunk_json"
+grep -q '^detector_handoff_schema DETECTOR_BAND_HANDOFF_V1$' \
+  "$neutral_chunk_checkpoint"
+neutral_chunk_handoff="$tmp/neutral-chunk.handoff.bin"
+cp "$neutral_handoff" "$neutral_chunk_handoff"
+neutral_chunk_handoff_hash="$(
+  awk '$1 == "detector_handoff_sha256" {print $2}' "$neutral_chunk_checkpoint"
+)"
 
 "$runner" \
   --r-start 376 \
@@ -140,7 +165,147 @@ grep -q '"original_r_start":248' "$neutral_resumed_json"
 grep -q '"r_final":512' "$neutral_resumed_json"
 grep -q '"schedule_index":3' "$neutral_resumed_json"
 grep -q '"resumable_checkpoint_written":true' "$neutral_resumed_json"
+grep -q '"detector_handoff_written":true' "$neutral_resumed_json"
 cmp "$neutral_full_checkpoint" "$neutral_resumed_checkpoint"
+neutral_resumed_handoff_hash="$(
+  awk '$1 == "detector_handoff_sha256" {print $2}' "$neutral_resumed_checkpoint"
+)"
+[[ "$neutral_resumed_handoff_hash" == "$neutral_full_handoff_hash" ]]
+[[ "$neutral_chunk_handoff_hash" != "$neutral_full_handoff_hash" ]]
+[[ "$(find "$tmp" -maxdepth 1 -name 'detector_handoff*.bin' -type f | wc -l | tr -d ' ')" == "1" ]]
+
+missing_dir="$tmp/missing-handoff"
+mkdir "$missing_dir"
+"$runner" \
+  --r-start 248 \
+  --r-final 512 \
+  --microband-width 128 \
+  --stop-after-microbands 1 \
+  --resumable-checkpoint-out "$missing_dir/checkpoint.txt" \
+  > "$missing_dir/chunk.json"
+rm "$missing_dir/detector_handoff.current.bin"
+if "$runner" \
+  --r-start 376 \
+  --r-final 512 \
+  --microband-width 128 \
+  --resumable-checkpoint-in "$missing_dir/checkpoint.txt" \
+  --resumable-checkpoint-out "$missing_dir/resumed.checkpoint.txt" \
+  >"$missing_dir/resumed.out" \
+  2>"$missing_handoff_err"; then
+  echo "runner accepted missing detector handoff on resume" >&2
+  exit 1
+fi
+grep -q -- 'cannot open --resumable-checkpoint-in detector handoff path' \
+  "$missing_handoff_err"
+[[ ! -e "$missing_dir/resumed.checkpoint.txt" ]]
+
+bad_hash_dir="$tmp/bad-hash"
+mkdir "$bad_hash_dir"
+"$runner" \
+  --r-start 248 \
+  --r-final 512 \
+  --microband-width 128 \
+  --stop-after-microbands 1 \
+  --resumable-checkpoint-out "$bad_hash_dir/checkpoint.txt" \
+  > "$bad_hash_dir/chunk.json"
+awk '{
+  if ($1 == "detector_handoff_sha256") {
+    print "detector_handoff_sha256 0000000000000000000000000000000000000000000000000000000000000000"
+  } else {
+    print
+  }
+}' "$bad_hash_dir/checkpoint.txt" > "$bad_hash_dir/bad.checkpoint.txt"
+if "$runner" \
+  --r-start 376 \
+  --r-final 512 \
+  --microband-width 128 \
+  --resumable-checkpoint-in "$bad_hash_dir/bad.checkpoint.txt" \
+  --resumable-checkpoint-out "$bad_hash_dir/resumed.checkpoint.txt" \
+  >"$bad_hash_dir/resumed.out" \
+  2>"$bad_hash_err"; then
+  echo "runner accepted bad detector handoff hash" >&2
+  exit 1
+fi
+grep -q -- 'wrong detector_handoff_sha256' "$bad_hash_err"
+[[ ! -e "$bad_hash_dir/resumed.checkpoint.txt" ]]
+
+bad_bytes_dir="$tmp/bad-bytes"
+mkdir "$bad_bytes_dir"
+"$runner" \
+  --r-start 248 \
+  --r-final 512 \
+  --microband-width 128 \
+  --stop-after-microbands 1 \
+  --resumable-checkpoint-out "$bad_bytes_dir/checkpoint.txt" \
+  > "$bad_bytes_dir/chunk.json"
+awk '{
+  if ($1 == "detector_handoff_bytes") {
+    print "detector_handoff_bytes 1"
+  } else {
+    print
+  }
+}' "$bad_bytes_dir/checkpoint.txt" > "$bad_bytes_dir/bad.checkpoint.txt"
+if "$runner" \
+  --r-start 376 \
+  --r-final 512 \
+  --microband-width 128 \
+  --resumable-checkpoint-in "$bad_bytes_dir/bad.checkpoint.txt" \
+  --resumable-checkpoint-out "$bad_bytes_dir/resumed.checkpoint.txt" \
+  >"$bad_bytes_dir/resumed.out" \
+  2>"$bad_bytes_err"; then
+  echo "runner accepted bad detector handoff byte count" >&2
+  exit 1
+fi
+grep -q -- 'wrong detector_handoff_bytes' "$bad_bytes_err"
+[[ ! -e "$bad_bytes_dir/resumed.checkpoint.txt" ]]
+
+wrong_cut_dir="$tmp/wrong-cut"
+mkdir "$wrong_cut_dir"
+"$runner" \
+  --r-start 248 \
+  --r-final 512 \
+  --microband-width 128 \
+  --resumable-checkpoint-out "$wrong_cut_dir/full.checkpoint.txt" \
+  > "$wrong_cut_dir/full.json"
+cp "$wrong_cut_dir/detector_handoff.current.bin" "$wrong_cut_dir/final.bin"
+final_hash="$(
+  awk '$1 == "detector_handoff_sha256" {print $2}' \
+    "$wrong_cut_dir/full.checkpoint.txt"
+)"
+final_bytes="$(wc -c < "$wrong_cut_dir/final.bin" | tr -d ' ')"
+"$runner" \
+  --r-start 248 \
+  --r-final 512 \
+  --microband-width 128 \
+  --stop-after-microbands 1 \
+  --resumable-checkpoint-out "$wrong_cut_dir/chunk.checkpoint.txt" \
+  > "$wrong_cut_dir/chunk.json"
+awk -v path="$wrong_cut_dir/final.bin" \
+    -v hash="$final_hash" \
+    -v bytes="$final_bytes" '{
+  if ($1 == "detector_handoff_path") {
+    print "detector_handoff_path " path
+  } else if ($1 == "detector_handoff_sha256") {
+    print "detector_handoff_sha256 " hash
+  } else if ($1 == "detector_handoff_bytes") {
+    print "detector_handoff_bytes " bytes
+  } else {
+    print
+  }
+}' "$wrong_cut_dir/chunk.checkpoint.txt" > "$wrong_cut_dir/bad.checkpoint.txt"
+if "$runner" \
+  --r-start 376 \
+  --r-final 512 \
+  --microband-width 128 \
+  --resumable-checkpoint-in "$wrong_cut_dir/bad.checkpoint.txt" \
+  --resumable-checkpoint-out "$wrong_cut_dir/resumed.checkpoint.txt" \
+  >"$wrong_cut_dir/resumed.out" \
+  2>"$wrong_cut_err"; then
+  echo "runner accepted wrong detector handoff cut radius" >&2
+  exit 1
+fi
+grep -q -- 'wrong cut_radius' "$wrong_cut_err"
+[[ ! -e "$wrong_cut_dir/resumed.checkpoint.txt" ]]
 
 if "$runner" \
   --r-start 248 \

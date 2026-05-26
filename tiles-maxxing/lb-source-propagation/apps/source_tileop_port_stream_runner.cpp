@@ -1,6 +1,8 @@
+#include "lb_source/detector_band_handoff.h"
 #include "lb_source/source_propagation.h"
 #include "lb_source/resumable_band_checkpoint.h"
 #include "lb_source/stream_checkpoint.h"
+#include "lb_source/tileop_static_reach.h"
 #include "lb_source/tileop_port_stream.h"
 
 #include <algorithm>
@@ -8,9 +10,12 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -45,6 +50,10 @@ constexpr std::string_view kCommandId =
     "source_tileop_port_stream_runner_fixed_width_v1";
 constexpr std::string_view kHarvestStatus = "BAND_HARVEST_PROGRESS_V1";
 constexpr std::string_view kReplayStatus = "REPLAYABLE_CONTEXT_V1";
+constexpr std::string_view kSupportEnvelopeId =
+    "tileop-port-carry-ceil-sqrt-k-v1";
+constexpr std::string_view kPortIdentitySchemeId = "tileop-local-port-atom-v1";
+constexpr std::string_view kBoundaryPolicyId = "closed-tile-boundary-v1";
 
 struct Config {
   std::uint64_t r_start = 248;
@@ -61,6 +70,12 @@ struct Config {
   std::optional<std::string> live_manifest_out;
   std::optional<std::string> progress_out;
   std::optional<std::string> death_out;
+};
+
+struct DetectorHandoffWriteResult {
+  std::string path;
+  std::string sha256_hex;
+  std::uint64_t bytes = 0;
 };
 
 struct ScheduleInfo {
@@ -476,6 +491,7 @@ lb_source::ResumableBandCheckpointV1 make_resumable_checkpoint(
     std::uint64_t schedule_index,
     std::uint64_t campaign_tiles_processed,
     std::uint64_t tileop_overflows,
+    const std::optional<DetectorHandoffWriteResult>& detector_handoff,
     const ScheduleInfo& schedule) {
   lb_source::ResumableBandCheckpointV1 checkpoint;
   checkpoint.runner_id = std::string(kRunnerId);
@@ -497,9 +513,157 @@ lb_source::ResumableBandCheckpointV1 make_resumable_checkpoint(
   checkpoint.proof_status = std::string(kProofStatus);
   checkpoint.harvest_status = std::string(kHarvestStatus);
   checkpoint.replay_status = std::string(kReplayStatus);
+  if (detector_handoff.has_value()) {
+    checkpoint.detector_handoff_path = detector_handoff->path;
+    checkpoint.detector_handoff_sha256 = detector_handoff->sha256_hex;
+    checkpoint.detector_handoff_schema =
+        std::string(lb_source::kDetectorBandHandoffSchema);
+    checkpoint.detector_handoff_bytes = detector_handoff->bytes;
+  }
   checkpoint.campaign_tiles_processed = campaign_tiles_processed;
   checkpoint.tileop_overflows = tileop_overflows;
   return checkpoint;
+}
+
+lb_source::DetectorBandHandoffV1 make_detector_handoff(
+    std::uint64_t cut_radius,
+    std::uint64_t schedule_index,
+    const lb_source::StaticReachSeparator& separator,
+    const ScheduleInfo& schedule) {
+  lb_source::DetectorBandHandoffV1 handoff;
+  handoff.k_sq = static_cast<std::uint64_t>(campaign::k_sq_value);
+  handoff.cut_radius = cut_radius;
+  handoff.carry_width = lb_source::ceil_sqrt(handoff.k_sq);
+  handoff.schedule_index = schedule_index;
+  handoff.schedule_digest_algorithm = std::string(kScheduleDigestAlgorithm);
+  handoff.schedule_digest_hex = schedule.digest_hex;
+  handoff.geometry_id = std::string(kGeometryId);
+  handoff.oracle_id = std::string(kOracleId);
+  handoff.build_id = std::string(kBuildId);
+  handoff.support_envelope_id = std::string(kSupportEnvelopeId);
+  handoff.port_identity_scheme_id = std::string(kPortIdentitySchemeId);
+  handoff.boundary_policy_id = std::string(kBoundaryPolicyId);
+  handoff.separator = separator;
+  return lb_source::canonicalize_detector_band_handoff(handoff);
+}
+
+lb_source::DetectorBandHandoffExpectedContext expected_detector_context(
+    std::uint64_t cut_radius,
+    std::uint64_t schedule_index,
+    const ScheduleInfo& schedule) {
+  lb_source::DetectorBandHandoffExpectedContext expected;
+  expected.k_sq = static_cast<std::uint64_t>(campaign::k_sq_value);
+  expected.cut_radius = cut_radius;
+  expected.carry_width =
+      lb_source::ceil_sqrt(static_cast<std::uint64_t>(campaign::k_sq_value));
+  expected.schedule_index = schedule_index;
+  expected.schedule_digest_algorithm = std::string(kScheduleDigestAlgorithm);
+  expected.schedule_digest_hex = schedule.digest_hex;
+  expected.geometry_id = std::string(kGeometryId);
+  expected.oracle_id = std::string(kOracleId);
+  expected.build_id = std::string(kBuildId);
+  expected.support_envelope_id = std::string(kSupportEnvelopeId);
+  expected.port_identity_scheme_id = std::string(kPortIdentitySchemeId);
+  expected.boundary_policy_id = std::string(kBoundaryPolicyId);
+  return expected;
+}
+
+lb_source::StaticReachSeedPolicy detector_seed_policy(std::size_t segment,
+                                                      std::size_t segments) {
+  if (segments == 1) {
+    return lb_source::StaticReachSeedPolicy::kOneBand;
+  }
+  if (segment == 0) {
+    return lb_source::StaticReachSeedPolicy::kFirstBand;
+  }
+  if (segment + 1 == segments) {
+    return lb_source::StaticReachSeedPolicy::kFinalBand;
+  }
+  return lb_source::StaticReachSeedPolicy::kInteriorBand;
+}
+
+std::string default_detector_handoff_path(const std::string& checkpoint_path) {
+  const std::filesystem::path checkpoint(checkpoint_path);
+  const std::filesystem::path parent = checkpoint.parent_path();
+  const std::filesystem::path live = parent.empty()
+                                         ? std::filesystem::path(
+                                               "detector_handoff.current.bin")
+                                         : parent /
+                                               "detector_handoff.current.bin";
+  return live.string();
+}
+
+std::vector<std::uint8_t> read_binary_file_or_die(
+    const std::string& path,
+    std::string_view label) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) {
+    std::cerr << "cannot open " << label << " path: " << path << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(in),
+                                   std::istreambuf_iterator<char>());
+}
+
+DetectorHandoffWriteResult write_detector_handoff_atomically_or_die(
+    const lb_source::DetectorBandHandoffV1& handoff,
+    const std::string& live_path) {
+  const lb_source::DetectorBandHandoffBytesResult encoded =
+      lb_source::detector_band_handoff_to_bytes(handoff);
+  if (!encoded.accepted()) {
+    std::cerr << "detector handoff encode rejected: "
+              << encoded.diagnostic << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  const std::string sha256_hex =
+      campaign::detail::sha256_hex(encoded.bytes.data(), encoded.bytes.size());
+  const std::string tmp_path = live_path + ".tmp";
+  {
+    std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+      std::cerr << "cannot open detector handoff temp path: " << tmp_path
+                << "\n";
+      std::exit(EXIT_FAILURE);
+    }
+    out.write(reinterpret_cast<const char*>(encoded.bytes.data()),
+              static_cast<std::streamsize>(encoded.bytes.size()));
+    if (!out) {
+      std::cerr << "cannot write detector handoff temp path: " << tmp_path
+                << "\n";
+      std::exit(EXIT_FAILURE);
+    }
+  }
+
+  const std::vector<std::uint8_t> readback =
+      read_binary_file_or_die(tmp_path, "detector handoff temp");
+  if (readback.size() != encoded.bytes.size() ||
+      campaign::detail::sha256_hex(readback.data(), readback.size()) !=
+          sha256_hex) {
+    std::cerr << "detector handoff temp read-back mismatch\n";
+    std::exit(EXIT_FAILURE);
+  }
+  const lb_source::DetectorBandHandoffReadResult decoded =
+      [&]() {
+        ScheduleInfo schedule;
+        schedule.digest_hex = handoff.schedule_digest_hex;
+        return lb_source::detector_band_handoff_from_bytes(
+            readback, expected_detector_context(handoff.cut_radius,
+                                                handoff.schedule_index,
+                                                schedule));
+      }();
+  if (!decoded.accepted()) {
+    std::cerr << "detector handoff temp validation rejected: "
+              << decoded.diagnostic << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  if (std::rename(tmp_path.c_str(), live_path.c_str()) != 0) {
+    std::cerr << "cannot atomically replace detector handoff path: "
+              << live_path << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return {.path = live_path,
+          .sha256_hex = sha256_hex,
+          .bytes = static_cast<std::uint64_t>(encoded.bytes.size())};
 }
 
 std::uint64_t checkpoint_size_bytes(const lb_source::StreamCheckpointV1& cp) {
@@ -623,6 +787,9 @@ void validate_resumable_checkpoint_binding_or_die(
   expected.proof_status = std::string(kProofStatus);
   expected.harvest_status = std::string(kHarvestStatus);
   expected.replay_status = std::string(kReplayStatus);
+  if (checkpoint.schedule_index > 0) {
+    expected.require_detector_handoff_reference = true;
+  }
   const std::string validation =
       lb_source::validate_resumable_band_checkpoint(checkpoint, expected);
   if (!validation.empty()) {
@@ -634,6 +801,37 @@ void validate_resumable_checkpoint_binding_or_die(
     std::cerr << "invalid --resumable-checkpoint-in: wrong schedule_index\n";
     std::exit(EXIT_FAILURE);
   }
+}
+
+lb_source::DetectorBandHandoffV1 read_detector_handoff_for_checkpoint_or_die(
+    const lb_source::ResumableBandCheckpointV1& checkpoint,
+    const ScheduleInfo& schedule) {
+  const std::vector<std::uint8_t> bytes =
+      read_binary_file_or_die(checkpoint.detector_handoff_path,
+                              "--resumable-checkpoint-in detector handoff");
+  if (bytes.size() != checkpoint.detector_handoff_bytes) {
+    std::cerr << "invalid --resumable-checkpoint-in: wrong "
+                 "detector_handoff_bytes\n";
+    std::exit(EXIT_FAILURE);
+  }
+  const std::string actual_sha256 =
+      campaign::detail::sha256_hex(bytes.data(), bytes.size());
+  if (actual_sha256 != checkpoint.detector_handoff_sha256) {
+    std::cerr << "invalid --resumable-checkpoint-in: wrong "
+                 "detector_handoff_sha256\n";
+    std::exit(EXIT_FAILURE);
+  }
+  const lb_source::DetectorBandHandoffReadResult result =
+      lb_source::detector_band_handoff_from_bytes(
+          bytes, expected_detector_context(checkpoint.next_r_start,
+                                           checkpoint.schedule_index,
+                                           schedule));
+  if (!result.accepted()) {
+    std::cerr << "invalid --resumable-checkpoint-in detector handoff: "
+              << result.diagnostic << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+  return result.handoff;
 }
 
 ScheduleInfo build_schedule_info(
@@ -689,7 +887,10 @@ int main(int argc, char** argv) {
   std::optional<lb_source::StreamCheckpointV1> checkpoint;
   std::optional<lb_source::ResumableBandCheckpointV1> resumable_checkpoint;
   std::optional<lb_source::LiveSeparator> live_incoming;
+  std::optional<lb_source::StaticReachSeparator> detector_incoming;
   std::optional<lb_source::LiveHandoffV1> current_live_handoff;
+  std::optional<lb_source::DetectorBandHandoffV1> current_detector_handoff;
+  std::optional<DetectorHandoffWriteResult> current_detector_handoff_ref;
   std::string source_mode = config.seed_inner_flags
                                 ? std::string(kFirstBandSourceMode)
                                 : "NONE";
@@ -722,6 +923,16 @@ int main(int argc, char** argv) {
   if (resumable_checkpoint.has_value()) {
     validate_resumable_checkpoint_binding_or_die(*resumable_checkpoint,
                                                  config, schedule);
+    if (resumable_checkpoint->schedule_index > 0) {
+      current_detector_handoff =
+          read_detector_handoff_for_checkpoint_or_die(*resumable_checkpoint,
+                                                      schedule);
+      detector_incoming = current_detector_handoff->separator;
+      current_detector_handoff_ref = {
+          .path = resumable_checkpoint->detector_handoff_path,
+          .sha256_hex = resumable_checkpoint->detector_handoff_sha256,
+          .bytes = resumable_checkpoint->detector_handoff_bytes};
+    }
   }
   if (schedule.radii.empty() || schedule_index >= schedule.radii.size() ||
       schedule.radii[schedule_index] != config.r_start) {
@@ -747,6 +958,7 @@ int main(int argc, char** argv) {
   }
 
   lb_source::LiveProcessResult live_last;
+  lb_source::StaticReachProcessResult detector_last;
   std::uint64_t processed_outer = config.r_start;
   std::uint64_t microbands_processed_this_run = 0;
   std::uint64_t campaign_tiles_processed =
@@ -761,6 +973,13 @@ int main(int argc, char** argv) {
   std::uint64_t seam_edges = 0;
   std::uint64_t max_tileop_threads = 0;
   RunningMaxima maxima;
+  const std::size_t segment_count =
+      schedule.radii.empty() ? 0 : schedule.radii.size() - 1;
+  const std::optional<std::string> detector_handoff_live_path =
+      config.resumable_checkpoint_out.has_value()
+          ? std::optional<std::string>(default_detector_handoff_path(
+                *config.resumable_checkpoint_out))
+          : std::nullopt;
 
   for (std::size_t segment = schedule_index; segment + 1 < schedule.radii.size();
        ++segment) {
@@ -813,6 +1032,30 @@ int main(int argc, char** argv) {
     }
     const auto stream_done = std::chrono::steady_clock::now();
 
+    const lb_source::TileOpStaticReachMicrobandResult detector_band =
+        lb_source::build_tileop_static_reach_microband({
+            .k_sq = static_cast<std::uint64_t>(campaign::k_sq_value),
+            .outer_radius = r_outer,
+            .coords = coords,
+            .tileops = tileops,
+            .seed_policy = detector_seed_policy(segment, segment_count),
+        });
+    if (!detector_band.accepted()) {
+      std::cerr << "TileOp static reach microband rejected: "
+                << detector_band.diagnostic << "\n";
+      return EXIT_FAILURE;
+    }
+    detector_last = lb_source::process_static_reach_band(
+        detector_band.band, detector_incoming,
+        {.max_atoms = config.max_atoms,
+         .max_carry_atoms = config.max_atoms,
+         .max_components = config.max_atoms});
+    if (!detector_last.accepted()) {
+      std::cerr << "TileOp static reach process rejected: "
+                << detector_last.diagnostic << "\n";
+      return EXIT_FAILURE;
+    }
+
     live_last = lb_source::process_band_live(
         stream.band, live_incoming,
         {.max_atoms = config.max_atoms,
@@ -844,10 +1087,18 @@ int main(int argc, char** argv) {
       maxima.live_frontier_atoms =
           std::max<std::uint64_t>(maxima.live_frontier_atoms,
                                   live_last.outgoing.carry_atoms.size());
+      current_detector_handoff =
+          make_detector_handoff(r_outer, schedule_index,
+                                detector_last.outgoing, schedule);
+      if (detector_handoff_live_path.has_value()) {
+        current_detector_handoff_ref =
+            write_detector_handoff_atomically_or_die(
+                *current_detector_handoff, *detector_handoff_live_path);
+      }
       const lb_source::ResumableBandCheckpointV1 progress_checkpoint =
-          make_resumable_checkpoint(r_outer, schedule_index,
-                                    campaign_tiles_processed, tileop_overflows,
-                                    schedule);
+          make_resumable_checkpoint(
+              r_outer, schedule_index, campaign_tiles_processed,
+              tileop_overflows, current_detector_handoff_ref, schedule);
       maxima.checkpoint_bytes =
           std::max(maxima.checkpoint_bytes,
                    checkpoint_size_bytes(progress_checkpoint));
@@ -912,6 +1163,7 @@ int main(int argc, char** argv) {
       break;
     }
     live_incoming = live_last.outgoing;
+    detector_incoming = detector_last.outgoing;
 
     if (config.stop_after_microbands != 0 &&
         microbands_processed_this_run >= config.stop_after_microbands) {
@@ -970,7 +1222,7 @@ int main(int argc, char** argv) {
     const lb_source::ResumableBandCheckpointV1 out_checkpoint =
         make_resumable_checkpoint(processed_outer, schedule_index,
                                   campaign_tiles_processed, tileop_overflows,
-                                  schedule);
+                                  current_detector_handoff_ref, schedule);
     resumable_checkpoint_bytes = checkpoint_size_bytes(out_checkpoint);
     std::ofstream out(*config.resumable_checkpoint_out);
     if (!out) {
@@ -1036,6 +1288,19 @@ int main(int argc, char** argv) {
             << (resumable_checkpoint_written ? "true" : "false")
             << ",\"resumable_checkpoint_bytes\":"
             << resumable_checkpoint_bytes
+            << ",\"detector_spanning\":"
+            << (detector_last.spanning ? "true" : "false")
+            << ",\"detector_handoff_written\":"
+            << (current_detector_handoff_ref.has_value() ? "true" : "false")
+            << ",\"detector_handoff_sha256\":";
+  append_json_string(std::cout,
+                     current_detector_handoff_ref.has_value()
+                         ? current_detector_handoff_ref->sha256_hex
+                         : "");
+  std::cout << ",\"detector_handoff_bytes\":"
+            << (current_detector_handoff_ref.has_value()
+                    ? current_detector_handoff_ref->bytes
+                    : 0)
             << ",\"death_summary_status\":\"" << death_summary_status << "\""
             << ",\"death_written\":false"
             << ",\"max_resident_microband_tiles\":"

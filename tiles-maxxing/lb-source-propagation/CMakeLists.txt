@@ -178,7 +178,7 @@ add_executable(source_tileop_port_stream_runner
 )
 target_link_libraries(source_tileop_port_stream_runner
   PRIVATE
-    lb_source_tileop_port_stream
+    lb_source_detector_band_handoff
 )
 target_include_directories(source_tileop_port_stream_runner
   PRIVATE
