@@ -98,6 +98,22 @@ target_include_directories(lb_source_tileop_static_reach
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+add_library(lb_source_detector_band_handoff STATIC
+  src/detector_band_handoff.cpp
+)
+target_compile_options(lb_source_detector_band_handoff PRIVATE
+  -Wall -Wextra -Werror)
+target_link_libraries(lb_source_detector_band_handoff
+  PUBLIC
+    lb_source_tileop_static_reach
+)
+target_include_directories(lb_source_detector_band_handoff
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../cpp-campaign-v2/src
+)
+
 add_executable(source_prop_smoke apps/source_prop_smoke.cpp)
 target_link_libraries(source_prop_smoke PRIVATE lb_source_propagation)
 
@@ -227,6 +243,14 @@ target_link_libraries(tileop_static_reach_tests
     lb_source_tileop_static_reach
 )
 
+add_executable(detector_band_handoff_tests
+  tests/test_detector_band_handoff.cpp
+)
+target_link_libraries(detector_band_handoff_tests
+  PRIVATE
+    lb_source_detector_band_handoff
+)
+
 add_test(NAME source_prop_tests COMMAND source_prop_tests)
 add_test(NAME stream_checkpoint COMMAND stream_checkpoint_tests)
 add_test(NAME resumable_band_checkpoint
@@ -238,6 +262,7 @@ add_test(NAME source_prop_tileop_port_graph_tests
   COMMAND source_prop_tileop_port_graph_tests)
 add_test(NAME tileop_port_stream COMMAND tileop_port_stream_tests)
 add_test(NAME tileop_static_reach COMMAND tileop_static_reach_tests)
+add_test(NAME detector_band_handoff COMMAND detector_band_handoff_tests)
 add_test(NAME tileop_static_reach_equivalence_smoke
   COMMAND tileop_static_reach_equivalence
     --r-start 248
