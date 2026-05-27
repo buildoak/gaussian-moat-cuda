@@ -30,11 +30,13 @@ Lower-bound source-propagation first-read:
    implementation surfaces, gates, and non-claim boundaries.
 3. `../tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md` - live
    handoff and targeted last-band refinement design.
-4. `../tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
+4. `lb-static-reach-streaming-telemetry-20260526.md` - latest Layer 1
+   static-reach streaming/resident-width results and memory model.
+5. `../tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
    only when touching streaming.
-5. `../tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
+6. `../tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
    only when touching K26.
-6. Remote/overnight runbooks only when paid remote execution is explicitly
+7. Remote/overnight runbooks only when paid remote execution is explicitly
    authorized.
 
 ## Live References
@@ -44,6 +46,7 @@ Lower-bound source-propagation first-read:
 | `current-verification-spine.md` | Active static-annulus verification gates, demoted tools, and sample policy. |
 | `cuda-band-engine-playbook.md` | Operator playbook for battle-tested CUDA band rows, resumable campaign use, and non-claim boundaries. |
 | `cuda-band-results-ledger.md` | Compact results ledger for harvested CUDA/static-annulus rows, K40 launchpad status, and known gaps. |
+| `lb-static-reach-streaming-telemetry-20260526.md` | Latest Layer 1 static-reach streaming/resident-width telemetry, RSS comparison, and 2-3 GiB memory-model warning. |
 | `attached-static-annulus-moats.md` | Attached lower-K36 and local K34 static-annulus moat evidence, with proof-status cautions. |
 | `experiment-contract.md` | Operational contract for running/reporting campaign experiments. |
 | `optimization-safety-checklist.md` | Do-not-break checklist for math/TileOp/port/verdict changes. |

@@ -37,6 +37,13 @@ through K40. The strongest current acceptance surface is K36 hardening around
 the calibrated launchpad for K>40 scout design. There is no inspected K>40
 result stream yet.
 
+Layer 1 static-reach stitching telemetry from 2026-05-26 is recorded in
+`lb-static-reach-streaming-telemetry-20260526.md`. The streaming/resident-width
+implementation passed the full-static detector handoff equality gate and cut
+production peak RSS roughly in half, but it is still tens of GiB because it
+owns hundreds of millions of resident port atoms. Treat it as implementation
+telemetry for `resumable-band`, not as new moat evidence.
+
 ## Ledger
 
 | Status | K | Geometry | Result | Evidence notes |

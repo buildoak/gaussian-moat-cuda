@@ -7,6 +7,16 @@ This document is Layer 1 only: static-annulus detector continuation across
 bands. It does not introduce source-origin proof semantics, source-death
 certificates, proof-status promotion, or full tile inventories in the hot path.
 
+Latest implementation telemetry lives in
+`lb-static-reach-streaming-telemetry-20260526.md`. The 2026-05-26
+streaming/resident-width implementation cut production peak RSS roughly in half
+(`R=60M`: about 76.4 GB to 39.3 GB; `R=80M`: about 101.1 GB to 55.1 GB) and
+passed the full-static handoff equality gate. It is still not a lightweight
+2-3 GiB path: the current exact DSU fold owns hundreds of millions of resident
+port atoms and large lookup tables. Reaching 2-3 GiB requires bounded
+stripe/row retirement and compact live-state compaction, not merely binary
+handoff packaging.
+
 ## Objective
 
 Build detector band stitching so CUDA/TileOp static-annulus campaigns can stop,

@@ -33,6 +33,7 @@ independent verification.
 | `reference/experiment-contract.md` | Operational contract for running/reporting experiments. |
 | `reference/current-verification-spine.md` | Static-annulus gate spine and status vocabulary. |
 | `reference/lb-detector-band-stitching-plan.md` | Layer 1 detector handoff implementation plan and verification gates. |
+| `reference/lb-static-reach-streaming-telemetry-20260526.md` | Latest static-reach streaming/resident-width telemetry and memory-model warning. |
 | `reference/archive/` | Historical evidence and implemented plans; not current authority. |
 
 Do not recreate root-level `docs/`, `artifacts/`, `results/`, or old campaign
@@ -109,12 +110,14 @@ read in this order:
    before autonomous, remote, or goal-loop work;
 7. `reference/lb-detector-band-stitching-plan.md` before implementing Layer 1
    detector handoff/stitching;
-8. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
-9. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
+8. `reference/lb-static-reach-streaming-telemetry-20260526.md` before
+   optimizing static-reach RSS or planning large remote stitching telemetry;
+9. `tiles-maxxing/lb-source-propagation/docs/lb-handoff-redesign.md`;
+10. `tiles-maxxing/lb-source-propagation/docs/tile-frontier-streaming-redesign.md`
    only when touching streaming;
-10. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
+11. `tiles-maxxing/lb-source-propagation/docs/k26-tsuchimura-readiness.md`
    only when touching K26;
-11. remote/overnight runbooks only when paid remote execution is explicitly
+12. remote/overnight runbooks only when paid remote execution is explicitly
    authorized.
 
 `reference/current-verification-spine.md` is the static-annulus verification
